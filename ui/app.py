@@ -125,7 +125,7 @@ with col_main:
             head_records = cache_data.get("head", [])
             if head_records:
                 df_head = pd.DataFrame.from_records(head_records)
-                st.dataframe(df_head, use_container_width=True, height=260)
+                st.dataframe(df_head, width="stretch", height=260)
             else:
                 st.info("No preview rows available.")
         except Exception as e:
