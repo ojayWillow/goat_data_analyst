@@ -15,6 +15,7 @@ API docs: http://localhost:8000/docs
 
 import sys
 from pathlib import Path
+import math
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -94,16 +95,26 @@ def convert_to_json_serializable(obj):
     - numpy bool
     - numpy string/unicode
     - numpy datetime64, timedelta64
+    - NaN, Inf, -Inf (converted to null)
     - pandas NA/NaT values
     - nested structures (dicts, lists, tuples)
     """
     try:
+        # Check for NaN/Inf FIRST (works for both float and numpy.float)
+        if isinstance(obj, (float, np.floating)):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+        
         # Handle numpy generic types
         if isinstance(obj, np.generic):
             if isinstance(obj, np.integer):
                 return int(obj)
             elif isinstance(obj, np.floating):
-                return float(obj)
+                # Double-check for NaN/Inf
+                val = float(obj)
+                if math.isnan(val) or math.isinf(val):
+                    return None
+                return val
             elif isinstance(obj, np.bool_):
                 return bool(obj)
             elif isinstance(obj, (np.datetime64, np.timedelta64)):
