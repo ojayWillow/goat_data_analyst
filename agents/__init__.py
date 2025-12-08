@@ -8,5 +8,6 @@ from .data_loader import DataLoader
 from .explorer import Explorer
 from .aggregator import Aggregator
 from .visualizer import Visualizer
+from .predictor import Predictor
 
-__all__ = ['Orchestrator', 'DataLoader', 'Explorer', 'Aggregator', 'Visualizer']
+__all__ = ['Orchestrator', 'DataLoader', 'Explorer', 'Aggregator', 'Visualizer', 'Predictor']
