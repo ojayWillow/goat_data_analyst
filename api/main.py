@@ -82,6 +82,62 @@ logger.info("FastAPI server initialized with all agents")
 
 
 # ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
+
+def convert_to_json_serializable(obj):
+    """Convert numpy and pandas types to JSON-serializable Python types.
+    
+    Handles:
+    - numpy integer types (int8, int16, int32, int64, uint8, etc.)
+    - numpy floating types (float16, float32, float64)
+    - numpy bool
+    - numpy string/unicode
+    - numpy datetime64, timedelta64
+    - pandas NA/NaT values
+    - nested structures (dicts, lists, tuples)
+    """
+    try:
+        # Handle numpy generic types
+        if isinstance(obj, np.generic):
+            if isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, np.bool_):
+                return bool(obj)
+            elif isinstance(obj, (np.datetime64, np.timedelta64)):
+                return str(obj)
+            elif isinstance(obj, np.str_):
+                return str(obj)
+            else:
+                return str(obj)
+        
+        # Handle pandas NA/NaT
+        elif pd.isna(obj):
+            return None
+        
+        # Handle dictionaries recursively
+        elif isinstance(obj, dict):
+            return {k: convert_to_json_serializable(v) for k, v in obj.items()}
+        
+        # Handle lists and tuples
+        elif isinstance(obj, (list, tuple)):
+            return [convert_to_json_serializable(item) for item in obj]
+        
+        # Handle pandas Series/Index
+        elif isinstance(obj, (pd.Series, pd.Index)):
+            return [convert_to_json_serializable(item) for item in obj.tolist()]
+        
+        # Return as-is for standard Python types
+        return obj
+    
+    except Exception as e:
+        logger.warning(f"Could not convert type {type(obj)}: {e}", exc_info=True)
+        return str(obj)
+
+
+# ============================================================================
 # REQUEST/RESPONSE MODELS
 # ============================================================================
 
@@ -195,60 +251,34 @@ async def list_agents():
 
 @app.post("/api/load")
 async def load_data(request: LoadDataRequest):
-    """Load data from file."""
+    """Load data from file.
+    
+    Loads data using DataLoader agent and returns metadata.
+    Handles all numpy/pandas types in response.
+    """
     try:
+        logger.info(f"Loading data from: {request.file_path}")
+        
         task = orchestrator.create_task("load_data", {"file_path": request.file_path})
         task_result = orchestrator.execute_task(task["id"])
         result = task_result.get("result", {})
-
-        # Convert numpy types to Python types
-        def convert_types(obj):
-            if isinstance(obj, dict):
-                return {k: convert_types(v) for k, v in obj.items()}
-            elif isinstance(obj, (list, tuple)):
-                return [convert_types(item) for item in obj]
-            elif isinstance(obj, (np.integer, np.floating)):
-                return int(obj) if isinstance(obj, np.integer) else float(obj)
-            elif isinstance(obj, (np.bool_)):
-                return bool(obj)
-            elif pd.isna(obj):
-                return None
-            return obj
-
-        result = convert_types(result)
-
+        
+        # Convert all numpy/pandas types to JSON-serializable
+        result = convert_to_json_serializable(result)
+        
+        logger.info(f"Successfully loaded data: {result.get('rows')} rows, {result.get('columns')} columns")
+        
         return {
             "status": "success",
-            "file_path": result.get("file_path"),
+            "file_path": str(result.get("file_path", "")),
             "rows": int(result.get("rows", 0)),
             "columns": int(result.get("columns", 0)),
             "columns_list": result.get("columns_list", []),
         }
 
     except Exception as e:
+        logger.error(f"Error loading data: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post("/api/load")
-async def load_data(request: LoadDataRequest):
-    """Load data from file."""
-    try:
-        task = orchestrator.create_task("load_data", {"file_path": request.file_path})
-        task_result = orchestrator.execute_task(task["id"])
-        result = task_result.get("result", {})
-
-        return {
-            "status": "success",
-            "file_path": str(result.get("file_path", "")),
-            "rows": int(result.get("rows", 0)),
-            "columns": int(result.get("columns", 0)),
-            "columns_list": [str(c) for c in result.get("columns_list", [])],
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
 
 
 # ============================================================================
@@ -259,6 +289,8 @@ async def load_data(request: LoadDataRequest):
 async def explore_data(request: ExploreDataRequest):
     """Explore data using Explorer agent."""
     try:
+        logger.info(f"Exploring data from key: {request.data_key}")
+        
         data = orchestrator.get_cached_data(request.data_key)
         if data is None:
             raise HTTPException(status_code=404, detail="Data not found")
@@ -273,6 +305,12 @@ async def explore_data(request: ExploreDataRequest):
         categorical = explorer.describe_categorical()
         quality = explorer.data_quality_assessment()
         corr = explorer.correlation_analysis()
+        
+        # Convert all results to JSON-serializable
+        numeric = convert_to_json_serializable(numeric)
+        categorical = convert_to_json_serializable(categorical)
+        quality = convert_to_json_serializable(quality)
+        corr = convert_to_json_serializable(corr)
         
         # Build JSON-safe response
         exploration = {
@@ -292,6 +330,8 @@ async def explore_data(request: ExploreDataRequest):
             },
         }
         
+        logger.info(f"Data exploration complete")
+        
         return {
             "status": "success",
             "data_key": request.data_key,
@@ -299,8 +339,8 @@ async def explore_data(request: ExploreDataRequest):
         }
     
     except Exception as e:
+        logger.error(f"Error exploring data: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
-
 
 
 # ============================================================================
@@ -311,6 +351,8 @@ async def explore_data(request: ExploreDataRequest):
 async def aggregate_data(request: AggregateRequest):
     """Aggregate data."""
     try:
+        logger.info(f"Aggregating data by '{request.group_by}' on column '{request.agg_col}'")
+        
         task = orchestrator.create_task(
             "aggregate_data",
             {
@@ -321,8 +363,15 @@ async def aggregate_data(request: AggregateRequest):
             }
         )
         result = orchestrator.execute_task(task["id"])
+        
+        # Convert to JSON-serializable
+        result = convert_to_json_serializable(result)
+        
+        logger.info(f"Aggregation complete")
+        
         return result
     except Exception as e:
+        logger.error(f"Error aggregating data: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -334,6 +383,8 @@ async def aggregate_data(request: AggregateRequest):
 async def visualize_data(request: VisualizationRequest):
     """Create visualization."""
     try:
+        logger.info(f"Creating {request.chart_type} visualization")
+        
         task = orchestrator.create_task(
             "visualize_data",
             {
@@ -346,8 +397,14 @@ async def visualize_data(request: VisualizationRequest):
             }
         )
         result = orchestrator.execute_task(task["id"])
+        
+        result = convert_to_json_serializable(result)
+        
+        logger.info(f"Visualization created")
+        
         return result
     except Exception as e:
+        logger.error(f"Error creating visualization: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -359,6 +416,8 @@ async def visualize_data(request: VisualizationRequest):
 async def predict(request: PredictionRequest):
     """Generate predictions."""
     try:
+        logger.info(f"Generating {request.prediction_type} predictions")
+        
         task = orchestrator.create_task(
             "predict",
             {
@@ -371,8 +430,14 @@ async def predict(request: PredictionRequest):
             }
         )
         result = orchestrator.execute_task(task["id"])
+        
+        result = convert_to_json_serializable(result)
+        
+        logger.info(f"Predictions generated")
+        
         return result
     except Exception as e:
+        logger.error(f"Error generating predictions: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -384,6 +449,8 @@ async def predict(request: PredictionRequest):
 async def detect_anomalies(request: AnomalyRequest):
     """Detect anomalies."""
     try:
+        logger.info(f"Detecting anomalies using {request.method} method")
+        
         task = orchestrator.create_task(
             "detect_anomalies",
             {
@@ -395,8 +462,14 @@ async def detect_anomalies(request: AnomalyRequest):
             }
         )
         result = orchestrator.execute_task(task["id"])
+        
+        result = convert_to_json_serializable(result)
+        
+        logger.info(f"Anomaly detection complete")
+        
         return result
     except Exception as e:
+        logger.error(f"Error detecting anomalies: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -408,13 +481,21 @@ async def detect_anomalies(request: AnomalyRequest):
 async def get_recommendations(request: RecommendationRequest):
     """Get recommendations."""
     try:
+        logger.info(f"Generating recommendations")
+        
         task = orchestrator.create_task(
             "get_recommendations",
             {"data_key": request.data_key}
         )
         result = orchestrator.execute_task(task["id"])
+        
+        result = convert_to_json_serializable(result)
+        
+        logger.info(f"Recommendations generated")
+        
         return result
     except Exception as e:
+        logger.error(f"Error generating recommendations: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -426,6 +507,8 @@ async def get_recommendations(request: RecommendationRequest):
 async def generate_report(request: ReportRequest):
     """Generate report."""
     try:
+        logger.info(f"Generating {request.report_type} report")
+        
         task = orchestrator.create_task(
             "generate_report",
             {
@@ -434,8 +517,14 @@ async def generate_report(request: ReportRequest):
             }
         )
         result = orchestrator.execute_task(task["id"])
+        
+        result = convert_to_json_serializable(result)
+        
+        logger.info(f"Report generated")
+        
         return result
     except Exception as e:
+        logger.error(f"Error generating report: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -447,9 +536,17 @@ async def generate_report(request: ReportRequest):
 async def execute_workflow(request: WorkflowRequest):
     """Execute a complete workflow."""
     try:
+        logger.info(f"Executing workflow with {len(request.tasks)} tasks")
+        
         workflow_result = orchestrator.execute_workflow(request.tasks)
+        
+        workflow_result = convert_to_json_serializable(workflow_result)
+        
+        logger.info(f"Workflow execution complete")
+        
         return workflow_result
     except Exception as e:
+        logger.error(f"Error executing workflow: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -457,6 +554,8 @@ async def execute_workflow(request: WorkflowRequest):
 async def get_cached_data(key: str):
     """Get cached data."""
     try:
+        logger.info(f"Retrieving cached data: {key}")
+        
         data = orchestrator.get_cached_data(key)
         if data is None:
             raise HTTPException(status_code=404, detail=f"Key '{key}' not found")
@@ -470,8 +569,12 @@ async def get_cached_data(key: str):
                 "columns": data.columns.tolist(),
                 "head": data.head(10).to_dict(orient="records"),
             }
+        
+        logger.info(f"Cached data retrieved successfully")
+        
         return {"status": "success", "key": key, "data": str(data)}
     except Exception as e:
+        logger.error(f"Error retrieving cached data: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 
