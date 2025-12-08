@@ -1,0 +1,16 @@
+date,product,region,sales,quantity,customer_id
+2024-01-01,Product A,North,1500,50,C001
+2024-01-01,Product B,South,2000,75,C002
+2024-01-01,Product C,East,1800,60,C003
+2024-01-02,Product A,North,1600,55,C001
+2024-01-02,Product B,South,2100,80,C004
+2024-01-02,Product C,East,1900,65,C005
+2024-01-03,Product A,West,1400,45,C006
+2024-01-03,Product B,North,2200,85,C002
+2024-01-03,Product C,South,2000,70,C007
+2024-01-04,Product A,East,1700,60,C008
+2024-01-04,Product B,West,1900,70,C009
+2024-01-04,Product C,North,2100,75,C010
+2024-01-05,Product A,South,1550,52,C001
+2024-01-05,Product B,East,2050,78,C002
+2024-01-05,Product C,West,1950,68,C003
