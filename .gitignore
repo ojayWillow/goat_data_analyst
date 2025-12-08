@@ -56,3 +56,7 @@ logs/
 config/secrets.yml
 data/temp/
 outputs/
+
+# CSV files
+*.csv
+
