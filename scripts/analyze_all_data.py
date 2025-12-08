@@ -48,7 +48,8 @@ def main():
         logger.error("No CSV files found in data/ directory")
         return
     
-    logger.info(f"Found {len(csv_files)} CSV files\n")
+    logger.info(f"Found {len(csv_files)} CSV files")
+    logger.info("")
     
     # Summary table
     summary_data = []
@@ -87,11 +88,11 @@ def main():
             
             logger.info(f"  [OK] Rows: {meta['rows']:,} | Columns: {meta['columns']} | Size: {format_size(file_path.stat().st_size)}")
             logger.info(f"  [OK] Memory: {meta['memory_usage_mb']:.2f} MB | Nulls: {null_count:,} ({null_pct:.2f}%) | Duplicates: {meta['duplicates']}")
-            logger.info()
+            logger.info("")
             
         except Exception as e:
             logger.error(f"  [ERROR] {str(e)}")
-            logger.info()
+            logger.info("")
             continue
     
     # Display summary table
@@ -112,7 +113,7 @@ def main():
     
     table_output = tabulate(summary_data, headers=headers, tablefmt="grid")
     logger.info(table_output)
-    logger.info()
+    logger.info("")
     
     # Detailed analysis for each file
     logger.info("="*80)
@@ -120,7 +121,8 @@ def main():
     logger.info("="*80)
     
     for file_path in csv_files[:5]:  # Detailed analysis for first 5 files
-        logger.info(f"\n[FILE] {file_path.name}")
+        logger.info(f"")
+        logger.info(f"[FILE] {file_path.name}")
         logger.info("-" * 80)
         
         try:
@@ -144,7 +146,8 @@ def main():
             logger.info(col_table)
             
             # Sample data
-            logger.info("\nSample Data (first 3 rows):")
+            logger.info("")
+            logger.info("Sample Data (first 3 rows):")
             sample = loader.get_sample(n_rows=3)
             for j, row in enumerate(sample['sample'], 1):
                 logger.info(f"  Row {j}: {row}")
@@ -152,7 +155,8 @@ def main():
         except Exception as e:
             logger.error(f"Error analyzing {file_path.name}: {e}")
     
-    logger.info("\n" + "="*80)
+    logger.info("")
+    logger.info("="*80)
     logger.info("[OK] Analysis complete!")
     logger.info("="*80)
 
