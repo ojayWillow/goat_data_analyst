@@ -1,0 +1,646 @@
+{
+  "status": "success",
+  "report_type": "comprehensive_analysis",
+  "generated_at": "2025-12-08T15:08:58.261199",
+  "title": "Data Analysis Report",
+  "description": "Comprehensive analysis of dataset including profiling, statistics, and quality assessment.",
+  "sections": {
+    "executive_summary": {
+      "status": "success",
+      "report_type": "executive_summary",
+      "generated_at": "2025-12-08T15:08:58.182785",
+      "dataset_info": {
+        "rows": 41714,
+        "columns": 19,
+        "numeric_columns": 13,
+        "categorical_columns": 3,
+        "total_cells": 792566
+      },
+      "data_quality": {
+        "quality_rating": "Excellent",
+        "null_percentage": 0.0,
+        "duplicate_count": 0,
+        "duplicate_percentage": 0.0
+      },
+      "summary_statement": "Dataset contains 41,714 rows and 19 columns with Excellent data quality."
+    },
+    "data_profile": {
+      "status": "success",
+      "report_type": "data_profile",
+      "generated_at": "2025-12-08T15:08:58.182785",
+      "columns": {
+        "City": {
+          "data_type": "object",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 9,
+          "completeness": 100.0,
+          "top_values": {
+            "Rome": 9027,
+            "Paris": 6688,
+            "Lisbon": 5763
+          }
+        },
+        "Price": {
+          "data_type": "float64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 8087,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 260.09442261413653,
+            "median": 203.8192740107052,
+            "std": 279.40849286541567,
+            "min": 34.77933919255534,
+            "max": 18545.450284723363
+          }
+        },
+        "Day": {
+          "data_type": "object",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 2,
+          "completeness": 100.0,
+          "top_values": {
+            "Weekday": 20886,
+            "Weekend": 20828
+          }
+        },
+        "Room Type": {
+          "data_type": "object",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 3,
+          "completeness": 100.0,
+          "top_values": {
+            "Entire home/apt": 28264,
+            "Private room": 13134,
+            "Shared room": 316
+          }
+        },
+        "Shared Room": {
+          "data_type": "bool",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 2,
+          "completeness": 100.0,
+          "top_values": {
+            "false": 41398,
+            "true": 316
+          }
+        },
+        "Private Room": {
+          "data_type": "bool",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 2,
+          "completeness": 100.0,
+          "top_values": {
+            "false": 28580,
+            "true": 13134
+          }
+        },
+        "Person Capacity": {
+          "data_type": "float64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 5,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 3.237234501606175,
+            "median": 3.0,
+            "std": 1.2994591722122604,
+            "min": 2.0,
+            "max": 6.0
+          }
+        },
+        "Superhost": {
+          "data_type": "bool",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 2,
+          "completeness": 100.0,
+          "top_values": {
+            "false": 30055,
+            "true": 11659
+          }
+        },
+        "Multiple Rooms": {
+          "data_type": "int64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 2,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 0.295272570360071,
+            "median": 0.0,
+            "std": 0.4561706567569734,
+            "min": 0.0,
+            "max": 1.0
+          }
+        },
+        "Business": {
+          "data_type": "int64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 2,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 0.34118041904396607,
+            "median": 0.0,
+            "std": 0.47411151572700594,
+            "min": 0.0,
+            "max": 1.0
+          }
+        },
+        "Cleanliness Rating": {
+          "data_type": "float64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 9,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 9.442273577216282,
+            "median": 10.0,
+            "std": 0.8891730402262128,
+            "min": 2.0,
+            "max": 10.0
+          }
+        },
+        "Guest Satisfaction": {
+          "data_type": "float64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 51,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 93.10317878889582,
+            "median": 95.0,
+            "std": 8.141745130652714,
+            "min": 20.0,
+            "max": 100.0
+          }
+        },
+        "Bedrooms": {
+          "data_type": "int64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 9,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 1.1659394927362516,
+            "median": 1.0,
+            "std": 0.638156680353485,
+            "min": 0.0,
+            "max": 10.0
+          }
+        },
+        "City Center (km)": {
+          "data_type": "float64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 41714,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 2.679792244831608,
+            "median": 2.2532367444695147,
+            "std": 1.9966841018411803,
+            "min": 0.0150445207049455,
+            "max": 25.28455674776536
+          }
+        },
+        "Metro Distance (km)": {
+          "data_type": "float64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 41714,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 0.6039207561135372,
+            "median": 0.39121979342602076,
+            "std": 0.7062063197480216,
+            "min": 0.0023010680119306,
+            "max": 14.273576925283232
+          }
+        },
+        "Attraction Index": {
+          "data_type": "float64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 41714,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 293.905989899479,
+            "median": 228.9205991695281,
+            "std": 235.7500551839968,
+            "min": 15.152201471783997,
+            "max": 4513.563485759789
+          }
+        },
+        "Normalised Attraction Index": {
+          "data_type": "float64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 41697,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 11.719658004892553,
+            "median": 9.951086236380394,
+            "std": 8.379161221817302,
+            "min": 0.9263009179317978,
+            "max": 100.0
+          }
+        },
+        "Restraunt Index": {
+          "data_type": "float64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 41714,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 626.6926182142346,
+            "median": 519.5835088058163,
+            "std": 520.6447200030905,
+            "min": 19.57692380149325,
+            "max": 6696.15677247043
+          }
+        },
+        "Normalised Restraunt Index": {
+          "data_type": "float64",
+          "missing_values": 0,
+          "missing_percentage": 0.0,
+          "unique_values": 41697,
+          "completeness": 100.0,
+          "statistics": {
+            "mean": 25.553589888566403,
+            "median": 21.814413646480546,
+            "std": 18.484572314836758,
+            "min": 0.5927569191343718,
+            "max": 100.0
+          }
+        }
+      }
+    },
+    "statistical_analysis": {
+      "status": "success",
+      "report_type": "statistical_analysis",
+      "generated_at": "2025-12-08T15:08:58.223941",
+      "summary_statistics": {
+        "Price": {
+          "count": 41714.0,
+          "mean": 260.09,
+          "std": 279.41,
+          "min": 34.78,
+          "25%": 144.02,
+          "50%": 203.82,
+          "75%": 297.37,
+          "max": 18545.45
+        },
+        "Person Capacity": {
+          "count": 41714.0,
+          "mean": 3.24,
+          "std": 1.3,
+          "min": 2.0,
+          "25%": 2.0,
+          "50%": 3.0,
+          "75%": 4.0,
+          "max": 6.0
+        },
+        "Multiple Rooms": {
+          "count": 41714.0,
+          "mean": 0.3,
+          "std": 0.46,
+          "min": 0.0,
+          "25%": 0.0,
+          "50%": 0.0,
+          "75%": 1.0,
+          "max": 1.0
+        },
+        "Business": {
+          "count": 41714.0,
+          "mean": 0.34,
+          "std": 0.47,
+          "min": 0.0,
+          "25%": 0.0,
+          "50%": 0.0,
+          "75%": 1.0,
+          "max": 1.0
+        },
+        "Cleanliness Rating": {
+          "count": 41714.0,
+          "mean": 9.44,
+          "std": 0.89,
+          "min": 2.0,
+          "25%": 9.0,
+          "50%": 10.0,
+          "75%": 10.0,
+          "max": 10.0
+        },
+        "Guest Satisfaction": {
+          "count": 41714.0,
+          "mean": 93.1,
+          "std": 8.14,
+          "min": 20.0,
+          "25%": 90.0,
+          "50%": 95.0,
+          "75%": 98.0,
+          "max": 100.0
+        },
+        "Bedrooms": {
+          "count": 41714.0,
+          "mean": 1.17,
+          "std": 0.64,
+          "min": 0.0,
+          "25%": 1.0,
+          "50%": 1.0,
+          "75%": 1.0,
+          "max": 10.0
+        },
+        "City Center (km)": {
+          "count": 41714.0,
+          "mean": 2.68,
+          "std": 2.0,
+          "min": 0.02,
+          "25%": 1.28,
+          "50%": 2.25,
+          "75%": 3.58,
+          "max": 25.28
+        },
+        "Metro Distance (km)": {
+          "count": 41714.0,
+          "mean": 0.6,
+          "std": 0.71,
+          "min": 0.0,
+          "25%": 0.24,
+          "50%": 0.39,
+          "75%": 0.68,
+          "max": 14.27
+        },
+        "Attraction Index": {
+          "count": 41714.0,
+          "mean": 293.91,
+          "std": 235.75,
+          "min": 15.15,
+          "25%": 124.37,
+          "50%": 228.92,
+          "75%": 394.0,
+          "max": 4513.56
+        },
+        "Normalised Attraction Index": {
+          "count": 41714.0,
+          "mean": 11.72,
+          "std": 8.38,
+          "min": 0.93,
+          "25%": 5.51,
+          "50%": 9.95,
+          "75%": 15.47,
+          "max": 100.0
+        },
+        "Restraunt Index": {
+          "count": 41714.0,
+          "mean": 626.69,
+          "std": 520.64,
+          "min": 19.58,
+          "25%": 210.46,
+          "50%": 519.58,
+          "75%": 860.71,
+          "max": 6696.16
+        },
+        "Normalised Restraunt Index": {
+          "count": 41714.0,
+          "mean": 25.55,
+          "std": 18.48,
+          "min": 0.59,
+          "25%": 11.13,
+          "50%": 21.81,
+          "75%": 36.82,
+          "max": 100.0
+        }
+      },
+      "correlation_analysis": {
+        "matrix": {
+          "Price": {
+            "Price": 1.0,
+            "Person Capacity": 0.18,
+            "Multiple Rooms": -0.055,
+            "Business": 0.014,
+            "Cleanliness Rating": 0.004,
+            "Guest Satisfaction": 0.016,
+            "Bedrooms": 0.207,
+            "City Center (km)": -0.052,
+            "Metro Distance (km)": -0.039,
+            "Attraction Index": 0.169,
+            "Normalised Attraction Index": 0.271,
+            "Restraunt Index": 0.113,
+            "Normalised Restraunt Index": 0.219
+          },
+          "Person Capacity": {
+            "Price": 0.18,
+            "Person Capacity": 1.0,
+            "Multiple Rooms": -0.058,
+            "Business": 0.1,
+            "Cleanliness Rating": 0.01,
+            "Guest Satisfaction": 0.017,
+            "Bedrooms": 0.559,
+            "City Center (km)": -0.078,
+            "Metro Distance (km)": 0.008,
+            "Attraction Index": 0.013,
+            "Normalised Attraction Index": -0.052,
+            "Restraunt Index": 0.022,
+            "Normalised Restraunt Index": -0.011
+          },
+          "Multiple Rooms": {
+            "Price": -0.055,
+            "Person Capacity": -0.058,
+            "Multiple Rooms": 1.0,
+            "Business": -0.466,
+            "Cleanliness Rating": 0.034,
+            "Guest Satisfaction": 0.04,
+            "Bedrooms": -0.005,
+            "City Center (km)": 0.033,
+            "Metro Distance (km)": 0.035,
+            "Attraction Index": 0.022,
+            "Normalised Attraction Index": -0.022,
+            "Restraunt Index": 0.024,
+            "Normalised Restraunt Index": -0.043
+          },
+          "Business": {
+            "Price": 0.014,
+            "Person Capacity": 0.1,
+            "Multiple Rooms": -0.466,
+            "Business": 1.0,
+            "Cleanliness Rating": -0.077,
+            "Guest Satisfaction": -0.179,
+            "Bedrooms": -0.022,
+            "City Center (km)": -0.181,
+            "Metro Distance (km)": -0.066,
+            "Attraction Index": 0.087,
+            "Normalised Attraction Index": 0.021,
+            "Restraunt Index": 0.113,
+            "Normalised Restraunt Index": 0.09
+          },
+          "Cleanliness Rating": {
+            "Price": 0.004,
+            "Person Capacity": 0.01,
+            "Multiple Rooms": 0.034,
+            "Business": -0.077,
+            "Cleanliness Rating": 1.0,
+            "Guest Satisfaction": 0.692,
+            "Bedrooms": 0.031,
+            "City Center (km)": 0.005,
+            "Metro Distance (km)": 0.019,
+            "Attraction Index": -0.024,
+            "Normalised Attraction Index": -0.042,
+            "Restraunt Index": -0.031,
+            "Normalised Restraunt Index": -0.048
+          },
+          "Guest Satisfaction": {
+            "Price": 0.016,
+            "Person Capacity": 0.017,
+            "Multiple Rooms": 0.04,
+            "Business": -0.179,
+            "Cleanliness Rating": 0.692,
+            "Guest Satisfaction": 1.0,
+            "Bedrooms": 0.043,
+            "City Center (km)": 0.031,
+            "Metro Distance (km)": 0.025,
+            "Attraction Index": -0.049,
+            "Normalised Attraction Index": -0.025,
+            "Restraunt Index": -0.073,
+            "Normalised Restraunt Index": -0.048
+          },
+          "Bedrooms": {
+            "Price": 0.207,
+            "Person Capacity": 0.559,
+            "Multiple Rooms": -0.005,
+            "Business": -0.022,
+            "Cleanliness Rating": 0.031,
+            "Guest Satisfaction": 0.043,
+            "Bedrooms": 1.0,
+            "City Center (km)": 0.0,
+            "Metro Distance (km)": 0.054,
+            "Attraction Index": -0.015,
+            "Normalised Attraction Index": -0.082,
+            "Restraunt Index": -0.016,
+            "Normalised Restraunt Index": -0.077
+          },
+          "City Center (km)": {
+            "Price": -0.052,
+            "Person Capacity": -0.078,
+            "Multiple Rooms": 0.033,
+            "Business": -0.181,
+            "Cleanliness Rating": 0.005,
+            "Guest Satisfaction": 0.031,
+            "Bedrooms": 0.0,
+            "City Center (km)": 1.0,
+            "Metro Distance (km)": 0.458,
+            "Attraction Index": -0.327,
+            "Normalised Attraction Index": -0.321,
+            "Restraunt Index": -0.311,
+            "Normalised Restraunt Index": -0.379
+          },
+          "Metro Distance (km)": {
+            "Price": -0.039,
+            "Person Capacity": 0.008,
+            "Multiple Rooms": 0.035,
+            "Business": -0.066,
+            "Cleanliness Rating": 0.019,
+            "Guest Satisfaction": 0.025,
+            "Bedrooms": 0.054,
+            "City Center (km)": 0.458,
+            "Metro Distance (km)": 1.0,
+            "Attraction Index": -0.106,
+            "Normalised Attraction Index": -0.236,
+            "Restraunt Index": -0.064,
+            "Normalised Restraunt Index": -0.223
+          },
+          "Attraction Index": {
+            "Price": 0.169,
+            "Person Capacity": 0.013,
+            "Multiple Rooms": 0.022,
+            "Business": 0.087,
+            "Cleanliness Rating": -0.024,
+            "Guest Satisfaction": -0.049,
+            "Bedrooms": -0.015,
+            "City Center (km)": -0.327,
+            "Metro Distance (km)": -0.106,
+            "Attraction Index": 1.0,
+            "Normalised Attraction Index": 0.74,
+            "Restraunt Index": 0.843,
+            "Normalised Restraunt Index": 0.561
+          },
+          "Normalised Attraction Index": {
+            "Price": 0.271,
+            "Person Capacity": -0.052,
+            "Multiple Rooms": -0.022,
+            "Business": 0.021,
+            "Cleanliness Rating": -0.042,
+            "Guest Satisfaction": -0.025,
+            "Bedrooms": -0.082,
+            "City Center (km)": -0.321,
+            "Metro Distance (km)": -0.236,
+            "Attraction Index": 0.74,
+            "Normalised Attraction Index": 1.0,
+            "Restraunt Index": 0.502,
+            "Normalised Restraunt Index": 0.701
+          },
+          "Restraunt Index": {
+            "Price": 0.113,
+            "Person Capacity": 0.022,
+            "Multiple Rooms": 0.024,
+            "Business": 0.113,
+            "Cleanliness Rating": -0.031,
+            "Guest Satisfaction": -0.073,
+            "Bedrooms": -0.016,
+            "City Center (km)": -0.311,
+            "Metro Distance (km)": -0.064,
+            "Attraction Index": 0.843,
+            "Normalised Attraction Index": 0.502,
+            "Restraunt Index": 1.0,
+            "Normalised Restraunt Index": 0.638
+          },
+          "Normalised Restraunt Index": {
+            "Price": 0.219,
+            "Person Capacity": -0.011,
+            "Multiple Rooms": -0.043,
+            "Business": 0.09,
+            "Cleanliness Rating": -0.048,
+            "Guest Satisfaction": -0.048,
+            "Bedrooms": -0.077,
+            "City Center (km)": -0.379,
+            "Metro Distance (km)": -0.223,
+            "Attraction Index": 0.561,
+            "Normalised Attraction Index": 0.701,
+            "Restraunt Index": 0.638,
+            "Normalised Restraunt Index": 1.0
+          }
+        },
+        "strong_correlations": [
+          {
+            "col1": "Attraction Index",
+            "col2": "Normalised Attraction Index",
+            "correlation": 0.7398498873307945
+          },
+          {
+            "col1": "Attraction Index",
+            "col2": "Restraunt Index",
+            "correlation": 0.8432739655705317
+          },
+          {
+            "col1": "Normalised Attraction Index",
+            "col2": "Normalised Restraunt Index",
+            "correlation": 0.7013877285759507
+          }
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "data_shape": {
+      "rows": 41714,
+      "columns": 19
+    },
+    "generated_timestamp": "2025-12-08T15:08:58.261199",
+    "report_version": "1.0"
+  }
+}

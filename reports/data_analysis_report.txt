@@ -1,0 +1,1867 @@
+====================================================================================================
+DATA ANALYSIS REPORT
+Generated: 2025-12-08 16:19:28
+====================================================================================================
+
+Total Files Found: 19
+
+====================================================================================================
+FILE: Aemf1.csv
+====================================================================================================
+File Size: 7.79 MB
+Rows: 41,714
+Columns: 19
+Memory Usage: 11.18 MB
+
+Data Quality:
+  Null Values: 0 (0.00%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+City                           object          41714           0.00      
+Price                          float64         41714           0.00      
+Day                            object          41714           0.00      
+Room Type                      object          41714           0.00      
+Shared Room                    bool            41714           0.00      
+Private Room                   bool            41714           0.00      
+Person Capacity                float64         41714           0.00      
+Superhost                      bool            41714           0.00      
+Multiple Rooms                 int64           41714           0.00      
+Business                       int64           41714           0.00      
+Cleanliness Rating             float64         41714           0.00      
+Guest Satisfaction             float64         41714           0.00      
+Bedrooms                       int64           41714           0.00      
+City Center (km)               float64         41714           0.00      
+Metro Distance (km)            float64         41714           0.00      
+Attraction Index               float64         41714           0.00      
+Normalised Attraction Index    float64         41714           0.00      
+Restraunt Index                float64         41714           0.00      
+Normalised Restraunt Index     float64         41714           0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  City: Amsterdam
+  Price: 194.03369812293488
+  Day: Weekday
+  Room Type: Private room
+  Shared Room: False
+  Private Room: True
+  Person Capacity: 2.0
+  Superhost: False
+  Multiple Rooms: 1
+  Business: 0
+  Cleanliness Rating: 10.0
+  Guest Satisfaction: 93.0
+  Bedrooms: 1
+  City Center (km): 5.022963798088291
+  Metro Distance (km): 2.539380002594493
+  Attraction Index: 78.69037927190317
+  Normalised Attraction Index: 4.166707868490748
+  Restraunt Index: 98.25389587009934
+  Normalised Restraunt Index: 6.846472824200016
+
+Row 2:
+  City: Amsterdam
+  Price: 344.2457760176224
+  Day: Weekday
+  Room Type: Private room
+  Shared Room: False
+  Private Room: True
+  Person Capacity: 4.0
+  Superhost: False
+  Multiple Rooms: 0
+  Business: 0
+  Cleanliness Rating: 8.0
+  Guest Satisfaction: 85.0
+  Bedrooms: 1
+  City Center (km): 0.4883892888289836
+  Metro Distance (km): 0.2394039228349863
+  Attraction Index: 631.1763782503964
+  Normalised Attraction Index: 33.421208615275404
+  Restraunt Index: 837.2807567422693
+  Normalised Restraunt Index: 58.34292774344904
+
+Row 3:
+  City: Amsterdam
+  Price: 264.1014224451058
+  Day: Weekday
+  Room Type: Private room
+  Shared Room: False
+  Private Room: True
+  Person Capacity: 2.0
+  Superhost: False
+  Multiple Rooms: 0
+  Business: 1
+  Cleanliness Rating: 9.0
+  Guest Satisfaction: 87.0
+  Bedrooms: 1
+  City Center (km): 5.748311915159562
+  Metro Distance (km): 3.651621288793656
+  Attraction Index: 75.27587691428164
+  Normalised Attraction Index: 3.9859076998790086
+  Restraunt Index: 95.3869549262145
+  Normalised Restraunt Index: 6.646700254501156
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: airlines.csv
+====================================================================================================
+File Size: 359.00 B
+Rows: 14
+Columns: 2
+Memory Usage: 0.00 MB
+
+Data Quality:
+  Null Values: 0 (0.00%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+IATA_CODE                      object          14              0.00      
+AIRLINE                        object          14              0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  IATA_CODE: UA
+  AIRLINE: United Air Lines Inc.
+
+Row 2:
+  IATA_CODE: AA
+  AIRLINE: American Airlines Inc.
+
+Row 3:
+  IATA_CODE: US
+  AIRLINE: US Airways Inc.
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: airports.csv
+====================================================================================================
+File Size: 23.31 KB
+Rows: 322
+Columns: 7
+Memory Usage: 0.10 MB
+
+Data Quality:
+  Null Values: 6 (0.27%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+IATA_CODE                      object          322             0.00      
+AIRPORT                        object          322             0.00      
+CITY                           object          322             0.00      
+STATE                          object          322             0.00      
+COUNTRY                        object          322             0.00      
+LATITUDE                       float64         319             0.93      
+LONGITUDE                      float64         319             0.93      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  IATA_CODE: ABE
+  AIRPORT: Lehigh Valley International Airport
+  CITY: Allentown
+  STATE: PA
+  COUNTRY: USA
+  LATITUDE: 40.65236
+  LONGITUDE: -75.4404
+
+Row 2:
+  IATA_CODE: ABI
+  AIRPORT: Abilene Regional Airport
+  CITY: Abilene
+  STATE: TX
+  COUNTRY: USA
+  LATITUDE: 32.41132
+  LONGITUDE: -99.6819
+
+Row 3:
+  IATA_CODE: ABQ
+  AIRPORT: Albuquerque International Sunport
+  CITY: Albuquerque
+  STATE: NM
+  COUNTRY: USA
+  LATITUDE: 35.04022
+  LONGITUDE: -106.60919
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: country_vaccinations.csv
+====================================================================================================
+File Size: 16.91 MB
+Rows: 86,512
+Columns: 15
+Memory Usage: 42.84 MB
+
+Data Quality:
+  Null Values: 323,414 (24.92%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+country                        object          86512           0.00      
+iso_code                       object          86512           0.00      
+date                           object          86512           0.00      
+total_vaccinations             float64         43607           49.59     
+people_vaccinated              float64         41294           52.27     
+people_fully_vaccinated        float64         38802           55.15     
+daily_vaccinations_raw         float64         35362           59.12     
+daily_vaccinations             float64         86213           0.35      
+total_vaccinations_per_hundred float64         43607           49.59     
+people_vaccinated_per_hundred  float64         41294           52.27     
+people_fully_vaccinated_per_hundred float64         38802           55.15     
+daily_vaccinations_per_million float64         86213           0.35      
+vaccines                       object          86512           0.00      
+source_name                    object          86512           0.00      
+source_website                 object          86512           0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  country: Afghanistan
+  iso_code: AFG
+  date: 2021-02-22
+  total_vaccinations: 0.0
+  people_vaccinated: 0.0
+  people_fully_vaccinated: nan
+  daily_vaccinations_raw: nan
+  daily_vaccinations: nan
+  total_vaccinations_per_hundred: 0.0
+  people_vaccinated_per_hundred: 0.0
+  people_fully_vaccinated_per_hundred: nan
+  daily_vaccinations_per_million: nan
+  vaccines: Johnson&Johnson, Oxford/AstraZeneca, Pfizer/BioNTech, Sinopharm/Beijing
+  source_name: World Health Organization
+  source_website: https://covid19.who.int/
+
+Row 2:
+  country: Afghanistan
+  iso_code: AFG
+  date: 2021-02-23
+  total_vaccinations: nan
+  people_vaccinated: nan
+  people_fully_vaccinated: nan
+  daily_vaccinations_raw: nan
+  daily_vaccinations: 1367.0
+  total_vaccinations_per_hundred: nan
+  people_vaccinated_per_hundred: nan
+  people_fully_vaccinated_per_hundred: nan
+  daily_vaccinations_per_million: 34.0
+  vaccines: Johnson&Johnson, Oxford/AstraZeneca, Pfizer/BioNTech, Sinopharm/Beijing
+  source_name: World Health Organization
+  source_website: https://covid19.who.int/
+
+Row 3:
+  country: Afghanistan
+  iso_code: AFG
+  date: 2021-02-24
+  total_vaccinations: nan
+  people_vaccinated: nan
+  people_fully_vaccinated: nan
+  daily_vaccinations_raw: nan
+  daily_vaccinations: 1367.0
+  total_vaccinations_per_hundred: nan
+  people_vaccinated_per_hundred: nan
+  people_fully_vaccinated_per_hundred: nan
+  daily_vaccinations_per_million: 34.0
+  vaccines: Johnson&Johnson, Oxford/AstraZeneca, Pfizer/BioNTech, Sinopharm/Beijing
+  source_name: World Health Organization
+  source_website: https://covid19.who.int/
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: fifa21 raw data v2.csv
+====================================================================================================
+File Size: 8.04 MB
+Rows: 18,979
+Columns: 77
+Memory Usage: 34.49 MB
+
+Data Quality:
+  Null Values: 20,561 (1.41%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+ID                             int64           18979           0.00      
+Name                           object          18979           0.00      
+LongName                       object          18979           0.00      
+photoUrl                       object          18979           0.00      
+playerUrl                      object          18979           0.00      
+Nationality                    object          18979           0.00      
+Age                            int64           18979           0.00      
+↓OVA                           int64           18979           0.00      
+POT                            int64           18979           0.00      
+Club                           object          18979           0.00      
+Contract                       object          18979           0.00      
+Positions                      object          18979           0.00      
+Height                         object          18979           0.00      
+Weight                         object          18979           0.00      
+Preferred Foot                 object          18979           0.00      
+BOV                            int64           18979           0.00      
+Best Position                  object          18979           0.00      
+Joined                         object          18979           0.00      
+Loan Date End                  object          1013            94.66     
+Value                          object          18979           0.00      
+Wage                           object          18979           0.00      
+Release Clause                 object          18979           0.00      
+Attacking                      int64           18979           0.00      
+Crossing                       int64           18979           0.00      
+Finishing                      int64           18979           0.00      
+Heading Accuracy               int64           18979           0.00      
+Short Passing                  int64           18979           0.00      
+Volleys                        int64           18979           0.00      
+Skill                          int64           18979           0.00      
+Dribbling                      int64           18979           0.00      
+Curve                          int64           18979           0.00      
+FK Accuracy                    int64           18979           0.00      
+Long Passing                   int64           18979           0.00      
+Ball Control                   int64           18979           0.00      
+Movement                       int64           18979           0.00      
+Acceleration                   int64           18979           0.00      
+Sprint Speed                   int64           18979           0.00      
+Agility                        int64           18979           0.00      
+Reactions                      int64           18979           0.00      
+Balance                        int64           18979           0.00      
+Power                          int64           18979           0.00      
+Shot Power                     int64           18979           0.00      
+Jumping                        int64           18979           0.00      
+Stamina                        int64           18979           0.00      
+Strength                       int64           18979           0.00      
+Long Shots                     int64           18979           0.00      
+Mentality                      int64           18979           0.00      
+Aggression                     int64           18979           0.00      
+Interceptions                  int64           18979           0.00      
+Positioning                    int64           18979           0.00      
+Vision                         int64           18979           0.00      
+Penalties                      int64           18979           0.00      
+Composure                      int64           18979           0.00      
+Defending                      int64           18979           0.00      
+Marking                        int64           18979           0.00      
+Standing Tackle                int64           18979           0.00      
+Sliding Tackle                 int64           18979           0.00      
+Goalkeeping                    int64           18979           0.00      
+GK Diving                      int64           18979           0.00      
+GK Handling                    int64           18979           0.00      
+GK Kicking                     int64           18979           0.00      
+GK Positioning                 int64           18979           0.00      
+GK Reflexes                    int64           18979           0.00      
+Total Stats                    int64           18979           0.00      
+Base Stats                     int64           18979           0.00      
+W/F                            object          18979           0.00      
+SM                             object          18979           0.00      
+A/W                            object          18979           0.00      
+D/W                            object          18979           0.00      
+IR                             object          18979           0.00      
+PAC                            int64           18979           0.00      
+SHO                            int64           18979           0.00      
+PAS                            int64           18979           0.00      
+DRI                            int64           18979           0.00      
+DEF                            int64           18979           0.00      
+PHY                            int64           18979           0.00      
+Hits                           object          16384           13.67     
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  ID: 158023
+  Name: L. Messi
+  LongName: Lionel Messi
+  photoUrl: https://cdn.sofifa.com/players/158/023/21_60.png
+  playerUrl: http://sofifa.com/player/158023/lionel-messi/210006/
+  Nationality: Argentina
+  Age: 33
+  ↓OVA: 93
+  POT: 93
+  Club: 
+
+
+
+FC Barcelona
+  Contract: 2004 ~ 2021
+  Positions: RW, ST, CF
+  Height: 170cm
+  Weight: 72kg
+  Preferred Foot: Left
+  BOV: 93
+  Best Position: RW
+  Joined: Jul 1, 2004
+  Loan Date End: nan
+  Value: €103.5M
+  Wage: €560K
+  Release Clause: €138.4M
+  Attacking: 429
+  Crossing: 85
+  Finishing: 95
+  Heading Accuracy: 70
+  Short Passing: 91
+  Volleys: 88
+  Skill: 470
+  Dribbling: 96
+  Curve: 93
+  FK Accuracy: 94
+  Long Passing: 91
+  Ball Control: 96
+  Movement: 451
+  Acceleration: 91
+  Sprint Speed: 80
+  Agility: 91
+  Reactions: 94
+  Balance: 95
+  Power: 389
+  Shot Power: 86
+  Jumping: 68
+  Stamina: 72
+  Strength: 69
+  Long Shots: 94
+  Mentality: 347
+  Aggression: 44
+  Interceptions: 40
+  Positioning: 93
+  Vision: 95
+  Penalties: 75
+  Composure: 96
+  Defending: 91
+  Marking: 32
+  Standing Tackle: 35
+  Sliding Tackle: 24
+  Goalkeeping: 54
+  GK Diving: 6
+  GK Handling: 11
+  GK Kicking: 15
+  GK Positioning: 14
+  GK Reflexes: 8
+  Total Stats: 2231
+  Base Stats: 466
+  W/F: 4 ★
+  SM: 4★
+  A/W: Medium
+  D/W: Low
+  IR: 5 ★
+  PAC: 85
+  SHO: 92
+  PAS: 91
+  DRI: 95
+  DEF: 38
+  PHY: 65
+  Hits: 771
+
+Row 2:
+  ID: 20801
+  Name: Cristiano Ronaldo
+  LongName: C. Ronaldo dos Santos Aveiro
+  photoUrl: https://cdn.sofifa.com/players/020/801/21_60.png
+  playerUrl: http://sofifa.com/player/20801/c-ronaldo-dos-santos-aveiro/210006/
+  Nationality: Portugal
+  Age: 35
+  ↓OVA: 92
+  POT: 92
+  Club: 
+
+
+
+Juventus
+  Contract: 2018 ~ 2022
+  Positions: ST, LW
+  Height: 187cm
+  Weight: 83kg
+  Preferred Foot: Right
+  BOV: 92
+  Best Position: ST
+  Joined: Jul 10, 2018
+  Loan Date End: nan
+  Value: €63M
+  Wage: €220K
+  Release Clause: €75.9M
+  Attacking: 437
+  Crossing: 84
+  Finishing: 95
+  Heading Accuracy: 90
+  Short Passing: 82
+  Volleys: 86
+  Skill: 414
+  Dribbling: 88
+  Curve: 81
+  FK Accuracy: 76
+  Long Passing: 77
+  Ball Control: 92
+  Movement: 431
+  Acceleration: 87
+  Sprint Speed: 91
+  Agility: 87
+  Reactions: 95
+  Balance: 71
+  Power: 444
+  Shot Power: 94
+  Jumping: 95
+  Stamina: 84
+  Strength: 78
+  Long Shots: 93
+  Mentality: 353
+  Aggression: 63
+  Interceptions: 29
+  Positioning: 95
+  Vision: 82
+  Penalties: 84
+  Composure: 95
+  Defending: 84
+  Marking: 28
+  Standing Tackle: 32
+  Sliding Tackle: 24
+  Goalkeeping: 58
+  GK Diving: 7
+  GK Handling: 11
+  GK Kicking: 15
+  GK Positioning: 14
+  GK Reflexes: 11
+  Total Stats: 2221
+  Base Stats: 464
+  W/F: 4 ★
+  SM: 5★
+  A/W: High
+  D/W: Low
+  IR: 5 ★
+  PAC: 89
+  SHO: 93
+  PAS: 81
+  DRI: 89
+  DEF: 35
+  PHY: 77
+  Hits: 562
+
+Row 3:
+  ID: 200389
+  Name: J. Oblak
+  LongName: Jan Oblak
+  photoUrl: https://cdn.sofifa.com/players/200/389/21_60.png
+  playerUrl: http://sofifa.com/player/200389/jan-oblak/210006/
+  Nationality: Slovenia
+  Age: 27
+  ↓OVA: 91
+  POT: 93
+  Club: 
+
+
+
+Atlético Madrid
+  Contract: 2014 ~ 2023
+  Positions: GK
+  Height: 188cm
+  Weight: 87kg
+  Preferred Foot: Right
+  BOV: 91
+  Best Position: GK
+  Joined: Jul 16, 2014
+  Loan Date End: nan
+  Value: €120M
+  Wage: €125K
+  Release Clause: €159.4M
+  Attacking: 95
+  Crossing: 13
+  Finishing: 11
+  Heading Accuracy: 15
+  Short Passing: 43
+  Volleys: 13
+  Skill: 109
+  Dribbling: 12
+  Curve: 13
+  FK Accuracy: 14
+  Long Passing: 40
+  Ball Control: 30
+  Movement: 307
+  Acceleration: 43
+  Sprint Speed: 60
+  Agility: 67
+  Reactions: 88
+  Balance: 49
+  Power: 268
+  Shot Power: 59
+  Jumping: 78
+  Stamina: 41
+  Strength: 78
+  Long Shots: 12
+  Mentality: 140
+  Aggression: 34
+  Interceptions: 19
+  Positioning: 11
+  Vision: 65
+  Penalties: 11
+  Composure: 68
+  Defending: 57
+  Marking: 27
+  Standing Tackle: 12
+  Sliding Tackle: 18
+  Goalkeeping: 437
+  GK Diving: 87
+  GK Handling: 92
+  GK Kicking: 78
+  GK Positioning: 90
+  GK Reflexes: 90
+  Total Stats: 1413
+  Base Stats: 489
+  W/F: 3 ★
+  SM: 1★
+  A/W: Medium
+  D/W: Medium
+  IR: 3 ★
+  PAC: 87
+  SHO: 92
+  PAS: 78
+  DRI: 90
+  DEF: 52
+  PHY: 90
+  Hits: 150
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: fifa21_raw_data.csv
+====================================================================================================
+File Size: 8.27 MB
+Rows: 18,979
+Columns: 77
+Memory Usage: 33.84 MB
+
+Data Quality:
+  Null Values: 17,966 (1.23%)
+  Duplicates: 1
+  Duplicate Percentage: 0.01%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+photoUrl                       object          18979           0.00      
+LongName                       object          18979           0.00      
+playerUrl                      object          18979           0.00      
+Nationality                    object          18979           0.00      
+Positions                      object          18979           0.00      
+Name                           object          18979           0.00      
+Age                            int64           18979           0.00      
+↓OVA                           int64           18979           0.00      
+POT                            int64           18979           0.00      
+Team & Contract                object          18979           0.00      
+ID                             int64           18979           0.00      
+Height                         object          18979           0.00      
+Weight                         object          18979           0.00      
+foot                           object          18979           0.00      
+BOV                            int64           18979           0.00      
+BP                             object          18979           0.00      
+Growth                         int64           18979           0.00      
+Joined                         object          18979           0.00      
+Loan Date End                  object          1013            94.66     
+Value                          object          18979           0.00      
+Wage                           object          18979           0.00      
+Release Clause                 object          18979           0.00      
+Attacking                      int64           18979           0.00      
+Crossing                       int64           18979           0.00      
+Finishing                      int64           18979           0.00      
+Heading Accuracy               int64           18979           0.00      
+Short Passing                  int64           18979           0.00      
+Volleys                        int64           18979           0.00      
+Skill                          int64           18979           0.00      
+Dribbling                      int64           18979           0.00      
+Curve                          int64           18979           0.00      
+FK Accuracy                    int64           18979           0.00      
+Long Passing                   int64           18979           0.00      
+Ball Control                   int64           18979           0.00      
+Movement                       int64           18979           0.00      
+Acceleration                   int64           18979           0.00      
+Sprint Speed                   int64           18979           0.00      
+Agility                        int64           18979           0.00      
+Reactions                      int64           18979           0.00      
+Balance                        int64           18979           0.00      
+Power                          int64           18979           0.00      
+Shot Power                     int64           18979           0.00      
+Jumping                        int64           18979           0.00      
+Stamina                        int64           18979           0.00      
+Strength                       int64           18979           0.00      
+Long Shots                     int64           18979           0.00      
+Mentality                      int64           18979           0.00      
+Aggression                     int64           18979           0.00      
+Interceptions                  int64           18979           0.00      
+Positioning                    int64           18979           0.00      
+Vision                         int64           18979           0.00      
+Penalties                      int64           18979           0.00      
+Composure                      int64           18979           0.00      
+Defending                      int64           18979           0.00      
+Marking                        int64           18979           0.00      
+Standing Tackle                int64           18979           0.00      
+Sliding Tackle                 int64           18979           0.00      
+Goalkeeping                    int64           18979           0.00      
+GK Diving                      int64           18979           0.00      
+GK Handling                    int64           18979           0.00      
+GK Kicking                     int64           18979           0.00      
+GK Positioning                 int64           18979           0.00      
+GK Reflexes                    int64           18979           0.00      
+Total Stats                    int64           18979           0.00      
+Base Stats                     int64           18979           0.00      
+W/F                            object          18979           0.00      
+SM                             object          18979           0.00      
+A/W                            object          18979           0.00      
+D/W                            object          18979           0.00      
+IR                             object          18979           0.00      
+PAC                            int64           18979           0.00      
+SHO                            int64           18979           0.00      
+PAS                            int64           18979           0.00      
+DRI                            int64           18979           0.00      
+DEF                            int64           18979           0.00      
+PHY                            int64           18979           0.00      
+Hits                           object          18979           0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  photoUrl: https://cdn.sofifa.com/players/158/023/21_60.png
+  LongName: Lionel Messi
+  playerUrl: http://sofifa.com/player/158023/lionel-messi/210005/
+  Nationality: Argentina
+  Positions: RW ST CF
+  Name: L. Messi
+  Age: 33
+  ↓OVA: 93
+  POT: 93
+  Team & Contract: 
+
+
+
+FC Barcelona
+2004 ~ 2021
+
+
+  ID: 158023
+  Height: 5'7"
+  Weight: 159lbs
+  foot: Left
+  BOV: 93
+  BP: RW
+  Growth: 0
+  Joined: Jul 1, 2004
+  Loan Date End: nan
+  Value: €67.5M
+  Wage: €560K
+  Release Clause: €138.4M
+  Attacking: 429
+  Crossing: 85
+  Finishing: 95
+  Heading Accuracy: 70
+  Short Passing: 91
+  Volleys: 88
+  Skill: 470
+  Dribbling: 96
+  Curve: 93
+  FK Accuracy: 94
+  Long Passing: 91
+  Ball Control: 96
+  Movement: 451
+  Acceleration: 91
+  Sprint Speed: 80
+  Agility: 91
+  Reactions: 94
+  Balance: 95
+  Power: 389
+  Shot Power: 86
+  Jumping: 68
+  Stamina: 72
+  Strength: 69
+  Long Shots: 94
+  Mentality: 347
+  Aggression: 44
+  Interceptions: 40
+  Positioning: 93
+  Vision: 95
+  Penalties: 75
+  Composure: 96
+  Defending: 91
+  Marking: 32
+  Standing Tackle: 35
+  Sliding Tackle: 24
+  Goalkeeping: 54
+  GK Diving: 6
+  GK Handling: 11
+  GK Kicking: 15
+  GK Positioning: 14
+  GK Reflexes: 8
+  Total Stats: 2231
+  Base Stats: 466
+  W/F: 4 ★
+  SM: 4★
+  A/W: Medium
+  D/W: Low
+  IR: 5 ★
+  PAC: 85
+  SHO: 92
+  PAS: 91
+  DRI: 95
+  DEF: 38
+  PHY: 65
+  Hits: 
+372
+
+Row 2:
+  photoUrl: https://cdn.sofifa.com/players/020/801/21_60.png
+  LongName: C. Ronaldo dos Santos Aveiro
+  playerUrl: http://sofifa.com/player/20801/c-ronaldo-dos-santos-aveiro/210005/
+  Nationality: Portugal
+  Positions: ST LW
+  Name: Cristiano Ronaldo
+  Age: 35
+  ↓OVA: 92
+  POT: 92
+  Team & Contract: 
+
+
+
+Juventus
+2018 ~ 2022
+
+
+  ID: 20801
+  Height: 6'2"
+  Weight: 183lbs
+  foot: Right
+  BOV: 92
+  BP: ST
+  Growth: 0
+  Joined: Jul 10, 2018
+  Loan Date End: nan
+  Value: €46M
+  Wage: €220K
+  Release Clause: €75.9M
+  Attacking: 437
+  Crossing: 84
+  Finishing: 95
+  Heading Accuracy: 90
+  Short Passing: 82
+  Volleys: 86
+  Skill: 414
+  Dribbling: 88
+  Curve: 81
+  FK Accuracy: 76
+  Long Passing: 77
+  Ball Control: 92
+  Movement: 431
+  Acceleration: 87
+  Sprint Speed: 91
+  Agility: 87
+  Reactions: 95
+  Balance: 71
+  Power: 444
+  Shot Power: 94
+  Jumping: 95
+  Stamina: 84
+  Strength: 78
+  Long Shots: 93
+  Mentality: 353
+  Aggression: 63
+  Interceptions: 29
+  Positioning: 95
+  Vision: 82
+  Penalties: 84
+  Composure: 95
+  Defending: 84
+  Marking: 28
+  Standing Tackle: 32
+  Sliding Tackle: 24
+  Goalkeeping: 58
+  GK Diving: 7
+  GK Handling: 11
+  GK Kicking: 15
+  GK Positioning: 14
+  GK Reflexes: 11
+  Total Stats: 2221
+  Base Stats: 464
+  W/F: 4 ★
+  SM: 5★
+  A/W: High
+  D/W: Low
+  IR: 5 ★
+  PAC: 89
+  SHO: 93
+  PAS: 81
+  DRI: 89
+  DEF: 35
+  PHY: 77
+  Hits: 
+344
+
+Row 3:
+  photoUrl: https://cdn.sofifa.com/players/200/389/21_60.png
+  LongName: Jan Oblak
+  playerUrl: http://sofifa.com/player/200389/jan-oblak/210005/
+  Nationality: Slovenia
+  Positions: GK
+  Name: J. Oblak
+  Age: 27
+  ↓OVA: 91
+  POT: 93
+  Team & Contract: 
+
+
+
+Atlético Madrid
+2014 ~ 2023
+
+
+  ID: 200389
+  Height: 6'2"
+  Weight: 192lbs
+  foot: Right
+  BOV: 91
+  BP: GK
+  Growth: 2
+  Joined: Jul 16, 2014
+  Loan Date End: nan
+  Value: €75M
+  Wage: €125K
+  Release Clause: €159.4M
+  Attacking: 95
+  Crossing: 13
+  Finishing: 11
+  Heading Accuracy: 15
+  Short Passing: 43
+  Volleys: 13
+  Skill: 109
+  Dribbling: 12
+  Curve: 13
+  FK Accuracy: 14
+  Long Passing: 40
+  Ball Control: 30
+  Movement: 307
+  Acceleration: 43
+  Sprint Speed: 60
+  Agility: 67
+  Reactions: 88
+  Balance: 49
+  Power: 268
+  Shot Power: 59
+  Jumping: 78
+  Stamina: 41
+  Strength: 78
+  Long Shots: 12
+  Mentality: 140
+  Aggression: 34
+  Interceptions: 19
+  Positioning: 11
+  Vision: 65
+  Penalties: 11
+  Composure: 68
+  Defending: 57
+  Marking: 27
+  Standing Tackle: 12
+  Sliding Tackle: 18
+  Goalkeeping: 437
+  GK Diving: 87
+  GK Handling: 92
+  GK Kicking: 78
+  GK Positioning: 90
+  GK Reflexes: 90
+  Total Stats: 1413
+  Base Stats: 489
+  W/F: 3 ★
+  SM: 1★
+  A/W: Medium
+  D/W: Medium
+  IR: 3 ★
+  PAC: 87
+  SHO: 92
+  PAS: 78
+  DRI: 90
+  DEF: 52
+  PHY: 90
+  Hits: 
+86
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: fitness_dataset.csv
+====================================================================================================
+File Size: 81.73 KB
+Rows: 2,000
+Columns: 11
+Memory Usage: 0.33 MB
+
+Data Quality:
+  Null Values: 160 (0.73%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+age                            int64           2000            0.00      
+height_cm                      int64           2000            0.00      
+weight_kg                      int64           2000            0.00      
+heart_rate                     float64         2000            0.00      
+blood_pressure                 float64         2000            0.00      
+sleep_hours                    float64         1840            8.00      
+nutrition_quality              float64         2000            0.00      
+activity_index                 float64         2000            0.00      
+smokes                         object          2000            0.00      
+gender                         object          2000            0.00      
+is_fit                         int64           2000            0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  age: 56
+  height_cm: 152
+  weight_kg: 65
+  heart_rate: 69.6
+  blood_pressure: 117.0
+  sleep_hours: nan
+  nutrition_quality: 2.37
+  activity_index: 3.97
+  smokes: no
+  gender: F
+  is_fit: 1
+
+Row 2:
+  age: 69
+  height_cm: 186
+  weight_kg: 95
+  heart_rate: 60.8
+  blood_pressure: 114.8
+  sleep_hours: 7.5
+  nutrition_quality: 8.77
+  activity_index: 3.19
+  smokes: 0
+  gender: F
+  is_fit: 1
+
+Row 3:
+  age: 46
+  height_cm: 192
+  weight_kg: 103
+  heart_rate: 61.4
+  blood_pressure: 116.4
+  sleep_hours: nan
+  nutrition_quality: 8.2
+  activity_index: 2.03
+  smokes: 0
+  gender: F
+  is_fit: 0
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: hotel_bookings.csv
+====================================================================================================
+File Size: 16.07 MB
+Rows: 119,390
+Columns: 32
+Memory Usage: 93.90 MB
+
+Data Quality:
+  Null Values: 129,425 (3.39%)
+  Duplicates: 31994
+  Duplicate Percentage: 26.80%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+hotel                          object          119390          0.00      
+is_canceled                    int64           119390          0.00      
+lead_time                      int64           119390          0.00      
+arrival_date_year              int64           119390          0.00      
+arrival_date_month             object          119390          0.00      
+arrival_date_week_number       int64           119390          0.00      
+arrival_date_day_of_month      int64           119390          0.00      
+stays_in_weekend_nights        int64           119390          0.00      
+stays_in_week_nights           int64           119390          0.00      
+adults                         int64           119390          0.00      
+children                       float64         119386          0.00      
+babies                         int64           119390          0.00      
+meal                           object          119390          0.00      
+country                        object          118902          0.41      
+market_segment                 object          119390          0.00      
+distribution_channel           object          119390          0.00      
+is_repeated_guest              int64           119390          0.00      
+previous_cancellations         int64           119390          0.00      
+previous_bookings_not_canceled int64           119390          0.00      
+reserved_room_type             object          119390          0.00      
+assigned_room_type             object          119390          0.00      
+booking_changes                int64           119390          0.00      
+deposit_type                   object          119390          0.00      
+agent                          float64         103050          13.69     
+company                        float64         6797            94.31     
+days_in_waiting_list           int64           119390          0.00      
+customer_type                  object          119390          0.00      
+adr                            float64         119390          0.00      
+required_car_parking_spaces    int64           119390          0.00      
+total_of_special_requests      int64           119390          0.00      
+reservation_status             object          119390          0.00      
+reservation_status_date        object          119390          0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  hotel: Resort Hotel
+  is_canceled: 0
+  lead_time: 342
+  arrival_date_year: 2015
+  arrival_date_month: July
+  arrival_date_week_number: 27
+  arrival_date_day_of_month: 1
+  stays_in_weekend_nights: 0
+  stays_in_week_nights: 0
+  adults: 2
+  children: 0.0
+  babies: 0
+  meal: BB
+  country: PRT
+  market_segment: Direct
+  distribution_channel: Direct
+  is_repeated_guest: 0
+  previous_cancellations: 0
+  previous_bookings_not_canceled: 0
+  reserved_room_type: C
+  assigned_room_type: C
+  booking_changes: 3
+  deposit_type: No Deposit
+  agent: nan
+  company: nan
+  days_in_waiting_list: 0
+  customer_type: Transient
+  adr: 0.0
+  required_car_parking_spaces: 0
+  total_of_special_requests: 0
+  reservation_status: Check-Out
+  reservation_status_date: 2015-07-01
+
+Row 2:
+  hotel: Resort Hotel
+  is_canceled: 0
+  lead_time: 737
+  arrival_date_year: 2015
+  arrival_date_month: July
+  arrival_date_week_number: 27
+  arrival_date_day_of_month: 1
+  stays_in_weekend_nights: 0
+  stays_in_week_nights: 0
+  adults: 2
+  children: 0.0
+  babies: 0
+  meal: BB
+  country: PRT
+  market_segment: Direct
+  distribution_channel: Direct
+  is_repeated_guest: 0
+  previous_cancellations: 0
+  previous_bookings_not_canceled: 0
+  reserved_room_type: C
+  assigned_room_type: C
+  booking_changes: 4
+  deposit_type: No Deposit
+  agent: nan
+  company: nan
+  days_in_waiting_list: 0
+  customer_type: Transient
+  adr: 0.0
+  required_car_parking_spaces: 0
+  total_of_special_requests: 0
+  reservation_status: Check-Out
+  reservation_status_date: 2015-07-01
+
+Row 3:
+  hotel: Resort Hotel
+  is_canceled: 0
+  lead_time: 7
+  arrival_date_year: 2015
+  arrival_date_month: July
+  arrival_date_week_number: 27
+  arrival_date_day_of_month: 1
+  stays_in_weekend_nights: 0
+  stays_in_week_nights: 1
+  adults: 1
+  children: 0.0
+  babies: 0
+  meal: BB
+  country: GBR
+  market_segment: Direct
+  distribution_channel: Direct
+  is_repeated_guest: 0
+  previous_cancellations: 0
+  previous_bookings_not_canceled: 0
+  reserved_room_type: A
+  assigned_room_type: C
+  booking_changes: 0
+  deposit_type: No Deposit
+  agent: nan
+  company: nan
+  days_in_waiting_list: 0
+  customer_type: Transient
+  adr: 75.0
+  required_car_parking_spaces: 0
+  total_of_special_requests: 0
+  reservation_status: Check-Out
+  reservation_status_date: 2015-07-02
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: olist_customers_dataset.csv
+====================================================================================================
+File Size: 8.62 MB
+Rows: 99,441
+Columns: 5
+Memory Usage: 26.59 MB
+
+Data Quality:
+  Null Values: 0 (0.00%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+customer_id                    object          99441           0.00      
+customer_unique_id             object          99441           0.00      
+customer_zip_code_prefix       int64           99441           0.00      
+customer_city                  object          99441           0.00      
+customer_state                 object          99441           0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  customer_id: 06b8999e2fba1a1fbc88172c00ba8bc7
+  customer_unique_id: 861eff4711a542e4b93843c6dd7febb0
+  customer_zip_code_prefix: 14409
+  customer_city: franca
+  customer_state: SP
+
+Row 2:
+  customer_id: 18955e83d337fd6b2def6b18a428ac77
+  customer_unique_id: 290c77bc529b7ac935b93aa66c333dc3
+  customer_zip_code_prefix: 9790
+  customer_city: sao bernardo do campo
+  customer_state: SP
+
+Row 3:
+  customer_id: 4e7b3e00288586ebd08712fdd0374a03
+  customer_unique_id: 060e732b5b29e8181a18229c7b0b2b5e
+  customer_zip_code_prefix: 1151
+  customer_city: sao paulo
+  customer_state: SP
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: olist_geolocation_dataset.csv
+====================================================================================================
+File Size: 58.44 MB
+Rows: 1,000,163
+Columns: 5
+Memory Usage: 129.38 MB
+
+Data Quality:
+  Null Values: 0 (0.00%)
+  Duplicates: 261831
+  Duplicate Percentage: 26.18%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+geolocation_zip_code_prefix    int64           1000163         0.00      
+geolocation_lat                float64         1000163         0.00      
+geolocation_lng                float64         1000163         0.00      
+geolocation_city               object          1000163         0.00      
+geolocation_state              object          1000163         0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  geolocation_zip_code_prefix: 1037
+  geolocation_lat: -23.54562128115268
+  geolocation_lng: -46.63929204800168
+  geolocation_city: sao paulo
+  geolocation_state: SP
+
+Row 2:
+  geolocation_zip_code_prefix: 1046
+  geolocation_lat: -23.54608112703553
+  geolocation_lng: -46.64482029837157
+  geolocation_city: sao paulo
+  geolocation_state: SP
+
+Row 3:
+  geolocation_zip_code_prefix: 1046
+  geolocation_lat: -23.54612896641469
+  geolocation_lng: -46.64295148361138
+  geolocation_city: sao paulo
+  geolocation_state: SP
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: olist_order_items_dataset.csv
+====================================================================================================
+File Size: 14.72 MB
+Rows: 112,650
+Columns: 7
+Memory Usage: 35.99 MB
+
+Data Quality:
+  Null Values: 0 (0.00%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+order_id                       object          112650          0.00      
+order_item_id                  int64           112650          0.00      
+product_id                     object          112650          0.00      
+seller_id                      object          112650          0.00      
+shipping_limit_date            object          112650          0.00      
+price                          float64         112650          0.00      
+freight_value                  float64         112650          0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  order_id: 00010242fe8c5a6d1ba2dd792cb16214
+  order_item_id: 1
+  product_id: 4244733e06e7ecb4970a6e2683c13e61
+  seller_id: 48436dade18ac8b2bce089ec2a041202
+  shipping_limit_date: 2017-09-19 09:45:35
+  price: 58.9
+  freight_value: 13.29
+
+Row 2:
+  order_id: 00018f77f2f0320c557190d7a144bdd3
+  order_item_id: 1
+  product_id: e5f2d52b802189ee658865ca93d83a8f
+  seller_id: dd7ddc04e1b6c2c614352b383efe2d36
+  shipping_limit_date: 2017-05-03 11:05:13
+  price: 239.9
+  freight_value: 19.93
+
+Row 3:
+  order_id: 000229ec398224ef6ca0657da4fc703e
+  order_item_id: 1
+  product_id: c777355d18b72b67abbeef9df44fd0fd
+  seller_id: 5b51032eddd242adc84c38acab88f23d
+  shipping_limit_date: 2018-01-18 14:48:30
+  price: 199.0
+  freight_value: 17.87
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: olist_order_payments_dataset.csv
+====================================================================================================
+File Size: 5.51 MB
+Rows: 103,886
+Columns: 5
+Memory Usage: 16.23 MB
+
+Data Quality:
+  Null Values: 0 (0.00%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+order_id                       object          103886          0.00      
+payment_sequential             int64           103886          0.00      
+payment_type                   object          103886          0.00      
+payment_installments           int64           103886          0.00      
+payment_value                  float64         103886          0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  order_id: b81ef226f3fe1789b1e8b2acac839d17
+  payment_sequential: 1
+  payment_type: credit_card
+  payment_installments: 8
+  payment_value: 99.33
+
+Row 2:
+  order_id: a9810da82917af2d9aefd1278f1dcfa0
+  payment_sequential: 1
+  payment_type: credit_card
+  payment_installments: 1
+  payment_value: 24.39
+
+Row 3:
+  order_id: 25e8ea4e93396b6fa0d3dd708e76c1bd
+  payment_sequential: 1
+  payment_type: credit_card
+  payment_installments: 1
+  payment_value: 65.71
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: olist_order_reviews_dataset.csv
+====================================================================================================
+File Size: 13.78 MB
+Rows: 99,224
+Columns: 7
+Memory Usage: 39.12 MB
+
+Data Quality:
+  Null Values: 145,903 (21.01%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+review_id                      object          99224           0.00      
+order_id                       object          99224           0.00      
+review_score                   int64           99224           0.00      
+review_comment_title           object          11568           88.34     
+review_comment_message         object          40977           58.70     
+review_creation_date           object          99224           0.00      
+review_answer_timestamp        object          99224           0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  review_id: 7bc2406110b926393aa56f80a40eba40
+  order_id: 73fc7af87114b39712e6da79b0a377eb
+  review_score: 4
+  review_comment_title: nan
+  review_comment_message: nan
+  review_creation_date: 2018-01-18 00:00:00
+  review_answer_timestamp: 2018-01-18 21:46:59
+
+Row 2:
+  review_id: 80e641a11e56f04c1ad469d5645fdfde
+  order_id: a548910a1c6147796b98fdf73dbeba33
+  review_score: 5
+  review_comment_title: nan
+  review_comment_message: nan
+  review_creation_date: 2018-03-10 00:00:00
+  review_answer_timestamp: 2018-03-11 03:05:13
+
+Row 3:
+  review_id: 228ce5500dc1d8e020d8d1322874b6f0
+  order_id: f9e4b658b201a9f2ecdecbb34bed034b
+  review_score: 5
+  review_comment_title: nan
+  review_comment_message: nan
+  review_creation_date: 2018-02-17 00:00:00
+  review_answer_timestamp: 2018-02-18 14:36:24
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: olist_orders_dataset.csv
+====================================================================================================
+File Size: 16.84 MB
+Rows: 99,441
+Columns: 8
+Memory Usage: 52.94 MB
+
+Data Quality:
+  Null Values: 4,908 (0.62%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+order_id                       object          99441           0.00      
+customer_id                    object          99441           0.00      
+order_status                   object          99441           0.00      
+order_purchase_timestamp       object          99441           0.00      
+order_approved_at              object          99281           0.16      
+order_delivered_carrier_date   object          97658           1.79      
+order_delivered_customer_date  object          96476           2.98      
+order_estimated_delivery_date  object          99441           0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  order_id: e481f51cbdc54678b7cc49136f2d6af7
+  customer_id: 9ef432eb6251297304e76186b10a928d
+  order_status: delivered
+  order_purchase_timestamp: 2017-10-02 10:56:33
+  order_approved_at: 2017-10-02 11:07:15
+  order_delivered_carrier_date: 2017-10-04 19:55:00
+  order_delivered_customer_date: 2017-10-10 21:25:13
+  order_estimated_delivery_date: 2017-10-18 00:00:00
+
+Row 2:
+  order_id: 53cdb2fc8bc7dce0b6741e2150273451
+  customer_id: b0830fb4747a6c6d20dea0b8c802d7ef
+  order_status: delivered
+  order_purchase_timestamp: 2018-07-24 20:41:37
+  order_approved_at: 2018-07-26 03:24:27
+  order_delivered_carrier_date: 2018-07-26 14:31:00
+  order_delivered_customer_date: 2018-08-07 15:27:45
+  order_estimated_delivery_date: 2018-08-13 00:00:00
+
+Row 3:
+  order_id: 47770eb9100c2d0c44946d9cf07ec65d
+  customer_id: 41ce2a54c0b03bf3443c3d931a367089
+  order_status: delivered
+  order_purchase_timestamp: 2018-08-08 08:38:49
+  order_approved_at: 2018-08-08 08:55:23
+  order_delivered_carrier_date: 2018-08-08 13:50:00
+  order_delivered_customer_date: 2018-08-17 18:06:29
+  order_estimated_delivery_date: 2018-09-04 00:00:00
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: olist_products_dataset.csv
+====================================================================================================
+File Size: 2.27 MB
+Rows: 32,951
+Columns: 9
+Memory Usage: 6.30 MB
+
+Data Quality:
+  Null Values: 2,448 (0.83%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+product_id                     object          32951           0.00      
+product_category_name          object          32341           1.85      
+product_name_lenght            float64         32341           1.85      
+product_description_lenght     float64         32341           1.85      
+product_photos_qty             float64         32341           1.85      
+product_weight_g               float64         32949           0.01      
+product_length_cm              float64         32949           0.01      
+product_height_cm              float64         32949           0.01      
+product_width_cm               float64         32949           0.01      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  product_id: 1e9e8ef04dbcff4541ed26657ea517e5
+  product_category_name: perfumaria
+  product_name_lenght: 40.0
+  product_description_lenght: 287.0
+  product_photos_qty: 1.0
+  product_weight_g: 225.0
+  product_length_cm: 16.0
+  product_height_cm: 10.0
+  product_width_cm: 14.0
+
+Row 2:
+  product_id: 3aa071139cb16b67ca9e5dea641aaa2f
+  product_category_name: artes
+  product_name_lenght: 44.0
+  product_description_lenght: 276.0
+  product_photos_qty: 1.0
+  product_weight_g: 1000.0
+  product_length_cm: 30.0
+  product_height_cm: 18.0
+  product_width_cm: 20.0
+
+Row 3:
+  product_id: 96bd76ec8810374ed1b65e291975717f
+  product_category_name: esporte_lazer
+  product_name_lenght: 46.0
+  product_description_lenght: 250.0
+  product_photos_qty: 1.0
+  product_weight_g: 154.0
+  product_length_cm: 18.0
+  product_height_cm: 9.0
+  product_width_cm: 15.0
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: olist_sellers_dataset.csv
+====================================================================================================
+File Size: 170.61 KB
+Rows: 3,095
+Columns: 4
+Memory Usage: 0.59 MB
+
+Data Quality:
+  Null Values: 0 (0.00%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+seller_id                      object          3095            0.00      
+seller_zip_code_prefix         int64           3095            0.00      
+seller_city                    object          3095            0.00      
+seller_state                   object          3095            0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  seller_id: 3442f8959a84dea7ee197c632cb2df15
+  seller_zip_code_prefix: 13023
+  seller_city: campinas
+  seller_state: SP
+
+Row 2:
+  seller_id: d1b65fc7debc3361ea86b5f14c68d2e2
+  seller_zip_code_prefix: 13844
+  seller_city: mogi guacu
+  seller_state: SP
+
+Row 3:
+  seller_id: ce3ad9de960102d0677a81f5d0bb7b2d
+  seller_zip_code_prefix: 20031
+  seller_city: rio de janeiro
+  seller_state: RJ
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: product_category_name_translation.csv
+====================================================================================================
+File Size: 2.55 KB
+Rows: 71
+Columns: 2
+Memory Usage: 0.01 MB
+
+Data Quality:
+  Null Values: 0 (0.00%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+product_category_name          object          71              0.00      
+product_category_name_english  object          71              0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  product_category_name: beleza_saude
+  product_category_name_english: health_beauty
+
+Row 2:
+  product_category_name: informatica_acessorios
+  product_category_name_english: computers_accessories
+
+Row 3:
+  product_category_name: automotivo
+  product_category_name_english: auto
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: sample_data.csv
+====================================================================================================
+File Size: 656.00 B
+Rows: 15
+Columns: 6
+Memory Usage: 0.00 MB
+
+Data Quality:
+  Null Values: 0 (0.00%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+date                           object          15              0.00      
+product                        object          15              0.00      
+region                         object          15              0.00      
+sales                          int64           15              0.00      
+quantity                       int64           15              0.00      
+customer_id                    object          15              0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  date: 2024-01-01
+  product: Product A
+  region: North
+  sales: 1500
+  quantity: 50
+  customer_id: C001
+
+Row 2:
+  date: 2024-01-01
+  product: Product B
+  region: South
+  sales: 2000
+  quantity: 75
+  customer_id: C002
+
+Row 3:
+  date: 2024-01-01
+  product: Product C
+  region: East
+  sales: 1800
+  quantity: 60
+  customer_id: C003
+
+
+====================================================================================================
+
+====================================================================================================
+FILE: ted_main.csv
+====================================================================================================
+File Size: 7.23 MB
+Rows: 2,550
+Columns: 17
+Memory Usage: 8.78 MB
+
+Data Quality:
+  Null Values: 6 (0.01%)
+  Duplicates: 0
+  Duplicate Percentage: 0.00%
+
+Column Details:
+----------------------------------------------------------------------------------------------------
+Column Name                    Type            Non-Null        Null %    
+----------------------------------------------------------------------------------------------------
+comments                       int64           2550            0.00      
+description                    object          2550            0.00      
+duration                       int64           2550            0.00      
+event                          object          2550            0.00      
+film_date                      int64           2550            0.00      
+languages                      int64           2550            0.00      
+main_speaker                   object          2550            0.00      
+name                           object          2550            0.00      
+num_speaker                    int64           2550            0.00      
+published_date                 int64           2550            0.00      
+ratings                        object          2550            0.00      
+related_talks                  object          2550            0.00      
+speaker_occupation             object          2544            0.24      
+tags                           object          2550            0.00      
+title                          object          2550            0.00      
+url                            object          2550            0.00      
+views                          int64           2550            0.00      
+
+Sample Data (First 3 Rows):
+----------------------------------------------------------------------------------------------------
+Row 1:
+  comments: 4553
+  description: Sir Ken Robinson makes an entertaining and profoundly moving case for creating an education system that nurtures (rather than undermines) creativity.
+  duration: 1164
+  event: TED2006
+  film_date: 1140825600
+  languages: 60
+  main_speaker: Ken Robinson
+  name: Ken Robinson: Do schools kill creativity?
+  num_speaker: 1
+  published_date: 1151367060
+  ratings: [{'id': 7, 'name': 'Funny', 'count': 19645}, {'id': 1, 'name': 'Beautiful', 'count': 4573}, {'id': 9, 'name': 'Ingenious', 'count': 6073}, {'id': 3, 'name': 'Courageous', 'count': 3253}, {'id': 11, 'name': 'Longwinded', 'count': 387}, {'id': 2, 'name': 'Confusing', 'count': 242}, {'id': 8, 'name': 'Informative', 'count': 7346}, {'id': 22, 'name': 'Fascinating', 'count': 10581}, {'id': 21, 'name': 'Unconvincing', 'count': 300}, {'id': 24, 'name': 'Persuasive', 'count': 10704}, {'id': 23, 'name': 'Jaw-dropping', 'count': 4439}, {'id': 25, 'name': 'OK', 'count': 1174}, {'id': 26, 'name': 'Obnoxious', 'count': 209}, {'id': 10, 'name': 'Inspiring', 'count': 24924}]
+  related_talks: [{'id': 865, 'hero': 'https://pe.tedcdn.com/images/ted/172559_800x600.jpg', 'speaker': 'Ken Robinson', 'title': 'Bring on the learning revolution!', 'duration': 1008, 'slug': 'sir_ken_robinson_bring_on_the_revolution', 'viewed_count': 7266103}, {'id': 1738, 'hero': 'https://pe.tedcdn.com/images/ted/de98b161ad1434910ff4b56c89de71af04b8b873_1600x1200.jpg', 'speaker': 'Ken Robinson', 'title': "How to escape education's death valley", 'duration': 1151, 'slug': 'ken_robinson_how_to_escape_education_s_death_valley', 'viewed_count': 6657572}, {'id': 2276, 'hero': 'https://pe.tedcdn.com/images/ted/3821f3728e0b755c7b9aea2e69cc093eca41abe1_2880x1620.jpg', 'speaker': 'Linda Cliatt-Wayman', 'title': 'How to fix a broken school? Lead fearlessly, love hard', 'duration': 1027, 'slug': 'linda_cliatt_wayman_how_to_fix_a_broken_school_lead_fearlessly_love_hard', 'viewed_count': 1617101}, {'id': 892, 'hero': 'https://pe.tedcdn.com/images/ted/e79958940573cc610ccb583619a54866c41ef303_2880x1620.jpg', 'speaker': 'Charles Leadbeater', 'title': 'Education innovation in the slums', 'duration': 1138, 'slug': 'charles_leadbeater_on_education', 'viewed_count': 772296}, {'id': 1232, 'hero': 'https://pe.tedcdn.com/images/ted/0e3e4e92d5ee8ae0e43962d447d3f790b31099b8_800x600.jpg', 'speaker': 'Geoff Mulgan', 'title': 'A short intro to the Studio School', 'duration': 376, 'slug': 'geoff_mulgan_a_short_intro_to_the_studio_school', 'viewed_count': 667971}, {'id': 2616, 'hero': 'https://pe.tedcdn.com/images/ted/71cde5a6fa6c717488fb55eff9eef939a9241761_2880x1620.jpg', 'speaker': 'Kandice Sumner', 'title': "How America's public schools keep kids in poverty", 'duration': 830, 'slug': 'kandice_sumner_how_america_s_public_schools_keep_kids_in_poverty', 'viewed_count': 1181333}]
+  speaker_occupation: Author/educator
+  tags: ['children', 'creativity', 'culture', 'dance', 'education', 'parenting', 'teaching']
+  title: Do schools kill creativity?
+  url: https://www.ted.com/talks/ken_robinson_says_schools_kill_creativity
+
+  views: 47227110
+
+Row 2:
+  comments: 265
+  description: With the same humor and humanity he exuded in "An Inconvenient Truth," Al Gore spells out 15 ways that individuals can address climate change immediately, from buying a hybrid to inventing a new, hotter brand name for global warming.
+  duration: 977
+  event: TED2006
+  film_date: 1140825600
+  languages: 43
+  main_speaker: Al Gore
+  name: Al Gore: Averting the climate crisis
+  num_speaker: 1
+  published_date: 1151367060
+  ratings: [{'id': 7, 'name': 'Funny', 'count': 544}, {'id': 3, 'name': 'Courageous', 'count': 139}, {'id': 2, 'name': 'Confusing', 'count': 62}, {'id': 1, 'name': 'Beautiful', 'count': 58}, {'id': 21, 'name': 'Unconvincing', 'count': 258}, {'id': 11, 'name': 'Longwinded', 'count': 113}, {'id': 8, 'name': 'Informative', 'count': 443}, {'id': 10, 'name': 'Inspiring', 'count': 413}, {'id': 22, 'name': 'Fascinating', 'count': 132}, {'id': 9, 'name': 'Ingenious', 'count': 56}, {'id': 24, 'name': 'Persuasive', 'count': 268}, {'id': 23, 'name': 'Jaw-dropping', 'count': 116}, {'id': 26, 'name': 'Obnoxious', 'count': 131}, {'id': 25, 'name': 'OK', 'count': 203}]
+  related_talks: [{'id': 243, 'hero': 'https://pe.tedcdn.com/images/ted/566c14767bd62c5ff760e483c5b16cd2753328cd_2880x1620.jpg', 'speaker': 'Al Gore', 'title': 'New thinking on the climate crisis', 'duration': 1674, 'slug': 'al_gore_s_new_thinking_on_the_climate_crisis', 'viewed_count': 1751408}, {'id': 547, 'hero': 'https://pe.tedcdn.com/images/ted/89288_800x600.jpg', 'speaker': 'Ray Anderson', 'title': 'The business logic of sustainability', 'duration': 954, 'slug': 'ray_anderson_on_the_business_logic_of_sustainability', 'viewed_count': 881833}, {'id': 2093, 'hero': 'https://pe.tedcdn.com/images/ted/146d88845861cbf768bbf8bec8b2e41f8bfc7903_2400x1800.jpg', 'speaker': 'Lord Nicholas Stern', 'title': 'The state of the climate — and what we might do about it', 'duration': 993, 'slug': 'lord_nicholas_stern_the_state_of_the_climate_and_what_we_might_do_about_it', 'viewed_count': 773779}, {'id': 2784, 'hero': 'https://pe.tedcdn.com/images/ted/e835e670a7836cf65aca2a7a644fd94398cb4b8e_2880x1620.jpg', 'speaker': 'Ted Halstead', 'title': 'A climate solution where all sides can win', 'duration': 787, 'slug': 'ted_halstead_a_climate_solution_where_all_sides_can_win', 'viewed_count': 1021315}, {'id': 2339, 'hero': 'https://pe.tedcdn.com/images/ted/f6879e1c78d4a069735bf745ecfede71ccf4a352_2880x1620.jpg', 'speaker': 'Alice Bows-Larkin', 'title': "Climate change is happening. Here's how we adapt", 'duration': 863, 'slug': 'alice_bows_larkin_we_re_too_late_to_prevent_climate_change_here_s_how_we_adapt', 'viewed_count': 1157975}, {'id': 2331, 'hero': 'https://pe.tedcdn.com/images/ted/64bbcc24af870d9b4e1768abe88e1fe041b02a6a_2880x1620.jpg', 'speaker': 'Mary Robinson', 'title': 'Why climate change is a threat to human rights', 'duration': 1307, 'slug': 'mary_robinson_why_climate_change_is_a_threat_to_human_rights', 'viewed_count': 1126293}]
+  speaker_occupation: Climate advocate
+  tags: ['alternative energy', 'cars', 'climate change', 'culture', 'environment', 'global issues', 'science', 'sustainability', 'technology']
+  title: Averting the climate crisis
+  url: https://www.ted.com/talks/al_gore_on_averting_climate_crisis
+
+  views: 3200520
+
+Row 3:
+  comments: 124
+  description: New York Times columnist David Pogue takes aim at technology’s worst interface-design offenders, and provides encouraging examples of products that get it right. To funny things up, he bursts into song.
+  duration: 1286
+  event: TED2006
+  film_date: 1140739200
+  languages: 26
+  main_speaker: David Pogue
+  name: David Pogue: Simplicity sells
+  num_speaker: 1
+  published_date: 1151367060
+  ratings: [{'id': 7, 'name': 'Funny', 'count': 964}, {'id': 3, 'name': 'Courageous', 'count': 45}, {'id': 9, 'name': 'Ingenious', 'count': 183}, {'id': 1, 'name': 'Beautiful', 'count': 60}, {'id': 21, 'name': 'Unconvincing', 'count': 104}, {'id': 11, 'name': 'Longwinded', 'count': 78}, {'id': 8, 'name': 'Informative', 'count': 395}, {'id': 10, 'name': 'Inspiring', 'count': 230}, {'id': 22, 'name': 'Fascinating', 'count': 166}, {'id': 2, 'name': 'Confusing', 'count': 27}, {'id': 25, 'name': 'OK', 'count': 146}, {'id': 24, 'name': 'Persuasive', 'count': 230}, {'id': 23, 'name': 'Jaw-dropping', 'count': 54}, {'id': 26, 'name': 'Obnoxious', 'count': 142}]
+  related_talks: [{'id': 1725, 'hero': 'https://pe.tedcdn.com/images/ted/b7f415a054cc0a2bfdd90d0ad5a7f64cf060150d_1600x1200.jpg', 'speaker': 'David Pogue', 'title': '10 top time-saving tech tips', 'duration': 344, 'slug': 'david_pogue_10_top_time_saving_tech_tips', 'viewed_count': 4843421}, {'id': 2274, 'hero': 'https://pe.tedcdn.com/images/ted/608e677e4392bcdcf82b068fa221b9df74a213ef_2880x1620.jpg', 'speaker': 'Tony Fadell', 'title': 'The first secret of design is ... noticing', 'duration': 1001, 'slug': 'tony_fadell_the_first_secret_of_design_is_noticing', 'viewed_count': 2005916}, {'id': 172, 'hero': 'https://pe.tedcdn.com/images/ted/b790be2f87ceffba73fe73837944400c7d61cba2_1600x1200.jpg', 'speaker': 'John Maeda', 'title': 'Designing for simplicity', 'duration': 959, 'slug': 'john_maeda_on_the_simple_life', 'viewed_count': 1215942}, {'id': 2664, 'hero': 'https://pe.tedcdn.com/images/ted/092f184f6625c2aeef10949c8d7b2aa14ba4132b_2880x1620.jpg', 'speaker': 'Dan Bricklin', 'title': 'Meet the inventor of the electronic spreadsheet', 'duration': 720, 'slug': 'dan_bricklin_meet_the_inventor_of_the_electronic_spreadsheet', 'viewed_count': 992322}, {'id': 436, 'hero': 'https://pe.tedcdn.com/images/ted/66438_800x600.jpg', 'speaker': 'David Carson', 'title': 'Design and discovery', 'duration': 1359, 'slug': 'david_carson_on_design', 'viewed_count': 774485}, {'id': 1546, 'hero': 'https://pe.tedcdn.com/images/ted/39d58abd56cf9edd6936f4f42119a15e65692dc1_1600x1200.jpg', 'speaker': 'Clay Shirky', 'title': 'How the Internet will (one day) transform government', 'duration': 1112, 'slug': 'clay_shirky_how_the_internet_will_one_day_transform_government', 'viewed_count': 1245084}]
+  speaker_occupation: Technology columnist
+  tags: ['computers', 'entertainment', 'interface design', 'media', 'music', 'performance', 'simplicity', 'software', 'technology']
+  title: Simplicity sells
+  url: https://www.ted.com/talks/david_pogue_says_simplicity_sells
+
+  views: 1636292
+
+
+====================================================================================================
+
+====================================================================================================
+SUMMARY STATISTICS
+====================================================================================================
+Files Successfully Processed: 19
+Total Rows Analyzed: 1,841,397
+Total Columns Analyzed: 315
+Average Rows per File: 96,915
+Average Columns per File: 16
+
+Report Generated: 2025-12-08 16:19:33

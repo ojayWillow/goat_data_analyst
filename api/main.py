@@ -28,6 +28,7 @@ from typing import Optional, List, Dict, Any
 import pandas as pd
 import io
 import json
+import numpy as np
 from datetime import datetime
 
 from agents.orchestrator import Orchestrator
@@ -228,26 +229,25 @@ async def load_data(request: LoadDataRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/api/upload")
-async def upload_data(file: UploadFile = File(...)):
-    """Upload and load data file."""
+@app.post("/api/load")
+async def load_data(request: LoadDataRequest):
+    """Load data from file."""
     try:
-        contents = await file.read()
-        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
-        
-        # Cache the data
-        orchestrator.cache_data("uploaded_data", df)
-        
+        task = orchestrator.create_task("load_data", {"file_path": request.file_path})
+        task_result = orchestrator.execute_task(task["id"])
+        result = task_result.get("result", {})
+
         return {
             "status": "success",
-            "filename": file.filename,
-            "rows": len(df),
-            "columns": len(df.columns),
-            "shape": df.shape,
-            "columns_list": df.columns.tolist(),
+            "file_path": str(result.get("file_path", "")),
+            "rows": int(result.get("rows", 0)),
+            "columns": int(result.get("columns", 0)),
+            "columns_list": [str(c) for c in result.get("columns_list", [])],
         }
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 
 
