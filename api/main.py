@@ -1,13 +1,24 @@
 """FastAPI server for GOAT Data Analyst.
 
-Provides REST API endpoints for all agents and orchestrator.
+Provides REST API endpoints for all agents.
 
 Usage:
-    uvicorn api.main:app --reload
+    From project root:
+    python -m api.main
+    
+    Or:
+    uvicorn api.main:app --reload --app-dir . 
     
 API will be available at: http://localhost:8000
 API docs: http://localhost:8000/docs
 """
+
+import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
@@ -17,7 +28,6 @@ from typing import Optional, List, Dict, Any
 import pandas as pd
 import io
 import json
-from pathlib import Path
 from datetime import datetime
 
 from agents.orchestrator import Orchestrator
@@ -50,6 +60,7 @@ app.add_middleware(
 )
 
 # Initialize Orchestrator and agents
+logger.info("Initializing Orchestrator...")
 orchestrator = Orchestrator()
 
 agents = [
