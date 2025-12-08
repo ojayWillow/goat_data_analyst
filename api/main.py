@@ -197,8 +197,33 @@ async def load_data(request: LoadDataRequest):
     """Load data from file."""
     try:
         task = orchestrator.create_task("load_data", {"file_path": request.file_path})
-        result = orchestrator.execute_task(task["id"])
-        return result
+        task_result = orchestrator.execute_task(task["id"])
+        result = task_result.get("result", {})
+
+        # Convert numpy types to Python types
+        def convert_types(obj):
+            if isinstance(obj, dict):
+                return {k: convert_types(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [convert_types(item) for item in obj]
+            elif isinstance(obj, (np.integer, np.floating)):
+                return int(obj) if isinstance(obj, np.integer) else float(obj)
+            elif isinstance(obj, (np.bool_)):
+                return bool(obj)
+            elif pd.isna(obj):
+                return None
+            return obj
+
+        result = convert_types(result)
+
+        return {
+            "status": "success",
+            "file_path": result.get("file_path"),
+            "rows": int(result.get("rows", 0)),
+            "columns": int(result.get("columns", 0)),
+            "columns_list": result.get("columns_list", []),
+        }
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -225,19 +250,57 @@ async def upload_data(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+
 # ============================================================================
 # EXPLORATION ENDPOINTS
 # ============================================================================
 
 @app.post("/api/explore")
 async def explore_data(request: ExploreDataRequest):
-    """Explore data."""
+    """Explore data using Explorer agent."""
     try:
-        task = orchestrator.create_task("explore_data", {"data_key": request.data_key})
-        result = orchestrator.execute_task(task["id"])
-        return result
+        data = orchestrator.get_cached_data(request.data_key)
+        if data is None:
+            raise HTTPException(status_code=404, detail="Data not found")
+        
+        # Use the Explorer agent properly
+        from agents.explorer import Explorer
+        explorer = Explorer()
+        explorer.set_data(data)
+        
+        # Get all analysis
+        numeric = explorer.describe_numeric()
+        categorical = explorer.describe_categorical()
+        quality = explorer.data_quality_assessment()
+        corr = explorer.correlation_analysis()
+        
+        # Build JSON-safe response
+        exploration = {
+            "numeric_columns_count": len(numeric.get("numeric_columns", [])),
+            "numeric_columns": numeric.get("numeric_columns", []),
+            "categorical_columns_count": len(categorical.get("categorical_columns", [])),
+            "categorical_columns": categorical.get("categorical_columns", []),
+            "data_quality": {
+                "overall_quality_score": quality.get("overall_quality_score", 0),
+                "null_percentage": quality.get("null_percentage", 0),
+                "duplicate_rows": quality.get("duplicates", 0),
+                "duplicate_percentage": quality.get("duplicate_percentage", 0),
+            },
+            "correlation_summary": {
+                "strong_correlations_count": len(corr.get("strong_correlations", [])),
+                "total_pairs_evaluated": corr.get("columns", []),
+            },
+        }
+        
+        return {
+            "status": "success",
+            "data_key": request.data_key,
+            "summary": exploration,
+        }
+    
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 
 # ============================================================================
