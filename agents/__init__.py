@@ -9,5 +9,6 @@ from .explorer import Explorer
 from .aggregator import Aggregator
 from .visualizer import Visualizer
 from .predictor import Predictor
+from .anomaly_detector import AnomalyDetector
 
-__all__ = ['Orchestrator', 'DataLoader', 'Explorer', 'Aggregator', 'Visualizer', 'Predictor']
+__all__ = ['Orchestrator', 'DataLoader', 'Explorer', 'Aggregator', 'Visualizer', 'Predictor', 'AnomalyDetector']
