@@ -4,5 +4,6 @@ Contains specialized agents for data analysis, visualization, and insights.
 """
 
 from .orchestrator import Orchestrator
+from .data_loader import DataLoader
 
-__all__ = ['Orchestrator']
+__all__ = ['Orchestrator', 'DataLoader']
