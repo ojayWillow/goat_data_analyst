@@ -16,6 +16,7 @@ API docs: http://localhost:8000/docs
 import sys
 from pathlib import Path
 import math
+import json
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -28,7 +29,6 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import pandas as pd
 import io
-import json
 import numpy as np
 from datetime import datetime
 
@@ -83,6 +83,63 @@ logger.info("FastAPI server initialized with all agents")
 
 
 # ============================================================================
+# CUSTOM JSON ENCODER
+# ============================================================================
+
+class NaNHandlingEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles NaN, Inf, and numpy types."""
+    
+    def encode(self, o):
+        if isinstance(o, float):
+            if math.isnan(o) or math.isinf(o):
+                return 'null'
+        return super().encode(o)
+    
+    def iterencode(self, o, _one_shot=False):
+        """Override iterencode to handle NaN/Inf at all levels."""
+        for chunk in super().iterencode(o, _one_shot):
+            yield chunk
+    
+    def default(self, obj):
+        """Handle objects that json doesn't know about."""
+        # Handle numpy types
+        if isinstance(obj, np.generic):
+            if isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                val = float(obj)
+                if math.isnan(val) or math.isinf(val):
+                    return None
+                return val
+            elif isinstance(obj, np.bool_):
+                return bool(obj)
+            elif isinstance(obj, (np.datetime64, np.timedelta64)):
+                return str(obj)
+            elif isinstance(obj, (np.str_, np.unicode_)):
+                return str(obj)
+            else:
+                return str(obj)
+        
+        # Handle pandas NA/NaT
+        if pd.isna(obj):
+            return None
+        
+        # Handle pandas Series
+        if isinstance(obj, pd.Series):
+            return obj.tolist()
+        
+        # Handle pandas Index
+        if isinstance(obj, pd.Index):
+            return obj.tolist()
+        
+        # Handle datetime
+        if isinstance(obj, (datetime,)):
+            return obj.isoformat()
+        
+        return super().default(obj)
+
+
+# ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
 
@@ -102,15 +159,16 @@ def convert_to_json_serializable(obj):
     try:
         # Check for NaN/Inf FIRST (works for both float and numpy.float)
         if isinstance(obj, (float, np.floating)):
-            if math.isnan(obj) or math.isinf(obj):
+            val = float(obj)
+            if math.isnan(val) or math.isinf(val):
                 return None
+            return val
         
         # Handle numpy generic types
         if isinstance(obj, np.generic):
             if isinstance(obj, np.integer):
                 return int(obj)
             elif isinstance(obj, np.floating):
-                # Double-check for NaN/Inf
                 val = float(obj)
                 if math.isnan(val) or math.isinf(val):
                     return None
@@ -119,7 +177,7 @@ def convert_to_json_serializable(obj):
                 return bool(obj)
             elif isinstance(obj, (np.datetime64, np.timedelta64)):
                 return str(obj)
-            elif isinstance(obj, np.str_):
+            elif isinstance(obj, (np.str_, np.unicode_)):
                 return str(obj)
             else:
                 return str(obj)
@@ -140,12 +198,37 @@ def convert_to_json_serializable(obj):
         elif isinstance(obj, (pd.Series, pd.Index)):
             return [convert_to_json_serializable(item) for item in obj.tolist()]
         
+        # Handle DataFrames
+        elif isinstance(obj, pd.DataFrame):
+            return obj.where(pd.notna(obj), None).to_dict(orient='records')
+        
         # Return as-is for standard Python types
         return obj
     
     except Exception as e:
         logger.warning(f"Could not convert type {type(obj)}: {e}", exc_info=True)
-        return str(obj)
+        return None
+
+
+def safe_json_response(data):
+    """Create JSON response with custom encoder that handles NaN."""
+    try:
+        # Use custom encoder
+        json_str = json.dumps(data, cls=NaNHandlingEncoder, allow_nan=False)
+        return JSONResponse(content=json.loads(json_str))
+    except Exception as e:
+        logger.error(f"Error encoding response: {e}", exc_info=True)
+        # Fallback: convert and try again
+        try:
+            safe_data = convert_to_json_serializable(data)
+            json_str = json.dumps(safe_data, cls=NaNHandlingEncoder, allow_nan=False)
+            return JSONResponse(content=json.loads(json_str))
+        except Exception as e2:
+            logger.error(f"Fallback encoding also failed: {e2}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Could not serialize response data"}
+            )
 
 
 # ============================================================================
@@ -279,13 +362,15 @@ async def load_data(request: LoadDataRequest):
         
         logger.info(f"Successfully loaded data: {result.get('rows')} rows, {result.get('columns')} columns")
         
-        return {
+        response_data = {
             "status": "success",
             "file_path": str(result.get("file_path", "")),
             "rows": int(result.get("rows", 0)),
             "columns": int(result.get("columns", 0)),
             "columns_list": result.get("columns_list", []),
         }
+        
+        return safe_json_response(response_data)
 
     except Exception as e:
         logger.error(f"Error loading data: {str(e)}", exc_info=True)
@@ -343,11 +428,13 @@ async def explore_data(request: ExploreDataRequest):
         
         logger.info(f"Data exploration complete")
         
-        return {
+        response_data = {
             "status": "success",
             "data_key": request.data_key,
             "summary": exploration,
         }
+        
+        return safe_json_response(response_data)
     
     except Exception as e:
         logger.error(f"Error exploring data: {str(e)}", exc_info=True)
@@ -380,7 +467,7 @@ async def aggregate_data(request: AggregateRequest):
         
         logger.info(f"Aggregation complete")
         
-        return result
+        return safe_json_response(result)
     except Exception as e:
         logger.error(f"Error aggregating data: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
@@ -413,7 +500,7 @@ async def visualize_data(request: VisualizationRequest):
         
         logger.info(f"Visualization created")
         
-        return result
+        return safe_json_response(result)
     except Exception as e:
         logger.error(f"Error creating visualization: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
@@ -446,7 +533,7 @@ async def predict(request: PredictionRequest):
         
         logger.info(f"Predictions generated")
         
-        return result
+        return safe_json_response(result)
     except Exception as e:
         logger.error(f"Error generating predictions: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
@@ -478,7 +565,7 @@ async def detect_anomalies(request: AnomalyRequest):
         
         logger.info(f"Anomaly detection complete")
         
-        return result
+        return safe_json_response(result)
     except Exception as e:
         logger.error(f"Error detecting anomalies: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
@@ -504,7 +591,7 @@ async def get_recommendations(request: RecommendationRequest):
         
         logger.info(f"Recommendations generated")
         
-        return result
+        return safe_json_response(result)
     except Exception as e:
         logger.error(f"Error generating recommendations: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
@@ -533,7 +620,7 @@ async def generate_report(request: ReportRequest):
         
         logger.info(f"Report generated")
         
-        return result
+        return safe_json_response(result)
     except Exception as e:
         logger.error(f"Error generating report: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
@@ -555,7 +642,7 @@ async def execute_workflow(request: WorkflowRequest):
         
         logger.info(f"Workflow execution complete")
         
-        return workflow_result
+        return safe_json_response(workflow_result)
     except Exception as e:
         logger.error(f"Error executing workflow: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
@@ -572,18 +659,23 @@ async def get_cached_data(key: str):
             raise HTTPException(status_code=404, detail=f"Key '{key}' not found")
         
         if isinstance(data, pd.DataFrame):
-            return {
+            # Convert DataFrame to safe dict with NaN handling
+            head_data = data.head(10).where(pd.notna(data.head(10)), None).to_dict(orient="records")
+            
+            response_data = {
                 "status": "success",
                 "key": key,
                 "type": "dataframe",
-                "shape": data.shape,
+                "shape": list(data.shape),
                 "columns": data.columns.tolist(),
-                "head": data.head(10).to_dict(orient="records"),
+                "head": head_data,
             }
+            
+            return safe_json_response(response_data)
         
         logger.info(f"Cached data retrieved successfully")
         
-        return {"status": "success", "key": key, "data": str(data)}
+        return safe_json_response({"status": "success", "key": key, "data": str(data)})
     except Exception as e:
         logger.error(f"Error retrieving cached data: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
