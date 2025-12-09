@@ -12,12 +12,11 @@ import sys
 from pathlib import Path
 
 
-@pytest.fixture(scope="session")
 def pytest_configure(config):
     """Configure pytest at session start."""
     # Disable pytest's log capture to avoid conflicts with our logging
     logging.getLogger().setLevel(logging.WARNING)
-    
+
 
 @pytest.fixture(autouse=True)
 def cleanup_logging():
@@ -27,9 +26,12 @@ def cleanup_logging():
     try:
         from core.structured_logger import _logger_cache
         # Close all loggers
-        for (name, log_dir), logger in _logger_cache.items():
+        for (name, log_dir), logger in list(_logger_cache.items()):
             if hasattr(logger, 'close'):
-                logger.close()
+                try:
+                    logger.close()
+                except Exception:
+                    pass
     except Exception:
         pass
 
@@ -75,7 +77,6 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.integration)
 
 
-# Add hooks to handle test outcomes
 def pytest_runtest_makereport(item, call):
     """Hook to clean up after each test."""
     if call.when == "teardown":
