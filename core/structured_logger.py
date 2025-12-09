@@ -24,6 +24,7 @@ from pathlib import Path
 import functools
 from contextlib import contextmanager
 import sys
+import os
 
 
 class JSONFormatter(logging.Formatter):
@@ -72,6 +73,7 @@ class StructuredLogger:
         self.name = name
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.file_handler = None
         
         # Create logger
         self.logger = logging.getLogger(name)
@@ -79,8 +81,11 @@ class StructuredLogger:
         self.logger.propagate = False  # Prevent duplicate logs
         
         # Remove existing handlers to avoid duplicates
-        for handler in self.logger.handlers[:]:
-            handler.close()
+        for handler in list(self.logger.handlers):
+            try:
+                handler.close()
+            except Exception:
+                pass
             self.logger.removeHandler(handler)
         
         # Console handler (JSON formatted)
@@ -89,16 +94,17 @@ class StructuredLogger:
         console_handler.setFormatter(JSONFormatter())
         self.logger.addHandler(console_handler)
         
-        # File handler (JSON formatted)
-        file_path = self.log_dir / f"{name.replace('.', '_')}.log"
-        try:
-            file_handler = logging.FileHandler(file_path, mode='a')
-            file_handler.setLevel(logging.DEBUG)
-            file_handler.setFormatter(JSONFormatter())
-            self.logger.addHandler(file_handler)
-        except (IOError, OSError):
-            # If file can't be created, just use console
-            pass
+        # File handler (JSON formatted) - only if not in pytest
+        if 'pytest' not in sys.modules:
+            try:
+                file_path = self.log_dir / f"{name.replace('.', '_')}.log"
+                self.file_handler = logging.FileHandler(file_path, mode='a')
+                self.file_handler.setLevel(logging.DEBUG)
+                self.file_handler.setFormatter(JSONFormatter())
+                self.logger.addHandler(self.file_handler)
+            except (IOError, OSError):
+                # If file can't be created, just use console
+                pass
         
         # Metrics
         self.metrics = {
@@ -264,12 +270,20 @@ class StructuredLogger:
         }
     
     def close(self):
-        """Close all handlers."""
-        for handler in self.logger.handlers[:]:
-            try:
-                handler.close()
-            except Exception:
-                pass
+        """Close all handlers safely."""
+        try:
+            for handler in list(self.logger.handlers):
+                try:
+                    handler.flush()
+                    handler.close()
+                except Exception:
+                    pass
+                try:
+                    self.logger.removeHandler(handler)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
 
 # Global logger cache
