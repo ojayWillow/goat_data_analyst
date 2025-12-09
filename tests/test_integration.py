@@ -54,12 +54,11 @@ class TestAgentPipeline:
         explorer = Explorer()
         explorer.set_data(df)
         
-        # Use correct Explorer API methods
-        numeric_stats = explorer.describe_numeric()
-        assert numeric_stats['status'] == 'success'
-        
-        categorical_stats = explorer.describe_categorical()
-        assert categorical_stats['status'] == 'success'
+        # Use Explorer's get_summary_report which aggregates all analyses
+        summary = explorer.get_summary_report()
+        assert summary['status'] == 'success'
+        assert 'numeric_stats' in summary
+        assert 'categorical_stats' in summary
         
         # STEP 3: Visualizer creates charts
         visualizer = Visualizer()
@@ -130,18 +129,19 @@ class TestAgentPipeline:
         load_result = loader.load(sample_data_file)
         df = load_result['data']
         
-        # Analyze
+        # Analyze with Explorer
         explorer = Explorer()
         explorer.set_data(df)
         
-        # Get numeric statistics
-        numeric_result = explorer.describe_numeric()
-        assert numeric_result['status'] == 'success'
-        numeric_cols = numeric_result['numeric_columns']
+        # Get full summary (this works with the worker-based architecture)
+        summary = explorer.get_summary_report()
+        assert summary['status'] == 'success'
         
-        # Visualize first numeric column
+        # Extract numeric columns from the result
+        numeric_cols = summary['numeric_stats'].get('numeric_columns', [])
         assert len(numeric_cols) > 0
         
+        # Visualize first numeric column
         visualizer = Visualizer()
         visualizer.set_data(df)
         
