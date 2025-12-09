@@ -12,6 +12,7 @@ from typing import Dict, List, Set, Any, Tuple
 import ast
 
 from core.logger import get_logger
+from .cleaner import Cleaner
 
 
 class StructureScanner:
@@ -371,17 +372,20 @@ class ProjectManager:
 
     def __init__(self):
         self.logger = get_logger("ProjectManager")
+        self.project_root = Path(__file__).parent.parent.parent
         self.scanner = StructureScanner(self.logger)
         self.learner = PatternLearner(self.logger)
         self.validator = PatternValidator(self.logger)
         self.tracker = ChangeTracker(self.logger)
         self.reporter = HealthReporter(self.logger)
+        self.cleaner = Cleaner(self.logger, self.project_root)
 
         # Store discovered structure and patterns
         self.structure = {}
         self.patterns = {}
         self.changes = {}
         self.report = {}
+        self.cleanup_result = {}
 
     def execute(self) -> Dict[str, Any]:
         """Execute complete project analysis and reporting.
@@ -423,6 +427,12 @@ class ProjectManager:
             )
             self.logger.info(f"Health: {self.report['health_score']}/100 - {self.report['status']}")
 
+            # 5. Clean up files
+            self.logger.info("Organizing project files...")
+            self.cleanup_result = self.cleaner.organize_files()
+            if self.cleanup_result.get("total_moved", 0) > 0:
+                self.logger.info(f"Organized {self.cleanup_result['total_moved']} files")
+
             return self.get_report()
 
         except Exception as e:
@@ -440,6 +450,7 @@ class ProjectManager:
             "patterns": self.patterns,
             "changes": self.changes,
             "health": self.report,
+            "cleanup": self.cleanup_result,
         }
 
     def validate_new_agent(self, agent_name: str) -> Dict[str, Any]:
@@ -501,5 +512,12 @@ class ProjectManager:
         print(f"\nRecommendations:")
         for rec in health["recommendations"]:
             print(f"  - {rec}")
+
+        # Print cleanup results
+        cleanup = self.cleanup_result
+        if cleanup.get("total_moved", 0) > 0:
+            print(f"\nFiles Organized: {cleanup['total_moved']}")
+            for file_info in cleanup.get("moved_files", []):
+                print(f"  - {file_info['file']} -> {file_info['to']}/")
 
         print("\n" + "=" * 60 + "\n")
