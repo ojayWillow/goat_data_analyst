@@ -86,11 +86,12 @@ class TestAgentPipeline:
         aggregator = Aggregator()
         aggregator.set_data(df)
         
-        stats = aggregator.get_stats('sales')
-        assert stats['status'] == 'success'
+        # Use correct Aggregator API: groupby_single
+        groupby_result = aggregator.groupby_single('region', 'sales', 'sum')
+        assert groupby_result['status'] == 'success'
         
-        group_stats = aggregator.group_by_and_aggregate('region', 'sales', 'mean')
-        assert group_stats['status'] == 'success'
+        pivot_result = aggregator.pivot_table('region', 'date', 'sales')
+        assert pivot_result['status'] == 'success'
         
         # VALIDATION: All agents working together
         assert visualizer.list_charts()['count'] >= 3
