@@ -400,7 +400,10 @@ async def load_data(request: LoadDataRequest):
 
 @app.post("/api/explore")
 async def explore_data(request: ExploreDataRequest):
-    """Explore data using Explorer agent."""
+    """Explore data using Explorer agent with worker-based analysis.
+    
+    Returns comprehensive report with worker results and quality validation.
+    """
     try:
         logger.info(f"Exploring data from key: {request.data_key}")
         
@@ -408,50 +411,19 @@ async def explore_data(request: ExploreDataRequest):
         if data is None:
             raise HTTPException(status_code=404, detail="Data not found")
         
-        # Use the Explorer agent properly
-        from agents.explorer import Explorer
+        # Use the Explorer agent with workers
         explorer = Explorer()
         explorer.set_data(data)
         
-        # Get all analysis
-        numeric = explorer.describe_numeric()
-        categorical = explorer.describe_categorical()
-        quality = explorer.data_quality_assessment()
-        corr = explorer.correlation_analysis()
+        # Get comprehensive report with all workers and validation
+        report = explorer.get_summary_report()
         
-        # Convert all results to JSON-serializable
-        numeric = convert_to_json_serializable(numeric)
-        categorical = convert_to_json_serializable(categorical)
-        quality = convert_to_json_serializable(quality)
-        corr = convert_to_json_serializable(corr)
-        
-        # Build JSON-safe response
-        exploration = {
-            "numeric_columns_count": len(numeric.get("numeric_columns", [])),
-            "numeric_columns": numeric.get("numeric_columns", []),
-            "categorical_columns_count": len(categorical.get("categorical_columns", [])),
-            "categorical_columns": categorical.get("categorical_columns", []),
-            "data_quality": {
-                "overall_quality_score": quality.get("overall_quality_score", 0),
-                "null_percentage": quality.get("null_percentage", 0),
-                "duplicate_rows": quality.get("duplicates", 0),
-                "duplicate_percentage": quality.get("duplicate_percentage", 0),
-            },
-            "correlation_summary": {
-                "strong_correlations_count": len(corr.get("strong_correlations", [])),
-                "total_pairs_evaluated": corr.get("columns", []),
-            },
-        }
+        # Convert to JSON-serializable
+        report = convert_to_json_serializable(report)
         
         logger.info(f"Data exploration complete")
         
-        response_data = {
-            "status": "success",
-            "data_key": request.data_key,
-            "summary": exploration,
-        }
-        
-        return safe_json_response(response_data)
+        return safe_json_response(report)
     
     except Exception as e:
         logger.error(f"Error exploring data: {str(e)}", exc_info=True)
