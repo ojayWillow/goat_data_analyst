@@ -32,7 +32,7 @@ class DataLoader:
     - Load CSV files
     - Load JSON files
     - Load Excel files (XLSX, XLS)
-    - Load Parquet files
+    - Load Parquet files (with streaming)
     - Load JSONL files (Week 2)
     - Load HDF5 files (Week 2)
     - Load SQLite databases (Week 2)
@@ -105,7 +105,7 @@ class DataLoader:
                 file_format=file_format
             )
         elif file_format == 'parquet':
-            load_result = self.parquet_loader.safe_execute(file_path=str(file_path))
+            load_result = self._load_parquet_streaming(file_path=str(file_path), **kwargs)
         elif file_format == 'jsonl':
             load_result = self._load_jsonl_worker(file_path=str(file_path))
         elif file_format in ['h5', 'hdf5']:
@@ -299,6 +299,69 @@ class DataLoader:
             return WorkerResult(
                 worker="DataLoaderSQLite",
                 task_type="load_sqlite",
+                success=False,
+                data=None,
+                errors=[{"message": str(e), "type": "load_error"}],
+                warnings=[]
+            )
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def _load_parquet_streaming(self, file_path: str, columns: Optional[List[str]] = None, chunk_size: int = 50000) -> WorkerResult:
+        """Load Parquet format with streaming/chunking support.
+        
+        Args:
+            file_path: Path to Parquet file
+            columns: Optional columns to read
+            chunk_size: Number of rows per chunk
+            
+        Returns:
+            WorkerResult with loaded DataFrame
+        """
+        structured_logger.info("Loading Parquet file with streaming", {
+            "filepath": file_path,
+            "format": "parquet",
+            "columns": columns,
+            "chunk_size": chunk_size
+        })
+        
+        try:
+            import pyarrow.parquet as pq
+            
+            # Read parquet file with streaming
+            parquet_file = pq.ParquetFile(file_path)
+            
+            # Read all batches
+            batches = []
+            for batch in parquet_file.iter_batches(batch_size=chunk_size, columns=columns):
+                batches.append(batch.to_pandas())
+            
+            # Concatenate all batches
+            if batches:
+                df = pd.concat(batches, ignore_index=True)
+            else:
+                df = pd.DataFrame()
+            
+            structured_logger.info("Parquet loaded successfully", {
+                "shape": str(df.shape),
+                "columns": len(df.columns),
+                "batches_read": len(batches)
+            })
+            return WorkerResult(
+                worker="DataLoaderParquet",
+                task_type="load_parquet_streaming",
+                success=True,
+                data=df,
+                errors=[],
+                warnings=[]
+            )
+        except Exception as e:
+            structured_logger.error("Failed to load Parquet", {
+                "filepath": file_path,
+                "error": str(e)
+            })
+            return WorkerResult(
+                worker="DataLoaderParquet",
+                task_type="load_parquet_streaming",
                 success=False,
                 data=None,
                 errors=[{"message": str(e), "type": "load_error"}],
