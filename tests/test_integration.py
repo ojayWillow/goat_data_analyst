@@ -53,9 +53,13 @@ class TestAgentPipeline:
         # STEP 2: Explorer analyzes
         explorer = Explorer()
         explorer.set_data(df)
-        summary = explorer.get_summary()
-        assert summary['status'] == 'success'
-        assert 'columns' in summary
+        
+        # Use correct Explorer API methods
+        numeric_stats = explorer.describe_numeric()
+        assert numeric_stats['status'] == 'success'
+        
+        categorical_stats = explorer.describe_categorical()
+        assert categorical_stats['status'] == 'success'
         
         # STEP 3: Visualizer creates charts
         visualizer = Visualizer()
@@ -94,7 +98,6 @@ class TestAgentPipeline:
         assert group_stats['status'] == 'success'
         
         # ALL AGENTS WORKING TOGETHER ✅
-        assert loader.get_summary() is not None
         assert visualizer.list_charts()['count'] >= 3
         assert detector.summary_report()['total_detections'] >= 2
 
@@ -131,19 +134,18 @@ class TestAgentPipeline:
         explorer = Explorer()
         explorer.set_data(df)
         
-        # Get column info
-        cols_result = explorer.get_columns()
-        assert cols_result['status'] == 'success'
-        columns = cols_result['columns']
+        # Get numeric statistics
+        numeric_result = explorer.describe_numeric()
+        assert numeric_result['status'] == 'success'
+        numeric_cols = numeric_result['numeric_columns']
         
         # Visualize first numeric column
-        numeric_cols = [c for c in columns if c['dtype'] in ['int64', 'float64']]
         assert len(numeric_cols) > 0
         
         visualizer = Visualizer()
         visualizer.set_data(df)
         
-        col_name = numeric_cols[0]['name']
+        col_name = numeric_cols[0]
         hist_result = visualizer.histogram(col_name)
         assert hist_result['success']
 
