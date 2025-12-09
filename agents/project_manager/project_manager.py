@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, List, Set, Any, Tuple
 import ast
 
-from core.logger import Logger
+from core.logger import get_logger
 
 
 class StructureScanner:
@@ -350,7 +350,7 @@ class ProjectManager:
     """
 
     def __init__(self):
-        self.logger = Logger("ProjectManager").get_logger()
+        self.logger = get_logger("ProjectManager")
         self.scanner = StructureScanner(self.logger)
         self.learner = PatternLearner(self.logger)
         self.validator = PatternValidator(self.logger)
