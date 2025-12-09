@@ -1,7 +1,36 @@
 """Aggregator Agent - Data aggregation, grouping, and summarization.
 
-Handles groupBy operations, multi-level aggregations, pivot tables,
-and custom aggregation functions.
+This agent performs grouping, aggregation, pivot tables, and statistical
+summaries on loaded datasets.
+
+Capabilities:
+- GroupBy operations (single and multiple columns)
+- Pivot table creation
+- Cross-tabulation
+- Rolling aggregations
+- Summary statistics
+- Value counting
+
+Returns:
+    Dictionary with the following structure:
+    {
+        'status': 'success' or 'error',
+        'message': 'human-readable message',
+        'data': aggregated_result,
+        'metadata': {
+            'rows': int,
+            'columns': int,
+            'groups': int
+        },
+        'errors': list of error messages
+    }
+
+Example:
+    agg = Aggregator()
+    agg.set_data(df)
+    result = agg.groupby_single('region', 'sales', 'sum')
+    if result['status'] == 'success':
+        print(f"Grouped into {result['metadata']['groups']} groups")
 """
 
 from typing import Any, Dict, List, Optional, Union
@@ -12,47 +41,87 @@ from datetime import datetime
 from core.logger import get_logger
 from core.exceptions import AgentError
 
-logger = get_logger(__name__)
-
 
 class Aggregator:
-    """Agent for data aggregation and grouping.
-    
-    Capabilities:
-    - GroupBy operations (single and multiple columns)
-    - Multi-level aggregations
-    - Pivot table creation
-    - Custom aggregation functions
-    - Time-based aggregation
-    - Rolling aggregations
-    - Cross-tabulation
-    """
-    
+    """Aggregator: Groups, aggregates, and summarizes data."""
+
     def __init__(self):
         """Initialize Aggregator agent."""
         self.name = "Aggregator"
+        self.logger = get_logger("Aggregator")
         self.data = None
         self.aggregation_cache = {}
-        logger.info(f"{self.name} initialized")
-    
-    def set_data(self, df: pd.DataFrame) -> None:
+        self.logger.info("Aggregator initialized")
+
+    # ===== SECTION 1: Data Management =====
+    # What: Set and retrieve data
+    # Input: DataFrame
+    # Output: confirmation or current data
+
+    def set_data(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Set data to aggregate.
         
         Args:
             df: DataFrame to aggregate
+            
+        Returns:
+            {
+                'status': 'success' or 'error',
+                'message': str,
+                'data': None,
+                'metadata': {'rows': int, 'columns': int},
+                'errors': list
+            }
         """
-        self.data = df.copy()
-        self.aggregation_cache = {}  # Clear cache
-        logger.info(f"Data set: {df.shape[0]} rows, {df.shape[1]} columns")
-    
+        try:
+            if df is None or df.empty:
+                return {
+                    'status': 'error',
+                    'message': 'Data is empty',
+                    'data': None,
+                    'metadata': {},
+                    'errors': ['DataFrame is empty']
+                }
+            
+            self.data = df.copy()
+            self.aggregation_cache = {}
+            
+            self.logger.info(f"Data set: {df.shape[0]} rows, {df.shape[1]} columns")
+            
+            return {
+                'status': 'success',
+                'message': f"Data loaded: {df.shape[0]} rows, {df.shape[1]} columns",
+                'data': None,
+                'metadata': {
+                    'rows': df.shape[0],
+                    'columns': df.shape[1],
+                    'column_names': df.columns.tolist()
+                },
+                'errors': []
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to set data: {e}")
+            return {
+                'status': 'error',
+                'message': f"Failed to set data: {e}",
+                'data': None,
+                'metadata': {},
+                'errors': [str(e)]
+            }
+
     def get_data(self) -> Optional[pd.DataFrame]:
-        """Get current data.
+        """Get currently loaded data.
         
         Returns:
-            DataFrame or None
+            Loaded DataFrame or None if no data loaded
         """
         return self.data
-    
+
+    # ===== SECTION 2: Single-Level GroupBy =====
+    # What: Group by one column and aggregate
+    # Input: group column, agg column, function
+    # Output: grouped result
+
     def groupby_single(self, group_col: str, agg_col: str, agg_func: str = "sum") -> Dict[str, Any]:
         """Group by single column and aggregate.
         
@@ -62,84 +131,160 @@ class Aggregator:
             agg_func: Aggregation function ('sum', 'mean', 'count', 'min', 'max', 'std', 'var')
             
         Returns:
-            Dictionary with groupby results
-            
-        Raises:
-            AgentError: If columns don't exist or aggregation fails
+            {
+                'status': 'success' or 'error',
+                'message': str,
+                'data': list of dicts,
+                'metadata': {'groups': int, 'function': str},
+                'errors': list
+            }
         """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
-        
-        if group_col not in self.data.columns:
-            raise AgentError(f"Column '{group_col}' not found")
-        
-        if agg_col not in self.data.columns:
-            raise AgentError(f"Column '{agg_col}' not found")
-        
         try:
-            logger.info(f"GroupBy '{group_col}' aggregating '{agg_col}' with {agg_func}")
+            # Validate data
+            if self.data is None:
+                return {
+                    'status': 'error',
+                    'message': 'No data loaded',
+                    'data': None,
+                    'metadata': {},
+                    'errors': ['No data set. Use set_data() first.']
+                }
+            
+            # Validate columns
+            if group_col not in self.data.columns:
+                return {
+                    'status': 'error',
+                    'message': f"Column '{group_col}' not found",
+                    'data': None,
+                    'metadata': {},
+                    'errors': [f"Group column '{group_col}' not found"]
+                }
+            
+            if agg_col not in self.data.columns:
+                return {
+                    'status': 'error',
+                    'message': f"Column '{agg_col}' not found",
+                    'data': None,
+                    'metadata': {},
+                    'errors': [f"Aggregation column '{agg_col}' not found"]
+                }
+            
+            # Perform groupby
+            self.logger.info(f"GroupBy '{group_col}' aggregating '{agg_col}' with {agg_func}")
             
             result = self.data.groupby(group_col)[agg_col].agg(agg_func).reset_index()
             result.columns = [group_col, f"{agg_col}_{agg_func}"]
             
             return {
-                "status": "success",
-                "group_by": group_col,
-                "aggregated_column": agg_col,
-                "function": agg_func,
-                "groups": len(result),
-                "results": result.to_dict(orient="records"),
-                "dataframe": result,
+                'status': 'success',
+                'message': f"Grouped by '{group_col}' into {len(result)} groups",
+                'data': result.to_dict(orient='records'),
+                'metadata': {
+                    'groups': len(result),
+                    'group_column': group_col,
+                    'aggregated_column': agg_col,
+                    'function': agg_func
+                },
+                'errors': []
             }
         
         except Exception as e:
-            logger.error(f"GroupBy failed: {e}")
-            raise AgentError(f"GroupBy operation failed: {e}")
-    
+            self.logger.error(f"GroupBy failed: {e}")
+            return {
+                'status': 'error',
+                'message': f"GroupBy operation failed: {e}",
+                'data': None,
+                'metadata': {},
+                'errors': [str(e)]
+            }
+
+    # ===== SECTION 3: Multi-Level GroupBy =====
+    # What: Group by multiple columns with multiple aggregations
+    # Input: group columns, aggregation specs
+    # Output: multi-level grouped result
+
     def groupby_multiple(self, group_cols: List[str], agg_specs: Dict[str, str]) -> Dict[str, Any]:
         """Group by multiple columns with multiple aggregations.
         
         Args:
             group_cols: Columns to group by
             agg_specs: Dictionary mapping columns to aggregation functions
-                      e.g., {'sales': 'sum', 'quantity': 'mean', 'price': 'max'}
+                      e.g., {'sales': 'sum', 'quantity': 'mean'}
             
         Returns:
-            Dictionary with multi-level groupby results
-            
-        Raises:
-            AgentError: If columns don't exist or aggregation fails
+            {
+                'status': 'success' or 'error',
+                'message': str,
+                'data': list of dicts,
+                'metadata': {'groups': int, 'group_columns': list, 'agg_specs': dict},
+                'errors': list
+            }
         """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
-        
-        # Validate columns
-        for col in group_cols:
-            if col not in self.data.columns:
-                raise AgentError(f"Group column '{col}' not found")
-        
-        for col in agg_specs.keys():
-            if col not in self.data.columns:
-                raise AgentError(f"Aggregation column '{col}' not found")
-        
         try:
-            logger.info(f"Multi-level GroupBy by {group_cols} with specs {agg_specs}")
+            # Validate data
+            if self.data is None:
+                return {
+                    'status': 'error',
+                    'message': 'No data loaded',
+                    'data': None,
+                    'metadata': {},
+                    'errors': ['No data set. Use set_data() first.']
+                }
+            
+            # Validate group columns
+            for col in group_cols:
+                if col not in self.data.columns:
+                    return {
+                        'status': 'error',
+                        'message': f"Column '{col}' not found",
+                        'data': None,
+                        'metadata': {},
+                        'errors': [f"Group column '{col}' not found"]
+                    }
+            
+            # Validate aggregation columns
+            for col in agg_specs.keys():
+                if col not in self.data.columns:
+                    return {
+                        'status': 'error',
+                        'message': f"Column '{col}' not found",
+                        'data': None,
+                        'metadata': {},
+                        'errors': [f"Aggregation column '{col}' not found"]
+                    }
+            
+            # Perform multi-level groupby
+            self.logger.info(f"Multi-level GroupBy by {group_cols} with specs {agg_specs}")
             
             result = self.data.groupby(group_cols).agg(agg_specs).reset_index()
             
             return {
-                "status": "success",
-                "group_by_columns": group_cols,
-                "aggregation_specs": agg_specs,
-                "groups": len(result),
-                "results": result.to_dict(orient="records"),
-                "dataframe": result,
+                'status': 'success',
+                'message': f"Grouped into {len(result)} groups",
+                'data': result.to_dict(orient='records'),
+                'metadata': {
+                    'groups': len(result),
+                    'group_columns': group_cols,
+                    'aggregation_specs': agg_specs
+                },
+                'errors': []
             }
         
         except Exception as e:
-            logger.error(f"Multi-level GroupBy failed: {e}")
-            raise AgentError(f"Multi-level GroupBy failed: {e}")
-    
+            self.logger.error(f"Multi-level GroupBy failed: {e}")
+            return {
+                'status': 'error',
+                'message': f"Multi-level GroupBy failed: {e}",
+                'data': None,
+                'metadata': {},
+                'errors': [str(e)]
+            }
+
+    # ===== SECTION 4: Pivot & CrossTab =====
+    # What: Reshape data into pivot tables
+    # Input: index, columns, values
+    # Output: pivot table result
+
     def pivot_table(self, index: str, columns: str, values: str, aggfunc: str = "sum") -> Dict[str, Any]:
         """Create pivot table.
         
@@ -150,21 +295,38 @@ class Aggregator:
             aggfunc: Aggregation function
             
         Returns:
-            Dictionary with pivot table
-            
-        Raises:
-            AgentError: If columns don't exist or pivot fails
+            {
+                'status': 'success' or 'error',
+                'message': str,
+                'data': list of dicts,
+                'metadata': {'shape': tuple, 'index': str, 'columns': str, 'values': str},
+                'errors': list
+            }
         """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
-        
-        # Validate columns
-        for col in [index, columns, values]:
-            if col not in self.data.columns:
-                raise AgentError(f"Column '{col}' not found")
-        
         try:
-            logger.info(f"Creating pivot table: index={index}, columns={columns}, values={values}")
+            # Validate data
+            if self.data is None:
+                return {
+                    'status': 'error',
+                    'message': 'No data loaded',
+                    'data': None,
+                    'metadata': {},
+                    'errors': ['No data set. Use set_data() first.']
+                }
+            
+            # Validate columns
+            for col in [index, columns, values]:
+                if col not in self.data.columns:
+                    return {
+                        'status': 'error',
+                        'message': f"Column '{col}' not found",
+                        'data': None,
+                        'metadata': {},
+                        'errors': [f"Column '{col}' not found"]
+                    }
+            
+            # Create pivot table
+            self.logger.info(f"Creating pivot table: index={index}, columns={columns}, values={values}")
             
             pivot = pd.pivot_table(
                 self.data,
@@ -175,20 +337,29 @@ class Aggregator:
             ).reset_index()
             
             return {
-                "status": "success",
-                "index": index,
-                "columns": columns,
-                "values": values,
-                "aggfunc": aggfunc,
-                "shape": pivot.shape,
-                "results": pivot.to_dict(orient="records"),
-                "dataframe": pivot,
+                'status': 'success',
+                'message': f"Pivot table created: {pivot.shape[0]} rows x {pivot.shape[1]} columns",
+                'data': pivot.to_dict(orient='records'),
+                'metadata': {
+                    'shape': pivot.shape,
+                    'index': index,
+                    'columns': columns,
+                    'values': values,
+                    'aggfunc': aggfunc
+                },
+                'errors': []
             }
         
         except Exception as e:
-            logger.error(f"Pivot table creation failed: {e}")
-            raise AgentError(f"Pivot table creation failed: {e}")
-    
+            self.logger.error(f"Pivot table creation failed: {e}")
+            return {
+                'status': 'error',
+                'message': f"Pivot table creation failed: {e}",
+                'data': None,
+                'metadata': {},
+                'errors': [str(e)]
+            }
+
     def crosstab(self, row_col: str, col_col: str, values: Optional[str] = None, aggfunc: str = "count") -> Dict[str, Any]:
         """Create cross-tabulation.
         
@@ -199,24 +370,47 @@ class Aggregator:
             aggfunc: Aggregation function
             
         Returns:
-            Dictionary with cross-tabulation
-            
-        Raises:
-            AgentError: If columns don't exist or crosstab fails
+            {
+                'status': 'success' or 'error',
+                'message': str,
+                'data': list of dicts,
+                'metadata': {'shape': tuple, 'rows': str, 'columns': str},
+                'errors': list
+            }
         """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
-        
-        # Validate columns
-        for col in [row_col, col_col]:
-            if col not in self.data.columns:
-                raise AgentError(f"Column '{col}' not found")
-        
-        if values and values not in self.data.columns:
-            raise AgentError(f"Values column '{values}' not found")
-        
         try:
-            logger.info(f"Creating crosstab: rows={row_col}, cols={col_col}")
+            # Validate data
+            if self.data is None:
+                return {
+                    'status': 'error',
+                    'message': 'No data loaded',
+                    'data': None,
+                    'metadata': {},
+                    'errors': ['No data set. Use set_data() first.']
+                }
+            
+            # Validate columns
+            for col in [row_col, col_col]:
+                if col not in self.data.columns:
+                    return {
+                        'status': 'error',
+                        'message': f"Column '{col}' not found",
+                        'data': None,
+                        'metadata': {},
+                        'errors': [f"Column '{col}' not found"]
+                    }
+            
+            if values and values not in self.data.columns:
+                return {
+                    'status': 'error',
+                    'message': f"Column '{values}' not found",
+                    'data': None,
+                    'metadata': {},
+                    'errors': [f"Values column '{values}' not found"]
+                }
+            
+            # Create crosstab
+            self.logger.info(f"Creating crosstab: rows={row_col}, cols={col_col}")
             
             if values:
                 ct = pd.crosstab(
@@ -234,20 +428,34 @@ class Aggregator:
             ct = ct.reset_index()
             
             return {
-                "status": "success",
-                "row_column": row_col,
-                "column_column": col_col,
-                "values_column": values,
-                "aggfunc": aggfunc,
-                "shape": ct.shape,
-                "results": ct.to_dict(orient="records"),
-                "dataframe": ct,
+                'status': 'success',
+                'message': f"Crosstab created: {ct.shape[0]} rows x {ct.shape[1]} columns",
+                'data': ct.to_dict(orient='records'),
+                'metadata': {
+                    'shape': ct.shape,
+                    'row_column': row_col,
+                    'column_column': col_col,
+                    'values_column': values,
+                    'aggfunc': aggfunc
+                },
+                'errors': []
             }
         
         except Exception as e:
-            logger.error(f"Crosstab creation failed: {e}")
-            raise AgentError(f"Crosstab creation failed: {e}")
-    
+            self.logger.error(f"Crosstab creation failed: {e}")
+            return {
+                'status': 'error',
+                'message': f"Crosstab creation failed: {e}",
+                'data': None,
+                'metadata': {},
+                'errors': [str(e)]
+            }
+
+    # ===== SECTION 5: Time Series Aggregation =====
+    # What: Rolling and time-based aggregations
+    # Input: column, window, function
+    # Output: time series result
+
     def rolling_aggregation(self, col: str, window: int, aggfunc: str = "mean") -> Dict[str, Any]:
         """Apply rolling aggregation (for time series).
         
@@ -257,19 +465,37 @@ class Aggregator:
             aggfunc: Aggregation function ('mean', 'sum', 'min', 'max')
             
         Returns:
-            Dictionary with rolling aggregation results
-            
-        Raises:
-            AgentError: If column doesn't exist or aggregation fails
+            {
+                'status': 'success' or 'error',
+                'message': str,
+                'data': list of dicts,
+                'metadata': {'window': int, 'function': str, 'non_null': int},
+                'errors': list
+            }
         """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
-        
-        if col not in self.data.columns:
-            raise AgentError(f"Column '{col}' not found")
-        
         try:
-            logger.info(f"Rolling {aggfunc} on '{col}' with window={window}")
+            # Validate data
+            if self.data is None:
+                return {
+                    'status': 'error',
+                    'message': 'No data loaded',
+                    'data': None,
+                    'metadata': {},
+                    'errors': ['No data set. Use set_data() first.']
+                }
+            
+            # Validate column
+            if col not in self.data.columns:
+                return {
+                    'status': 'error',
+                    'message': f"Column '{col}' not found",
+                    'data': None,
+                    'metadata': {},
+                    'errors': [f"Column '{col}' not found"]
+                }
+            
+            # Apply rolling aggregation
+            self.logger.info(f"Rolling {aggfunc} on '{col}' with window={window}")
             
             rolling_result = self.data[col].rolling(window=window).agg(aggfunc)
             
@@ -279,19 +505,33 @@ class Aggregator:
             })
             
             return {
-                "status": "success",
-                "column": col,
-                "window": window,
-                "function": aggfunc,
-                "non_null_values": int(rolling_result.notna().sum()),
-                "results": result_df.to_dict(orient="records"),
-                "dataframe": result_df,
+                'status': 'success',
+                'message': f"Rolling aggregation applied",
+                'data': result_df.to_dict(orient='records'),
+                'metadata': {
+                    'column': col,
+                    'window': window,
+                    'function': aggfunc,
+                    'non_null_values': int(rolling_result.notna().sum())
+                },
+                'errors': []
             }
         
         except Exception as e:
-            logger.error(f"Rolling aggregation failed: {e}")
-            raise AgentError(f"Rolling aggregation failed: {e}")
-    
+            self.logger.error(f"Rolling aggregation failed: {e}")
+            return {
+                'status': 'error',
+                'message': f"Rolling aggregation failed: {e}",
+                'data': None,
+                'metadata': {},
+                'errors': [str(e)]
+            }
+
+    # ===== SECTION 6: Statistical Summary =====
+    # What: Summary statistics and value counts
+    # Input: column(s)
+    # Output: summary statistics
+
     def summary_statistics(self, group_col: str) -> Dict[str, Any]:
         """Get comprehensive summary statistics for groups.
         
@@ -299,29 +539,53 @@ class Aggregator:
             group_col: Column to group by
             
         Returns:
-            Dictionary with comprehensive statistics per group
-            
-        Raises:
-            AgentError: If column doesn't exist
+            {
+                'status': 'success' or 'error',
+                'message': str,
+                'data': dict of statistics,
+                'metadata': {'groups': int, 'numeric_columns': int},
+                'errors': list
+            }
         """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
-        
-        if group_col not in self.data.columns:
-            raise AgentError(f"Column '{group_col}' not found")
-        
         try:
-            logger.info(f"Computing summary statistics grouped by '{group_col}'")
+            # Validate data
+            if self.data is None:
+                return {
+                    'status': 'error',
+                    'message': 'No data loaded',
+                    'data': None,
+                    'metadata': {},
+                    'errors': ['No data set. Use set_data() first.']
+                }
             
+            # Validate column
+            if group_col not in self.data.columns:
+                return {
+                    'status': 'error',
+                    'message': f"Column '{group_col}' not found",
+                    'data': None,
+                    'metadata': {},
+                    'errors': [f"Column '{group_col}' not found"]
+                }
+            
+            # Get numeric columns
             numeric_cols = self.data.select_dtypes(include=[np.number]).columns.tolist()
             
             if not numeric_cols:
-                return {"status": "no_numeric_columns", "message": "No numeric columns found"}
+                return {
+                    'status': 'error',
+                    'message': 'No numeric columns found',
+                    'data': None,
+                    'metadata': {},
+                    'errors': ['No numeric columns to aggregate']
+                }
             
             # Compute statistics for each group
-            grouped = self.data.groupby(group_col)
+            self.logger.info(f"Computing summary statistics grouped by '{group_col}'")
             
+            grouped = self.data.groupby(group_col)
             stats = {}
+            
             for group_name, group_df in grouped:
                 group_stats = {}
                 for col in numeric_cols:
@@ -336,16 +600,27 @@ class Aggregator:
                 stats[str(group_name)] = group_stats
             
             return {
-                "status": "success",
-                "group_by": group_col,
-                "groups": len(stats),
-                "statistics": stats,
+                'status': 'success',
+                'message': f"Summary statistics for {len(stats)} groups",
+                'data': stats,
+                'metadata': {
+                    'groups': len(stats),
+                    'group_column': group_col,
+                    'numeric_columns': len(numeric_cols)
+                },
+                'errors': []
             }
         
         except Exception as e:
-            logger.error(f"Summary statistics failed: {e}")
-            raise AgentError(f"Summary statistics failed: {e}")
-    
+            self.logger.error(f"Summary statistics failed: {e}")
+            return {
+                'status': 'error',
+                'message': f"Summary statistics failed: {e}",
+                'data': None,
+                'metadata': {},
+                'errors': [str(e)]
+            }
+
     def value_counts(self, col: str, top_n: int = 10) -> Dict[str, Any]:
         """Get value counts for a column.
         
@@ -354,19 +629,37 @@ class Aggregator:
             top_n: Number of top values to return
             
         Returns:
-            Dictionary with value counts
-            
-        Raises:
-            AgentError: If column doesn't exist
+            {
+                'status': 'success' or 'error',
+                'message': str,
+                'data': list of dicts,
+                'metadata': {'total_unique': int, 'top_n': int},
+                'errors': list
+            }
         """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
-        
-        if col not in self.data.columns:
-            raise AgentError(f"Column '{col}' not found")
-        
         try:
-            logger.info(f"Computing value counts for '{col}'")
+            # Validate data
+            if self.data is None:
+                return {
+                    'status': 'error',
+                    'message': 'No data loaded',
+                    'data': None,
+                    'metadata': {},
+                    'errors': ['No data set. Use set_data() first.']
+                }
+            
+            # Validate column
+            if col not in self.data.columns:
+                return {
+                    'status': 'error',
+                    'message': f"Column '{col}' not found",
+                    'data': None,
+                    'metadata': {},
+                    'errors': [f"Column '{col}' not found"]
+                }
+            
+            # Compute value counts
+            self.logger.info(f"Computing value counts for '{col}'")
             
             vc = self.data[col].value_counts().head(top_n)
             
@@ -380,13 +673,45 @@ class Aggregator:
                 })
             
             return {
-                "status": "success",
-                "column": col,
-                "total_unique": self.data[col].nunique(),
-                "top_n": top_n,
-                "results": result_list,
+                'status': 'success',
+                'message': f"Value counts for {len(result_list)} unique values",
+                'data': result_list,
+                'metadata': {
+                    'column': col,
+                    'total_unique': self.data[col].nunique(),
+                    'top_n': top_n,
+                    'results_returned': len(result_list)
+                },
+                'errors': []
             }
         
         except Exception as e:
-            logger.error(f"Value counts failed: {e}")
-            raise AgentError(f"Value counts failed: {e}")
+            self.logger.error(f"Value counts failed: {e}")
+            return {
+                'status': 'error',
+                'message': f"Value counts failed: {e}",
+                'data': None,
+                'metadata': {},
+                'errors': [str(e)]
+            }
+
+    # ===== SECTION 7: Utilities =====
+    # What: Helper functions
+    # Output: summary or info
+
+    def get_summary(self) -> str:
+        """Get human-readable summary of aggregator.
+        
+        Returns:
+            Formatted summary string
+        """
+        if self.data is None:
+            return "Aggregator: No data loaded"
+        
+        return (
+            f"Aggregator Summary:\n"
+            f"  Data: {self.data.shape[0]} rows x {self.data.shape[1]} columns\n"
+            f"  Columns: {', '.join(self.data.columns[:5])}{'...' if len(self.data.columns) > 5 else ''}\n"
+            f"  Numeric: {len(self.data.select_dtypes(include=[np.number]).columns)}\n"
+            f"  Categorical: {len(self.data.select_dtypes(include=['object']).columns)}"
+        )
