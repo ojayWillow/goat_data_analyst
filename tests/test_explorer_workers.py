@@ -4,7 +4,11 @@ Tests the complete worker-based exploration pipeline.
 No manual PowerShell commands needed - just run this script.
 """
 
+# Fix for Windows PowerShell UTF-8 encoding
 import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
 from pathlib import Path
 import json
 import pandas as pd
@@ -29,13 +33,13 @@ def test_explorer_workers():
         # Load FIFA data
         print("\n[1/4] Loading FIFA 21 data...")
         df = pd.read_csv("data/fifa21_raw_data.csv", low_memory=False)
-        print(f"✅ Loaded: {df.shape[0]} rows × {df.shape[1]} columns")
+        print(f"[OK] Loaded: {df.shape[0]} rows x {df.shape[1]} columns")
         
         # Initialize Explorer
         print("\n[2/4] Initializing Explorer agent with workers...")
         explorer = Explorer()
         explorer.set_data(df)
-        print("✅ Explorer ready with 4 workers:")
+        print("[OK] Explorer ready with 4 workers:")
         print("   - NumericAnalyzer")
         print("   - CategoricalAnalyzer")
         print("   - CorrelationAnalyzer")
@@ -44,7 +48,7 @@ def test_explorer_workers():
         # Execute workers
         print("\n[3/4] Executing all workers...")
         report = explorer.get_summary_report()
-        print("✅ All workers executed successfully")
+        print("[OK] All workers executed successfully")
         
         # Display results
         print("\n[4/4] Displaying Results...")
@@ -55,7 +59,7 @@ def test_explorer_workers():
         # Basic info
         print(f"\nStatus: {report['status']}")
         print(f"Timestamp: {report['timestamp']}")
-        print(f"Data Shape: {report['data_shape']['rows']} rows × {report['data_shape']['columns']} columns")
+        print(f"Data Shape: {report['data_shape']['rows']} rows x {report['data_shape']['columns']} columns")
         print(f"\nWorkers Executed: {report['workers_executed']}")
         print(f"Overall Quality Score: {report['overall_quality_score']}")
         
@@ -70,7 +74,7 @@ def test_explorer_workers():
         
         print("\nWorker Details:")
         for detail in validation['worker_details']:
-            status = "✅" if detail['success'] else "❌"
+            status = "[OK]" if detail['success'] else "[FAIL]"
             print(f"  {status} {detail['worker']:25} | Quality: {detail['quality_score']:.3f} | Errors: {detail['error_count']}")
         
         if validation['error_summary']:
@@ -118,7 +122,7 @@ def test_explorer_workers():
         if summary.get('correlations'):
             print(f"  Top 3:")
             for corr in summary['correlations'][:3]:
-                print(f"    - {corr['column_1']} ↔ {corr['column_2']}: {corr['correlation']:.3f}")
+                print(f"    - {corr['column_1']} <-> {corr['column_2']}: {corr['correlation']:.3f}")
         
         print(f"\nData Quality Score: {summary.get('quality_score', 0):.2f}")
         print(f"Quality Rating: {summary.get('quality_rating', 'N/A')}")
@@ -132,11 +136,11 @@ def test_explorer_workers():
         print(json.dumps(report, indent=2, default=str))
         
         print("\n" + "="*80)
-        print("✅ TEST COMPLETED SUCCESSFULLY")
+        print("TEST COMPLETED SUCCESSFULLY")
         print("="*80)
         
     except Exception as e:
-        print(f"\n❌ TEST FAILED: {str(e)}")
+        print(f"\nTEST FAILED: {str(e)}")
         import traceback
         traceback.print_exc()
         return False
