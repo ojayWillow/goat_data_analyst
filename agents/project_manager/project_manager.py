@@ -33,23 +33,43 @@ class StructureScanner:
         if not agents_dir.exists():
             return agents
 
+        # Discover .py files (flat structure)
+        for py_file in agents_dir.glob("*.py"):
+            if py_file.name.startswith("_"):
+                continue
+            agent_name = py_file.stem
+            agents[agent_name] = {
+                "path": str(agents_dir / agent_name),
+                "main_file": str(py_file),
+                "exists": True,
+                "has_test": self._has_test(agent_name),
+                "discoverable": True,
+            }
+
+        # Discover folders (folder structure)
         for item in agents_dir.iterdir():
             if not item.is_dir() or item.name.startswith("_"):
                 continue
 
-            # Check for main module file
-            py_files = list(item.glob(f"{item.name}.py")) or list(
-                item.glob("*.py")
-            )
-            if not py_files:
+            agent_name = item.name
+            # Skip if already discovered as .py file
+            if agent_name in agents:
                 continue
 
-            main_file = py_files[0]
-            agents[item.name] = {
+            # Check for main module file in folder
+            main_file = item / f"{agent_name}.py"
+            if not main_file.exists():
+                # Try first .py file in folder
+                py_files = list(item.glob("*.py"))
+                if not py_files:
+                    continue
+                main_file = py_files[0]
+
+            agents[agent_name] = {
                 "path": str(item),
                 "main_file": str(main_file),
                 "exists": True,
-                "has_test": self._has_test(item.name),
+                "has_test": self._has_test(agent_name),
                 "discoverable": True,
             }
 
@@ -316,13 +336,13 @@ class HealthReporter:
     def _get_status(self, score: float) -> str:
         """Get status based on health score."""
         if score >= 90:
-            return "🟢 Excellent"
+            return "Excellent"
         elif score >= 70:
-            return "🟡 Good"
+            return "Good"
         elif score >= 50:
-            return "🟠 Fair"
+            return "Fair"
         else:
-            return "🔴 Needs Work"
+            return "Needs Work"
 
     def _get_recommendations(self, agents: Dict, untested: List[str]) -> List[str]:
         """Generate recommendations for improvement."""
@@ -371,37 +391,37 @@ class ProjectManager:
         """
         try:
             # 1. Discover structure
-            self.logger.info("🔍 Scanning project structure...")
+            self.logger.info("Scanning project structure...")
             self.structure = self.scanner.discover_structure()
             agents_found = len(self.structure.get("agents", {}))
             tests_found = len(self.structure.get("tests", {}))
             self.logger.info(
-                f"   Found {agents_found} agents, {tests_found} tests"
+                f"Found {agents_found} agents, {tests_found} tests"
             )
 
             # 2. Learn patterns
-            self.logger.info("🧠 Learning patterns from existing code...")
+            self.logger.info("Learning patterns from existing code...")
             self.patterns = self.learner.learn_patterns(self.structure)
-            self.logger.info(f"   Pattern confidence: {self.patterns.get('pattern_confidence')}")
+            self.logger.info(f"Pattern confidence: {self.patterns.get('pattern_confidence')}")
 
             # 3. Track changes
-            self.logger.info("📊 Tracking changes...")
+            self.logger.info("Tracking changes...")
             current_state = self.tracker.get_current_state(self.structure)
             previous_state = self.tracker.load_previous_state()
             self.changes = self.tracker.get_changes(current_state, previous_state)
             self.tracker.save_state(current_state)
 
             if self.changes.get("new_agents"):
-                self.logger.info(f"   New: {self.changes['new_agents']}")
+                self.logger.info(f"New: {self.changes['new_agents']}")
             if self.changes.get("new_tests"):
-                self.logger.info(f"   New tests: {self.changes['new_tests']}")
+                self.logger.info(f"New tests: {self.changes['new_tests']}")
 
             # 4. Generate report
-            self.logger.info("📈 Generating health report...")
+            self.logger.info("Generating health report...")
             self.report = self.reporter.generate_report(
                 self.structure, self.patterns, self.changes
             )
-            self.logger.info(f"   Health: {self.report['health_score']}/100 - {self.report['status']}")
+            self.logger.info(f"Health: {self.report['health_score']}/100 - {self.report['status']}")
 
             return self.get_report()
 
@@ -431,13 +451,13 @@ class ProjectManager:
         Returns:
             Validation result
         """
-        self.logger.info(f"🔎 Validating agent '{agent_name}'...")
+        self.logger.info(f"Validating agent '{agent_name}'...")
         result = self.validator.validate_agent(agent_name, self.patterns)
         
         if result["valid"]:
-            self.logger.info(f"   ✅ Valid - matches learned pattern")
+            self.logger.info(f"Valid - matches learned pattern")
         else:
-            self.logger.warning(f"   ⚠️  Issues: {result['issues']}")
+            self.logger.warning(f"Issues: {result['issues']}")
         
         return result
 
@@ -453,7 +473,7 @@ class ProjectManager:
 
         summary = f"Found {len(agents)} agents:\n"
         for agent_name, info in agents.items():
-            status = "✅" if info.get("has_test") else "⚠️"
+            status = "[OK]" if info.get("has_test") else "[NO TEST]"
             summary += f"  {status} {agent_name}\n"
 
         return summary
@@ -480,6 +500,6 @@ class ProjectManager:
 
         print(f"\nRecommendations:")
         for rec in health["recommendations"]:
-            print(f"  • {rec}")
+            print(f"  - {rec}")
 
         print("\n" + "=" * 60 + "\n")
