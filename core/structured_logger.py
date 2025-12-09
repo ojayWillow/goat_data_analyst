@@ -1,0 +1,337 @@
+"""Structured Logging System for GOAT Data Analyst - Hardening Phase 1
+
+Provides comprehensive logging with:
+- JSON structured logging
+- Performance metrics
+- Audit trail support
+- Context preservation
+- Integration with configuration
+
+Usage:
+    from core.structured_logger import get_structured_logger
+    
+    logger = get_structured_logger(__name__)
+    logger.info('Operation started', extra={'user_id': 123, 'action': 'load'})
+    logger.error('Operation failed', extra={'error_code': 'E001', 'retry_count': 2})
+"""
+
+import logging
+import json
+import time
+from typing import Any, Dict, Optional
+from datetime import datetime
+from pathlib import Path
+import functools
+from contextlib import contextmanager
+
+
+class JSONFormatter(logging.Formatter):
+    """JSON formatter for structured logging."""
+    
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record as JSON.
+        
+        Args:
+            record: Log record to format
+            
+        Returns:
+            JSON string
+        """
+        log_data = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage(),
+            'module': record.module,
+            'function': record.funcName,
+            'line': record.lineno,
+        }
+        
+        # Add exception info if present
+        if record.exc_info:
+            log_data['exception'] = self.formatException(record.exc_info)
+        
+        # Add extra fields
+        if hasattr(record, 'extra_data'):
+            log_data['extra'] = record.extra_data
+        
+        return json.dumps(log_data, default=str)
+
+
+class StructuredLogger:
+    """Structured logger with metrics and audit trail support."""
+    
+    def __init__(self, name: str, log_dir: str = './logs'):
+        """Initialize structured logger.
+        
+        Args:
+            name: Logger name (usually __name__)
+            log_dir: Directory for log files
+        """
+        self.name = name
+        self.log_dir = Path(log_dir)
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create logger
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.DEBUG)
+        
+        # Remove existing handlers to avoid duplicates
+        self.logger.handlers = []
+        
+        # Console handler (JSON formatted)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(JSONFormatter())
+        self.logger.addHandler(console_handler)
+        
+        # File handler (JSON formatted)
+        file_path = self.log_dir / f"{name.replace('.', '_')}.log"
+        file_handler = logging.FileHandler(file_path, mode='a')
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(JSONFormatter())
+        self.logger.addHandler(file_handler)
+        
+        # Metrics
+        self.metrics = {
+            'total_logs': 0,
+            'by_level': {},
+            'operations': {},
+        }
+    
+    def _log_with_extra(self, level: int, msg: str, extra: Optional[Dict[str, Any]] = None):
+        """Log with extra data.
+        
+        Args:
+            level: Log level
+            msg: Log message
+            extra: Extra data dictionary
+        """
+        record = self.logger.makeRecord(
+            self.logger.name,
+            level,
+            '',
+            0,
+            msg,
+            (),
+            None,
+        )
+        
+        if extra:
+            record.extra_data = extra
+        
+        # Update metrics
+        self.metrics['total_logs'] += 1
+        level_name = logging.getLevelName(level)
+        self.metrics['by_level'][level_name] = self.metrics['by_level'].get(level_name, 0) + 1
+        
+        self.logger.handle(record)
+    
+    def debug(self, msg: str, extra: Optional[Dict[str, Any]] = None):
+        """Log debug message."""
+        self._log_with_extra(logging.DEBUG, msg, extra)
+    
+    def info(self, msg: str, extra: Optional[Dict[str, Any]] = None):
+        """Log info message."""
+        self._log_with_extra(logging.INFO, msg, extra)
+    
+    def warning(self, msg: str, extra: Optional[Dict[str, Any]] = None):
+        """Log warning message."""
+        self._log_with_extra(logging.WARNING, msg, extra)
+    
+    def error(self, msg: str, extra: Optional[Dict[str, Any]] = None, exc_info=False):
+        """Log error message."""
+        record = self.logger.makeRecord(
+            self.logger.name,
+            logging.ERROR,
+            '',
+            0,
+            msg,
+            (),
+            None,
+        )
+        
+        if extra:
+            record.extra_data = extra
+        
+        if exc_info:
+            import sys
+            record.exc_info = sys.exc_info()
+        
+        self.metrics['total_logs'] += 1
+        self.metrics['by_level']['ERROR'] = self.metrics['by_level'].get('ERROR', 0) + 1
+        self.logger.handle(record)
+    
+    def critical(self, msg: str, extra: Optional[Dict[str, Any]] = None):
+        """Log critical message."""
+        self._log_with_extra(logging.CRITICAL, msg, extra)
+    
+    @contextmanager
+    def operation(self, operation_name: str, context: Optional[Dict[str, Any]] = None):
+        """Context manager for operation tracking.
+        
+        Args:
+            operation_name: Name of operation
+            context: Additional context data
+            
+        Example:
+            with logger.operation('load_data', {'file': 'data.csv'}):
+                result = load_data('data.csv')
+        """
+        start_time = time.time()
+        context = context or {}
+        
+        self.info(f"Operation started: {operation_name}", extra=context)
+        
+        try:
+            yield
+            elapsed = time.time() - start_time
+            self.info(
+                f"Operation completed: {operation_name}",
+                extra={
+                    **context,
+                    'elapsed_seconds': round(elapsed, 3),
+                    'status': 'success'
+                }
+            )
+            
+            # Track operation metrics
+            if operation_name not in self.metrics['operations']:
+                self.metrics['operations'][operation_name] = []
+            self.metrics['operations'][operation_name].append({
+                'elapsed': elapsed,
+                'status': 'success',
+                'timestamp': datetime.utcnow().isoformat()
+            })
+        
+        except Exception as e:
+            elapsed = time.time() - start_time
+            self.error(
+                f"Operation failed: {operation_name}: {e}",
+                extra={
+                    **context,
+                    'elapsed_seconds': round(elapsed, 3),
+                    'status': 'failed',
+                    'error': str(e)
+                },
+                exc_info=True
+            )
+            
+            # Track operation metrics
+            if operation_name not in self.metrics['operations']:
+                self.metrics['operations'][operation_name] = []
+            self.metrics['operations'][operation_name].append({
+                'elapsed': elapsed,
+                'status': 'failed',
+                'error': str(e),
+                'timestamp': datetime.utcnow().isoformat()
+            })
+            raise
+    
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get logging metrics.
+        
+        Returns:
+            Dictionary with metrics
+        """
+        return {
+            'total_logs': self.metrics['total_logs'],
+            'by_level': self.metrics['by_level'],
+            'operations': self.metrics['operations'],
+            'timestamp': datetime.utcnow().isoformat(),
+        }
+    
+    def reset_metrics(self):
+        """Reset metrics."""
+        self.metrics = {
+            'total_logs': 0,
+            'by_level': {},
+            'operations': {},
+        }
+
+
+# Global logger cache
+_logger_cache = {}
+
+def get_structured_logger(name: str, log_dir: str = './logs') -> StructuredLogger:
+    """Get or create structured logger.
+    
+    Args:
+        name: Logger name (usually __name__)
+        log_dir: Directory for log files
+        
+    Returns:
+        StructuredLogger instance
+    """
+    cache_key = (name, log_dir)
+    if cache_key not in _logger_cache:
+        _logger_cache[cache_key] = StructuredLogger(name, log_dir)
+    return _logger_cache[cache_key]
+
+
+def log_operation(operation_name: str):
+    """Decorator for operation logging.
+    
+    Args:
+        operation_name: Name of operation
+        
+    Example:
+        @log_operation('load_data')
+        def load_data(filepath):
+            return pd.read_csv(filepath)
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            logger = get_structured_logger(func.__module__)
+            with logger.operation(operation_name or func.__name__):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def log_metrics(operation_name: str):
+    """Decorator for metrics logging.
+    
+    Args:
+        operation_name: Name of operation
+        
+    Example:
+        @log_metrics('process_data')
+        def process_data(data):
+            return data * 2
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            logger = get_structured_logger(func.__module__)
+            start_time = time.time()
+            
+            try:
+                result = func(*args, **kwargs)
+                elapsed = time.time() - start_time
+                logger.info(
+                    f"Metric logged: {operation_name}",
+                    extra={
+                        'operation': operation_name,
+                        'elapsed_seconds': round(elapsed, 3),
+                        'status': 'success'
+                    }
+                )
+                return result
+            except Exception as e:
+                elapsed = time.time() - start_time
+                logger.error(
+                    f"Metric logged: {operation_name}",
+                    extra={
+                        'operation': operation_name,
+                        'elapsed_seconds': round(elapsed, 3),
+                        'status': 'failed',
+                        'error': str(e)
+                    },
+                    exc_info=True
+                )
+                raise
+        
+        return wrapper
+    return decorator
