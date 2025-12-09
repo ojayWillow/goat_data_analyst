@@ -12,5 +12,17 @@ from .predictor import Predictor
 from .anomaly_detector import AnomalyDetector
 from .recommender import Recommender
 from .reporter import Reporter
+from .project_manager import ProjectManager
 
-__all__ = ['Orchestrator', 'DataLoader', 'Explorer', 'Aggregator', 'Visualizer', 'Predictor', 'AnomalyDetector', 'Recommender', 'Reporter']
+__all__ = [
+    'Orchestrator',
+    'DataLoader',
+    'Explorer',
+    'Aggregator',
+    'Visualizer',
+    'Predictor',
+    'AnomalyDetector',
+    'Recommender',
+    'Reporter',
+    'ProjectManager',
+]
