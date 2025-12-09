@@ -12,6 +12,7 @@ from core.logger import get_logger
 from .workers import (
     CSVLoaderWorker,
     JSONExcelLoaderWorker,
+    ParquetLoaderWorker,
     ValidatorWorker,
     WorkerResult,
 )
@@ -26,11 +27,12 @@ class DataLoader:
     - Load CSV files
     - Load JSON files
     - Load Excel files (XLSX, XLS)
+    - Load Parquet files
     - Validate loaded data
     - Extract metadata
     """
 
-    SUPPORTED_FORMATS = ['csv', 'json', 'xlsx', 'xls']
+    SUPPORTED_FORMATS = ['csv', 'json', 'xlsx', 'xls', 'parquet']
     MAX_FILE_SIZE_MB = 100
 
     def __init__(self) -> None:
@@ -43,9 +45,10 @@ class DataLoader:
         # === STEP 1: INITIALIZE ALL WORKERS ===
         self.csv_loader = CSVLoaderWorker()
         self.json_excel_loader = JSONExcelLoaderWorker()
+        self.parquet_loader = ParquetLoaderWorker()
         self.validator = ValidatorWorker()
 
-        self.logger.info("DataLoader initialized with 3 workers")
+        self.logger.info("DataLoader initialized with 4 workers")
 
     # === SECTION 1: MAIN LOADING ===
 
@@ -89,6 +92,8 @@ class DataLoader:
                 file_path=str(file_path),
                 file_format=file_format
             )
+        elif file_format == 'parquet':
+            load_result = self.parquet_loader.safe_execute(file_path=str(file_path))
         else:
             return self._error_result(f"Unsupported format: {file_format}")
 
