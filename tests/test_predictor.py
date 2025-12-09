@@ -7,10 +7,10 @@ from typing import List
 
 from agents.predictor import Predictor
 from agents.predictor.workers import (
-    LinearRegressionWorker,
-    DecisionTreeWorker,
-    TimeSeriesWorker,
-    ModelValidatorWorker,
+    LinearRegression,
+    DecisionTree,
+    TimeSeries,
+    ModelValidator,
     ErrorType,
 )
 
@@ -80,17 +80,17 @@ def predictor(sample_regression_data):
 # ===== LINEAR REGRESSION WORKER TESTS =====
 
 class TestLinearRegressionWorker:
-    """Test suite for LinearRegressionWorker."""
+    """Test suite for LinearRegression worker."""
     
     def test_worker_initialization(self):
         """Test worker initializes correctly."""
-        worker = LinearRegressionWorker()
-        assert worker.name == "LinearRegressionWorker"
+        worker = LinearRegression()
+        assert worker.name == "LinearRegression"
         assert worker.model is None
     
     def test_fit_simple_regression(self, sample_regression_data):
         """Test fitting on simple regression data."""
-        worker = LinearRegressionWorker()
+        worker = LinearRegression()
         result = worker.execute(
             df=sample_regression_data,
             features=['feature1', 'feature2'],
@@ -98,7 +98,7 @@ class TestLinearRegressionWorker:
         )
         
         assert result.success
-        assert result.worker == "LinearRegressionWorker"
+        assert result.worker == "LinearRegression"
         assert 'r2_score' in result.data
         assert 'coefficients' in result.data
         assert 'predictions' in result.data
@@ -106,7 +106,7 @@ class TestLinearRegressionWorker:
     
     def test_r2_score_reasonable(self, sample_regression_data):
         """Test that R2 score is reasonable."""
-        worker = LinearRegressionWorker()
+        worker = LinearRegression()
         result = worker.execute(
             df=sample_regression_data,
             features=['feature1', 'feature2'],
@@ -117,7 +117,7 @@ class TestLinearRegressionWorker:
     
     def test_coefficients_shape(self, sample_regression_data):
         """Test coefficients have correct shape."""
-        worker = LinearRegressionWorker()
+        worker = LinearRegression()
         result = worker.execute(
             df=sample_regression_data,
             features=['feature1', 'feature2'],
@@ -130,7 +130,7 @@ class TestLinearRegressionWorker:
     
     def test_error_missing_data(self):
         """Test error handling with missing data."""
-        worker = LinearRegressionWorker()
+        worker = LinearRegression()
         result = worker.execute(
             df=None,
             features=['feature1', 'feature2'],
@@ -142,7 +142,7 @@ class TestLinearRegressionWorker:
     
     def test_error_missing_column(self, sample_regression_data):
         """Test error handling with missing column."""
-        worker = LinearRegressionWorker()
+        worker = LinearRegression()
         result = worker.execute(
             df=sample_regression_data,
             features=['missing_feature'],
@@ -154,7 +154,7 @@ class TestLinearRegressionWorker:
     
     def test_error_no_features(self, sample_regression_data):
         """Test error handling with no features."""
-        worker = LinearRegressionWorker()
+        worker = LinearRegression()
         result = worker.execute(
             df=sample_regression_data,
             features=[],
@@ -165,7 +165,7 @@ class TestLinearRegressionWorker:
     
     def test_predictions_shape(self, sample_regression_data):
         """Test predictions have correct shape."""
-        worker = LinearRegressionWorker()
+        worker = LinearRegression()
         result = worker.execute(
             df=sample_regression_data,
             features=['feature1', 'feature2'],
@@ -178,17 +178,17 @@ class TestLinearRegressionWorker:
 # ===== DECISION TREE WORKER TESTS =====
 
 class TestDecisionTreeWorker:
-    """Test suite for DecisionTreeWorker."""
+    """Test suite for DecisionTree worker."""
     
     def test_worker_initialization(self):
         """Test worker initializes correctly."""
-        worker = DecisionTreeWorker()
-        assert worker.name == "DecisionTreeWorker"
+        worker = DecisionTree()
+        assert worker.name == "DecisionTree"
         assert worker.model is None
     
     def test_fit_regression(self, sample_regression_data):
         """Test fitting on regression data."""
-        worker = DecisionTreeWorker()
+        worker = DecisionTree()
         result = worker.execute(
             df=sample_regression_data,
             features=['feature1', 'feature2'],
@@ -203,7 +203,7 @@ class TestDecisionTreeWorker:
     
     def test_fit_classification(self, sample_classification_data):
         """Test fitting on classification data."""
-        worker = DecisionTreeWorker()
+        worker = DecisionTree()
         result = worker.execute(
             df=sample_classification_data,
             features=['feature1', 'feature2'],
@@ -217,7 +217,7 @@ class TestDecisionTreeWorker:
     
     def test_feature_importance(self, sample_regression_data):
         """Test feature importance extraction."""
-        worker = DecisionTreeWorker()
+        worker = DecisionTree()
         result = worker.execute(
             df=sample_regression_data,
             features=['feature1', 'feature2'],
@@ -231,7 +231,7 @@ class TestDecisionTreeWorker:
     
     def test_tree_depth_positive(self, sample_regression_data):
         """Test tree depth is positive."""
-        worker = DecisionTreeWorker()
+        worker = DecisionTree()
         result = worker.execute(
             df=sample_regression_data,
             features=['feature1', 'feature2'],
@@ -243,7 +243,7 @@ class TestDecisionTreeWorker:
     
     def test_max_depth_constraint(self, sample_regression_data):
         """Test max_depth constraint is respected."""
-        worker = DecisionTreeWorker()
+        worker = DecisionTree()
         result = worker.execute(
             df=sample_regression_data,
             features=['feature1', 'feature2'],
@@ -256,7 +256,7 @@ class TestDecisionTreeWorker:
     
     def test_error_insufficient_data(self):
         """Test error with insufficient data."""
-        worker = DecisionTreeWorker()
+        worker = DecisionTree()
         df = pd.DataFrame({'x': [1, 2], 'y': [1, 2]})
         result = worker.execute(
             df=df,
@@ -270,16 +270,16 @@ class TestDecisionTreeWorker:
 # ===== TIME SERIES WORKER TESTS =====
 
 class TestTimeSeriesWorker:
-    """Test suite for TimeSeriesWorker."""
+    """Test suite for TimeSeries worker."""
     
     def test_worker_initialization(self):
         """Test worker initializes correctly."""
-        worker = TimeSeriesWorker()
-        assert worker.name == "TimeSeriesWorker"
+        worker = TimeSeries()
+        assert worker.name == "TimeSeries"
     
     def test_forecast_with_series(self, sample_timeseries_data):
         """Test forecasting with time series data."""
-        worker = TimeSeriesWorker()
+        worker = TimeSeries()
         result = worker.execute(
             series=sample_timeseries_data['value'],
             periods=12,
@@ -292,7 +292,7 @@ class TestTimeSeriesWorker:
     
     def test_forecast_with_list(self):
         """Test forecasting with list data."""
-        worker = TimeSeriesWorker()
+        worker = TimeSeries()
         series_list = [1.0, 2.0, 1.5, 3.0, 2.5, 4.0, 3.5, 5.0]
         result = worker.execute(
             series=series_list,
@@ -304,7 +304,7 @@ class TestTimeSeriesWorker:
     
     def test_confidence_intervals(self, sample_timeseries_data):
         """Test confidence intervals are generated."""
-        worker = TimeSeriesWorker()
+        worker = TimeSeries()
         result = worker.execute(
             series=sample_timeseries_data['value'],
             periods=10,
@@ -317,7 +317,7 @@ class TestTimeSeriesWorker:
     
     def test_decomposition(self, sample_timeseries_data):
         """Test time series decomposition."""
-        worker = TimeSeriesWorker()
+        worker = TimeSeries()
         result = worker.execute(
             series=sample_timeseries_data['value'],
             periods=12,
@@ -331,7 +331,7 @@ class TestTimeSeriesWorker:
     
     def test_error_no_series(self):
         """Test error with no series."""
-        worker = TimeSeriesWorker()
+        worker = TimeSeries()
         result = worker.execute(
             series=None,
             periods=5,
@@ -341,7 +341,7 @@ class TestTimeSeriesWorker:
     
     def test_error_insufficient_data(self):
         """Test error with insufficient data."""
-        worker = TimeSeriesWorker()
+        worker = TimeSeries()
         result = worker.execute(
             series=[1.0, 2.0],
             periods=5,
@@ -353,16 +353,16 @@ class TestTimeSeriesWorker:
 # ===== MODEL VALIDATOR WORKER TESTS =====
 
 class TestModelValidatorWorker:
-    """Test suite for ModelValidatorWorker."""
+    """Test suite for ModelValidator worker."""
     
     def test_worker_initialization(self):
         """Test worker initializes correctly."""
-        worker = ModelValidatorWorker()
-        assert worker.name == "ModelValidatorWorker"
+        worker = ModelValidator()
+        assert worker.name == "ModelValidator"
     
     def test_linear_validation(self, sample_regression_data):
         """Test linear model validation."""
-        worker = ModelValidatorWorker()
+        worker = ModelValidator()
         X = sample_regression_data[['feature1', 'feature2']].values
         y = sample_regression_data['target'].values
         
@@ -379,7 +379,7 @@ class TestModelValidatorWorker:
     
     def test_tree_validation(self, sample_regression_data):
         """Test tree model validation."""
-        worker = ModelValidatorWorker()
+        worker = ModelValidator()
         X = sample_regression_data[['feature1', 'feature2']].values
         y = sample_regression_data['target'].values
         
@@ -395,7 +395,7 @@ class TestModelValidatorWorker:
     
     def test_cv_scores_generated(self, sample_regression_data):
         """Test cross-validation scores are generated."""
-        worker = ModelValidatorWorker()
+        worker = ModelValidator()
         X = sample_regression_data[['feature1', 'feature2']].values
         y = sample_regression_data['target'].values
         
@@ -409,7 +409,7 @@ class TestModelValidatorWorker:
     
     def test_residual_analysis(self, sample_regression_data):
         """Test residual analysis."""
-        worker = ModelValidatorWorker()
+        worker = ModelValidator()
         X = sample_regression_data[['feature1', 'feature2']].values
         y = sample_regression_data['target'].values
         
@@ -426,7 +426,7 @@ class TestModelValidatorWorker:
     
     def test_error_missing_data(self):
         """Test error with missing data."""
-        worker = ModelValidatorWorker()
+        worker = ModelValidator()
         result = worker.execute(
             X=None,
             y=None,
