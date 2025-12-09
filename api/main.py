@@ -121,8 +121,11 @@ class NaNHandlingEncoder(json.JSONEncoder):
                 return str(obj)
         
         # Handle pandas NA/NaT
-        if pd.isna(obj):
-            return None
+        try:
+            if pd.isna(obj):
+                return None
+        except (ValueError, TypeError):
+            pass
         
         # Handle pandas Series
         if isinstance(obj, pd.Series):
@@ -146,8 +149,11 @@ class NaNHandlingEncoder(json.JSONEncoder):
 def convert_to_json_serializable(obj):
     """Convert numpy and pandas types to JSON-serializable Python types.
     
+    CRITICAL: Check collection types BEFORE calling pd.isna() to avoid
+    "ambiguous truth value" errors on DataFrames and arrays.
+    
     Handles:
-    - numpy integer types (int8, int16, int32, int64, uint8, etc.)
+    - numpy integer types (int8-int64, uint8-uint64)
     - numpy floating types (float16, float32, float64)
     - numpy bool
     - numpy string/unicode
@@ -157,7 +163,26 @@ def convert_to_json_serializable(obj):
     - nested structures (dicts, lists, tuples)
     """
     try:
-        # Check for NaN/Inf FIRST (works for both float and numpy.float)
+        # IMPORTANT: Check collections FIRST (before pd.isna)
+        # pd.isna on DataFrames/arrays throws "ambiguous truth value" error
+        
+        # Handle dictionaries recursively
+        if isinstance(obj, dict):
+            return {k: convert_to_json_serializable(v) for k, v in obj.items()}
+        
+        # Handle lists and tuples
+        if isinstance(obj, (list, tuple)):
+            return [convert_to_json_serializable(item) for item in obj]
+        
+        # Handle pandas Series/Index
+        if isinstance(obj, (pd.Series, pd.Index)):
+            return [convert_to_json_serializable(item) for item in obj.tolist()]
+        
+        # Handle DataFrames - convert to list of dicts with NaN handling
+        if isinstance(obj, pd.DataFrame):
+            return obj.where(pd.notna(obj), None).to_dict(orient='records')
+        
+        # Check for NaN/Inf (works for float and numpy.floating)
         if isinstance(obj, (float, np.floating)):
             val = float(obj)
             if math.isnan(val) or math.isinf(val):
@@ -182,25 +207,13 @@ def convert_to_json_serializable(obj):
             else:
                 return str(obj)
         
-        # Handle pandas NA/NaT
-        elif pd.isna(obj):
-            return None
-        
-        # Handle dictionaries recursively
-        elif isinstance(obj, dict):
-            return {k: convert_to_json_serializable(v) for k, v in obj.items()}
-        
-        # Handle lists and tuples
-        elif isinstance(obj, (list, tuple)):
-            return [convert_to_json_serializable(item) for item in obj]
-        
-        # Handle pandas Series/Index
-        elif isinstance(obj, (pd.Series, pd.Index)):
-            return [convert_to_json_serializable(item) for item in obj.tolist()]
-        
-        # Handle DataFrames
-        elif isinstance(obj, pd.DataFrame):
-            return obj.where(pd.notna(obj), None).to_dict(orient='records')
+        # NOW safe to check pd.isna (after collections checked)
+        try:
+            if pd.isna(obj):
+                return None
+        except (ValueError, TypeError):
+            # If pd.isna fails, just return the object
+            pass
         
         # Return as-is for standard Python types
         return obj
