@@ -1,0 +1,21 @@
+{
+  "agents": [
+    "aggregator",
+    "anomaly_detector",
+    "data_loader",
+    "explorer",
+    "orchestrator",
+    "predictor",
+    "recommender",
+    "reporter",
+    "visualizer",
+    "project_manager"
+  ],
+  "tests": [
+    "test_data_loader",
+    "test_explorer_summary",
+    "test_explorer_workers",
+    "test_project_manager"
+  ],
+  "timestamp": "2025-12-09T10:54:35.054357"
+}
