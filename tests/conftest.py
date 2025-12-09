@@ -4,6 +4,7 @@ This file configures pytest to properly handle:
 - Logging setup and teardown
 - File handle cleanup
 - Pytest capture integration with custom logging
+- Prevents I/O operation on closed file errors
 """
 
 import pytest
@@ -16,6 +17,12 @@ def pytest_configure(config):
     """Configure pytest at session start."""
     # Disable pytest's log capture to avoid conflicts with our logging
     logging.getLogger().setLevel(logging.WARNING)
+    
+    # Disable pytest's capture for stdout/stderr to prevent file handle issues
+    config.option.capture = 'no'
+    
+    # Disable pytest's log capture plugin
+    config.pluginmanager.set_blocked("logging")
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +39,8 @@ def cleanup_logging():
                     logger.close()
                 except Exception:
                     pass
+        # Clear the cache
+        _logger_cache.clear()
     except Exception:
         pass
 
@@ -41,7 +50,7 @@ def reset_logger_handlers():
     """Reset logging handlers before each test."""
     # Get root logger and remove all handlers
     root_logger = logging.getLogger()
-    for handler in root_logger.handlers[:]:
+    for handler in list(root_logger.handlers):
         try:
             handler.close()
             root_logger.removeHandler(handler)
@@ -51,7 +60,7 @@ def reset_logger_handlers():
     yield
     
     # Cleanup after test
-    for handler in root_logger.handlers[:]:
+    for handler in list(root_logger.handlers):
         try:
             handler.close()
             root_logger.removeHandler(handler)
