@@ -19,10 +19,11 @@ import logging
 import json
 import time
 from typing import Any, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import functools
 from contextlib import contextmanager
+import sys
 
 
 class JSONFormatter(logging.Formatter):
@@ -38,7 +39,7 @@ class JSONFormatter(logging.Formatter):
             JSON string
         """
         log_data = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'level': record.levelname,
             'logger': record.name,
             'message': record.getMessage(),
@@ -75,22 +76,29 @@ class StructuredLogger:
         # Create logger
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.DEBUG)
+        self.logger.propagate = False  # Prevent duplicate logs
         
         # Remove existing handlers to avoid duplicates
-        self.logger.handlers = []
+        for handler in self.logger.handlers[:]:
+            handler.close()
+            self.logger.removeHandler(handler)
         
         # Console handler (JSON formatted)
-        console_handler = logging.StreamHandler()
+        console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(JSONFormatter())
         self.logger.addHandler(console_handler)
         
         # File handler (JSON formatted)
         file_path = self.log_dir / f"{name.replace('.', '_')}.log"
-        file_handler = logging.FileHandler(file_path, mode='a')
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(JSONFormatter())
-        self.logger.addHandler(file_handler)
+        try:
+            file_handler = logging.FileHandler(file_path, mode='a')
+            file_handler.setLevel(logging.DEBUG)
+            file_handler.setFormatter(JSONFormatter())
+            self.logger.addHandler(file_handler)
+        except (IOError, OSError):
+            # If file can't be created, just use console
+            pass
         
         # Metrics
         self.metrics = {
@@ -107,25 +115,29 @@ class StructuredLogger:
             msg: Log message
             extra: Extra data dictionary
         """
-        record = self.logger.makeRecord(
-            self.logger.name,
-            level,
-            '',
-            0,
-            msg,
-            (),
-            None,
-        )
-        
-        if extra:
-            record.extra_data = extra
-        
-        # Update metrics
-        self.metrics['total_logs'] += 1
-        level_name = logging.getLevelName(level)
-        self.metrics['by_level'][level_name] = self.metrics['by_level'].get(level_name, 0) + 1
-        
-        self.logger.handle(record)
+        try:
+            record = self.logger.makeRecord(
+                self.logger.name,
+                level,
+                '',
+                0,
+                msg,
+                (),
+                None,
+            )
+            
+            if extra:
+                record.extra_data = extra
+            
+            # Update metrics
+            self.metrics['total_logs'] += 1
+            level_name = logging.getLevelName(level)
+            self.metrics['by_level'][level_name] = self.metrics['by_level'].get(level_name, 0) + 1
+            
+            self.logger.handle(record)
+        except Exception:
+            # Silently fail if logging fails (don't crash the app)
+            pass
     
     def debug(self, msg: str, extra: Optional[Dict[str, Any]] = None):
         """Log debug message."""
@@ -141,26 +153,28 @@ class StructuredLogger:
     
     def error(self, msg: str, extra: Optional[Dict[str, Any]] = None, exc_info=False):
         """Log error message."""
-        record = self.logger.makeRecord(
-            self.logger.name,
-            logging.ERROR,
-            '',
-            0,
-            msg,
-            (),
-            None,
-        )
-        
-        if extra:
-            record.extra_data = extra
-        
-        if exc_info:
-            import sys
-            record.exc_info = sys.exc_info()
-        
-        self.metrics['total_logs'] += 1
-        self.metrics['by_level']['ERROR'] = self.metrics['by_level'].get('ERROR', 0) + 1
-        self.logger.handle(record)
+        try:
+            record = self.logger.makeRecord(
+                self.logger.name,
+                logging.ERROR,
+                '',
+                0,
+                msg,
+                (),
+                None,
+            )
+            
+            if extra:
+                record.extra_data = extra
+            
+            if exc_info:
+                record.exc_info = sys.exc_info()
+            
+            self.metrics['total_logs'] += 1
+            self.metrics['by_level']['ERROR'] = self.metrics['by_level'].get('ERROR', 0) + 1
+            self.logger.handle(record)
+        except Exception:
+            pass
     
     def critical(self, msg: str, extra: Optional[Dict[str, Any]] = None):
         """Log critical message."""
@@ -201,7 +215,7 @@ class StructuredLogger:
             self.metrics['operations'][operation_name].append({
                 'elapsed': elapsed,
                 'status': 'success',
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             })
         
         except Exception as e:
@@ -224,7 +238,7 @@ class StructuredLogger:
                 'elapsed': elapsed,
                 'status': 'failed',
                 'error': str(e),
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             })
             raise
     
@@ -238,7 +252,7 @@ class StructuredLogger:
             'total_logs': self.metrics['total_logs'],
             'by_level': self.metrics['by_level'],
             'operations': self.metrics['operations'],
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
         }
     
     def reset_metrics(self):
@@ -248,6 +262,14 @@ class StructuredLogger:
             'by_level': {},
             'operations': {},
         }
+    
+    def close(self):
+        """Close all handlers."""
+        for handler in self.logger.handlers[:]:
+            try:
+                handler.close()
+            except Exception:
+                pass
 
 
 # Global logger cache
