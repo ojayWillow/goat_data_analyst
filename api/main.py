@@ -361,7 +361,7 @@ async def load_data(request: LoadDataRequest):
     """Load data from file.
     
     Loads data using DataLoader agent and returns metadata.
-    Handles all numpy/pandas types in response.
+    Metadata is in result["metadata"] which contains rows, columns, etc.
     """
     try:
         logger.info(f"Loading data from: {request.file_path}")
@@ -370,17 +370,21 @@ async def load_data(request: LoadDataRequest):
         task_result = orchestrator.execute_task(task["id"])
         result = task_result.get("result", {})
         
-        # Convert all numpy/pandas types to JSON-serializable
-        result = convert_to_json_serializable(result)
+        # Extract metadata from result
+        # DataLoader returns: {"status": ..., "data": df, "metadata": {...}}
+        metadata = result.get("metadata", {})
         
-        logger.info(f"Successfully loaded data: {result.get('rows')} rows, {result.get('columns')} columns")
+        logger.info(f"Successfully loaded data: {metadata.get('rows')} rows, {metadata.get('columns')} columns")
+        
+        # Convert metadata to JSON-serializable
+        metadata = convert_to_json_serializable(metadata)
         
         response_data = {
             "status": "success",
-            "file_path": str(result.get("file_path", "")),
-            "rows": int(result.get("rows", 0)),
-            "columns": int(result.get("columns", 0)),
-            "columns_list": result.get("columns_list", []),
+            "file_path": metadata.get("file_path", ""),
+            "rows": metadata.get("rows", 0),
+            "columns": metadata.get("columns", 0),
+            "columns_list": metadata.get("column_names", []),
         }
         
         return safe_json_response(response_data)
