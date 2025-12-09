@@ -6,10 +6,10 @@ import numpy as np
 
 from core.logger import get_logger
 from .workers import (
-    LinearRegressionWorker,
-    DecisionTreeWorker,
-    TimeSeriesWorker,
-    ModelValidatorWorker,
+    LinearRegression,
+    DecisionTree,
+    TimeSeries,
+    ModelValidator,
     WorkerResult,
 )
 
@@ -20,10 +20,10 @@ class Predictor:
     """Predictor Agent - Trains ML models and makes predictions.
     
     Coordinates 4 specialized workers:
-    1. LinearRegressionWorker - Simple linear regression
-    2. DecisionTreeWorker - Tree-based predictions
-    3. TimeSeriesWorker - Time series forecasting
-    4. ModelValidatorWorker - Model validation & comparison
+    1. LinearRegression - Simple linear regression
+    2. DecisionTree - Tree-based predictions
+    3. TimeSeries - Time series forecasting
+    4. ModelValidator - Model validation & comparison
     """
     
     def __init__(self):
@@ -34,10 +34,10 @@ class Predictor:
         self.prediction_results: Dict[str, WorkerResult] = {}
         
         # Initialize workers
-        self.linear_regression_worker = LinearRegressionWorker()
-        self.decision_tree_worker = DecisionTreeWorker()
-        self.time_series_worker = TimeSeriesWorker()
-        self.model_validator_worker = ModelValidatorWorker()
+        self.linear_regression_worker = LinearRegression()
+        self.decision_tree_worker = DecisionTree()
+        self.time_series_worker = TimeSeries()
+        self.model_validator_worker = ModelValidator()
         
         self.logger.info("Predictor initialized with 4 workers")
     
