@@ -124,6 +124,9 @@ class DataLoader:
         """
         try:
             logger.debug(f"Loading CSV: {file_path}")
+            # Set low_memory=False by default to suppress dtype warnings
+            if 'low_memory' not in kwargs:
+                kwargs['low_memory'] = False
             return pd.read_csv(file_path, **kwargs)
         except Exception as e:
             raise DataLoadError(f"Failed to load CSV: {e}")
