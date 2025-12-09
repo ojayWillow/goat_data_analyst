@@ -30,10 +30,13 @@ class Cleaner:
         rules = {
             "docs": {
                 "patterns": [
+                    "*.md",  # ALL markdown files
                     "*_SUMMARY.md",
                     "SETUP_GUIDE.md",
                     "STEP*.md",
                     "PROJECT_MANAGER_GUIDE.md",
+                    "*_GUIDE.md",
+                    "*_COMPLETE.md",
                 ],
                 "description": "Documentation files",
             },
@@ -41,8 +44,9 @@ class Cleaner:
                 "patterns": [
                     "*_output.txt",
                     "test_*.txt",
+                    "*.log",
                 ],
-                "description": "Test output files",
+                "description": "Test output and log files",
             },
         }
 
@@ -77,9 +81,16 @@ class Cleaner:
         target_folder = self.project_root / folder_name
         target_folder.mkdir(exist_ok=True)
 
+        # Track moved files in this batch to avoid duplicates
+        moved_in_batch = set()
+
         # Find and move files
         for pattern in patterns:
             for file_path in self.project_root.glob(pattern):
+                # Skip if already moved in this batch
+                if file_path.name in moved_in_batch:
+                    continue
+
                 # Skip if already in target folder
                 if file_path.parent == target_folder:
                     continue
@@ -91,6 +102,7 @@ class Cleaner:
                 try:
                     dest = target_folder / file_path.name
                     shutil.move(str(file_path), str(dest))
+                    moved_in_batch.add(file_path.name)
                     self.moved_files.append(
                         {
                             "file": file_path.name,
