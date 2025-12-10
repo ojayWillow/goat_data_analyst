@@ -1,4 +1,4 @@
-"""CSV Loader Worker - Handles CSV file loading."""
+"""CSV Loader Worker - Handles CSV file loading with robust error handling."""
 
 import pandas as pd
 from pathlib import Path
@@ -11,14 +11,14 @@ logger = get_logger(__name__)
 
 
 class CSVLoaderWorker(BaseWorker):
-    """Worker that loads CSV files."""
+    """Worker that loads CSV files with robust error handling."""
     
     def __init__(self):
         """Initialize CSVLoaderWorker."""
         super().__init__("CSVLoaderWorker")
     
     def execute(self, **kwargs) -> WorkerResult:
-        """Execute CSV loading.
+        """Execute CSV loading with robust error handling.
         
         Args:
             file_path: Path to CSV file
@@ -27,10 +27,6 @@ class CSVLoaderWorker(BaseWorker):
         Returns:
             WorkerResult with loaded data
         """
-        return self.safe_execute(**kwargs)
-    
-    def execute(self, **kwargs) -> WorkerResult:
-        """Actual implementation of CSV loading."""
         file_path = kwargs.get('file_path')
         
         result = self._create_result(task_type="csv_loading")
@@ -50,8 +46,16 @@ class CSVLoaderWorker(BaseWorker):
             return result
         
         try:
-            # Load CSV with low_memory=False to avoid warnings
-            df = pd.read_csv(file_path, low_memory=False)
+            # Load CSV with robust error handling
+            # - low_memory=False to avoid DtypeWarning
+            # - on_bad_lines='skip' to skip corrupt/malformed lines
+            # - encoding_errors='ignore' to handle encoding issues
+            df = pd.read_csv(
+                file_path,
+                low_memory=False,
+                on_bad_lines='skip',  # Skip corrupt lines
+                encoding_errors='ignore'  # Ignore encoding errors
+            )
             
             if df.empty:
                 self._add_error(result, ErrorType.EMPTY_DATA, "CSV file is empty")
