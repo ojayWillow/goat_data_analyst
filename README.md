@@ -8,6 +8,28 @@ An AI-powered data analysis system with 8 specialized agents for comprehensive d
 
 ---
 
+## 🔐 **CRITICAL: ARCHITECTURE GOLDEN RULES**
+
+**📖 READ THIS FIRST:** [`ARCHITECTURE_GOLDEN_RULES.md`](ARCHITECTURE_GOLDEN_RULES.md)
+
+> **"Without structure, we lose functionality. Every new feature must follow the established architecture pattern. No exceptions."**
+
+### The Pattern (Non-Negotiable)
+```
+Every Department Agent has this structure:
+├── agent.py          (orchestrator - thin, no computation)
+└── workers/          (computation tasks)
+    ├── worker_1.py
+    ├── worker_2.py
+    └── worker_3.py
+```
+
+**Every PR, every feature, every commit must align with this architecture.**
+
+👉 **[See ARCHITECTURE_GOLDEN_RULES.md for complete details](ARCHITECTURE_GOLDEN_RULES.md)**
+
+---
+
 ## 📋 WEEK 1 COMPLETION SUMMARY
 
 ### ✅ Week 1: Foundation & Hardening (COMPLETE)
@@ -67,18 +89,15 @@ An AI-powered data analysis system with 8 specialized agents for comprehensive d
 
 ```
 goat_data_analyst/
-├── agents/                    # 8 Agent implementations
-│   ├── explorer.py           # ✅ INTEGRATED - Data exploration with Week 1 systems
-│   ├── predictor.py          # ✅ INTEGRATED - ML predictions with error recovery
-│   ├── recommender.py        # ✅ INTEGRATED - Insights with retry logic
-│   ├── orchestrator.py       # ✅ INTEGRATED - Master coordinator
-│   ├── agent_config.py       # ✅ Configuration management
-│   ├── data_loader/          # Data loading
-│   ├── anomaly_detector/     # Anomaly detection
-│   ├── visualizer/           # Visualization
-│   ├── aggregator/           # Data aggregation
-│   ├── reporter/             # Report generation
-│   └── project_manager/      # Project management
+├── agents/                    # Department agents + workers
+│   ├── aggregator/           # ✅ Agent + workers (reference implementation)
+│   ├── loader/               # ✅ Agent + workers
+│   ├── cleaner/              # ✅ Agent + workers  
+│   ├── explorer/             # ⚠️  Being refactored (see ARCHITECTURE_GOLDEN_RULES.md)
+│   ├── analyzer/             # 🔲 Future
+│   ├── modeler/              # 🔲 Future
+│   ├── reporter/             # 🔲 Future
+│   └── agent_config.py       # ✅ Configuration management
 ├── core/                      # Week 1 Foundation Systems
 │   ├── structured_logger.py  # ✅ JSON structured logging with metrics
 │   ├── error_recovery.py     # ✅ Retry logic with exponential backoff
@@ -93,6 +112,7 @@ goat_data_analyst/
 │   ├── test_validators.py            # Validation tests
 │   ├── conftest.py                   # Pytest configuration
 │   └── pytest.ini                    # Pytest settings
+├── ARCHITECTURE_GOLDEN_RULES.md         # 🔐 REQUIRED READING
 ├── WEEK1_AGENT_INTEGRATION_COMPLETE.md  # 📖 Session 1 summary
 ├── WEEK1_TEST_FIX.md                    # 📖 Issue fixes & solutions
 ├── AGENT_INTEGRATION.md                 # 📖 Integration guide
@@ -122,17 +142,18 @@ python -m pytest tests/
 
 ## 📊 Agent Status
 
-| Agent | Status | Integration | Testing |
-|-------|--------|-------------|----------|
-| Explorer | ✅ Complete | Week 1 | ✅ Passing |
-| Predictor | ✅ Complete | Week 1 | ✅ Passing |
-| Recommender | ✅ Complete | Week 1 | ✅ Passing |
-| Orchestrator | ✅ Complete | Week 1 | ✅ Passing |
-| Data Loader | ✅ Complete | - | ✅ Passing |
-| Anomaly Detector | ✅ Complete | - | ✅ Passing |
+| Agent | Status | Structure | Testing |
+|-------|--------|-----------|----------|
+| Aggregator | ✅ Complete | ✅ Agent+Workers | ✅ Passing |
+| Loader | ✅ Complete | ✅ Agent+Workers | ✅ Passing |
+| Cleaner | ✅ Complete | ✅ Agent+Workers | ✅ Passing |
+| Explorer | ⚠️ Refactoring | ⚠️ Being fixed | ✅ Methods exist |
+| Analyzer | 🔲 Pending | 🔲 Design phase | Pending |
+| Modeler | 🔲 Pending | 🔲 Design phase | Pending |
+| Reporter | 🔲 Pending | 🔲 Design phase | Pending |
 | Visualizer | ✅ Complete | - | ✅ Passing |
-| Aggregator | ✅ Complete | - | ✅ Passing |
-| Reporter | 🔲 Pending | Week 2 | Pending |
+
+**Note:** Explorer is being refactored to follow the Agent+Workers pattern. See [`ARCHITECTURE_GOLDEN_RULES.md`](ARCHITECTURE_GOLDEN_RULES.md).
 
 ---
 
@@ -225,6 +246,7 @@ class Explorer:
 
 ## 📚 Documentation
 
+- **[ARCHITECTURE_GOLDEN_RULES.md](ARCHITECTURE_GOLDEN_RULES.md)** - 🔐 **READ THIS FIRST** - Non-negotiable architectural principles
 - **WEEK1_AGENT_INTEGRATION_COMPLETE.md** - Complete Week 1 summary
 - **WEEK1_TEST_FIX.md** - Issue discovery, diagnosis, and fixes
 - **AGENT_INTEGRATION.md** - Integration guide for other agents
@@ -245,18 +267,10 @@ class Explorer:
 6. ✅ **Document** - Complete documentation
 7. ✅ **Deploy** - Production-ready code in GitHub
 
-### Not This
-- ❌ "Write code and hope"
-- ❌ "Assume it works"
-- ❌ "Figure it out in production"
+### Architecture Principle
+**Without structure, we lose functionality.**
 
-### But This
-- ✅ "Build with purpose"
-- ✅ "Test comprehensively"
-- ✅ "Fix systematically"
-- ✅ "Validate thoroughly"
-- ✅ "Document completely"
-- ✅ "Deploy confidently"
+Every agent must follow the Agent+Workers pattern. See [`ARCHITECTURE_GOLDEN_RULES.md`](ARCHITECTURE_GOLDEN_RULES.md).
 
 ---
 
@@ -294,6 +308,7 @@ All 4 integration agents enhanced with:
 - ✅ Python 3.12+ compatibility
 - ✅ Comprehensive testing (104 tests passing)
 - ✅ Complete documentation
+- ✅ Architectural golden rules established
 
 **Ready for Week 2: Real-world integration and testing!** 🚀
 
@@ -302,6 +317,7 @@ All 4 integration agents enhanced with:
 ## 📞 Questions?
 
 Refer to:
+- **[ARCHITECTURE_GOLDEN_RULES.md](ARCHITECTURE_GOLDEN_RULES.md)** - 🔐 **Architecture standards**
 - **WEEK1_AGENT_INTEGRATION_COMPLETE.md** - Full details
 - **WEEK1_TEST_FIX.md** - How we fixed issues
 - **AGENT_INTEGRATION.md** - How to integrate more agents
@@ -313,7 +329,9 @@ Refer to:
 
 **The foundation is bulletproof. All systems tested. All agents integrated. Ready for production!**
 
-Week 1: ✅ COMPLETE
+Week 1: ✅ COMPLETE  
 Week 2: 🚀 INCOMING
+
+**Remember: Without structure, we lose functionality. Follow [`ARCHITECTURE_GOLDEN_RULES.md`](ARCHITECTURE_GOLDEN_RULES.md) religiously.**
 
 Let's build something amazing! 🐐
