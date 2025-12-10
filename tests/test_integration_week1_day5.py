@@ -83,7 +83,7 @@ class TestFullPipelineExecution:
             with logger.operation('aggregate_data'):
                 aggregator = Aggregator()
                 aggregator.set_data(loaded_df)
-                agg_result = aggregator.execute_all()
+                agg_result = aggregator.aggregate_all()
             
             assert agg_result is not None
             logger.info('Data aggregated', extra={'result': str(type(agg_result))})
@@ -193,7 +193,7 @@ class TestPerformanceBenchmarking:
             
             aggregator = Aggregator()
             aggregator.set_data(loaded)
-            aggregator.execute_all()
+            aggregator.aggregate_all()
             
             total_time = time.time() - start_time
             
