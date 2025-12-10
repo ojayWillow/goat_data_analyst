@@ -2,17 +2,30 @@
 
 Generates comprehensive data analysis reports in multiple formats.
 Includes summary statistics, charts, insights, and recommendations.
+
+Wired to use Workers Pattern:
+- ExecutiveSummaryGenerator worker
+- DataProfileGenerator worker
+- StatisticalReportGenerator worker
+- JSONExporter worker
+- HTMLExporter worker
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 import pandas as pd
-import numpy as np
 from datetime import datetime
-import json
-from pathlib import Path
 
 from core.logger import get_logger
 from core.exceptions import AgentError
+
+# Worker imports
+from agents.reporter.workers import (
+    ExecutiveSummaryGenerator,
+    DataProfileGenerator,
+    StatisticalReportGenerator,
+    JSONExporter,
+    HTMLExporter,
+)
 
 logger = get_logger(__name__)
 
@@ -21,23 +34,36 @@ class Reporter:
     """Agent for report generation.
     
     Capabilities:
-    - Executive summaries
-    - Data profiling reports
-    - Statistical analysis reports
+    - Executive summaries (via ExecutiveSummaryGenerator worker)
+    - Data profiling reports (via DataProfileGenerator worker)
+    - Statistical analysis reports (via StatisticalReportGenerator worker)
+    - JSON export (via JSONExporter worker)
+    - HTML export (via HTMLExporter worker)
+    - Report templates
     - Anomaly reports
     - Trend analysis reports
-    - JSON export
-    - HTML export
     - CSV export
-    - Report templates
+    
+    Worker Pattern:
+    - Delegates specific report generation tasks to specialized workers
+    - Each worker handles one specific report type or export format
+    - Aggregates worker results into unified reports
     """
     
     def __init__(self):
-        """Initialize Reporter agent."""
+        """Initialize Reporter agent with worker instances."""
         self.name = "Reporter"
         self.data = None
         self.reports = {}
-        logger.info(f"{self.name} initialized")
+        
+        # Initialize workers
+        self.executive_summary_generator = ExecutiveSummaryGenerator()
+        self.data_profile_generator = DataProfileGenerator()
+        self.statistical_report_generator = StatisticalReportGenerator()
+        self.json_exporter = JSONExporter()
+        self.html_exporter = HTMLExporter()
+        
+        logger.info(f"{self.name} initialized with 5 workers")
     
     def set_data(self, df: pd.DataFrame) -> None:
         """Set data for report generation.
@@ -58,7 +84,7 @@ class Reporter:
         return self.data
     
     def generate_executive_summary(self) -> Dict[str, Any]:
-        """Generate executive summary report.
+        """Delegate executive summary generation to worker.
         
         Returns:
             Dictionary with summary information
@@ -72,51 +98,23 @@ class Reporter:
         try:
             logger.info("Generating executive summary...")
             
-            rows, cols = self.data.shape
-            null_pct = (self.data.isnull().sum().sum() / (rows * cols) * 100) if (rows * cols) > 0 else 0
-            duplicates = self.data.duplicated().sum()
-            numeric_cols = len(self.data.select_dtypes(include=[np.number]).columns)
-            categorical_cols = len(self.data.select_dtypes(include=['object']).columns)
+            # Delegate to worker
+            worker_result = self.executive_summary_generator.safe_execute(df=self.data)
             
-            # Quality rating
-            if null_pct == 0 and duplicates == 0:
-                quality = "Excellent"
-            elif null_pct < 5 and duplicates < 1:
-                quality = "Good"
-            elif null_pct < 20 and duplicates < 5:
-                quality = "Fair"
-            else:
-                quality = "Poor"
+            if not worker_result.success:
+                raise AgentError(f"Worker failed: {worker_result.errors}")
             
-            summary = {
-                "status": "success",
-                "report_type": "executive_summary",
-                "generated_at": datetime.utcnow().isoformat(),
-                "dataset_info": {
-                    "rows": rows,
-                    "columns": cols,
-                    "numeric_columns": numeric_cols,
-                    "categorical_columns": categorical_cols,
-                    "total_cells": rows * cols,
-                },
-                "data_quality": {
-                    "quality_rating": quality,
-                    "null_percentage": round(null_pct, 2),
-                    "duplicate_count": int(duplicates),
-                    "duplicate_percentage": round((duplicates / rows * 100) if rows > 0 else 0, 2),
-                },
-                "summary_statement": f"Dataset contains {rows:,} rows and {cols} columns with {quality} data quality.",
-            }
+            report = worker_result.data
+            self.reports["executive_summary"] = report
             
-            self.reports["executive_summary"] = summary
-            return summary
+            return report
         
         except Exception as e:
             logger.error(f"Executive summary generation failed: {e}")
             raise AgentError(f"Generation failed: {e}")
     
     def generate_data_profile(self) -> Dict[str, Any]:
-        """Generate detailed data profile report.
+        """Delegate data profile generation to worker.
         
         Returns:
             Dictionary with data profile
@@ -130,52 +128,23 @@ class Reporter:
         try:
             logger.info("Generating data profile...")
             
-            profile = {
-                "status": "success",
-                "report_type": "data_profile",
-                "generated_at": datetime.utcnow().isoformat(),
-                "columns": {},
-            }
+            # Delegate to worker
+            worker_result = self.data_profile_generator.safe_execute(df=self.data)
             
-            for col in self.data.columns:
-                dtype = str(self.data[col].dtype)
-                null_count = self.data[col].isnull().sum()
-                null_pct = (null_count / len(self.data) * 100) if len(self.data) > 0 else 0
-                unique = self.data[col].nunique()
-                
-                col_info = {
-                    "data_type": dtype,
-                    "missing_values": int(null_count),
-                    "missing_percentage": round(null_pct, 2),
-                    "unique_values": unique,
-                    "completeness": round(100 - null_pct, 2),
-                }
-                
-                # Add type-specific statistics
-                if self.data[col].dtype in [np.int64, np.float64, np.int32, np.float32]:
-                    series = self.data[col].dropna()
-                    col_info["statistics"] = {
-                        "mean": float(series.mean()) if len(series) > 0 else None,
-                        "median": float(series.median()) if len(series) > 0 else None,
-                        "std": float(series.std()) if len(series) > 0 else None,
-                        "min": float(series.min()) if len(series) > 0 else None,
-                        "max": float(series.max()) if len(series) > 0 else None,
-                    }
-                else:
-                    top_values = self.data[col].value_counts().head(3)
-                    col_info["top_values"] = dict(top_values.items())
-                
-                profile["columns"][col] = col_info
+            if not worker_result.success:
+                raise AgentError(f"Worker failed: {worker_result.errors}")
             
-            self.reports["data_profile"] = profile
-            return profile
+            report = worker_result.data
+            self.reports["data_profile"] = report
+            
+            return report
         
         except Exception as e:
             logger.error(f"Data profile generation failed: {e}")
             raise AgentError(f"Generation failed: {e}")
     
     def generate_statistical_report(self) -> Dict[str, Any]:
-        """Generate statistical analysis report.
+        """Delegate statistical report generation to worker.
         
         Returns:
             Dictionary with statistical analysis
@@ -189,36 +158,15 @@ class Reporter:
         try:
             logger.info("Generating statistical report...")
             
-            numeric_data = self.data.select_dtypes(include=[np.number])
+            # Delegate to worker
+            worker_result = self.statistical_report_generator.safe_execute(df=self.data)
             
-            report = {
-                "status": "success",
-                "report_type": "statistical_analysis",
-                "generated_at": datetime.utcnow().isoformat(),
-                "summary_statistics": numeric_data.describe().round(2).to_dict(),
-                "correlation_analysis": {},
-            }
+            if not worker_result.success:
+                raise AgentError(f"Worker failed: {worker_result.errors}")
             
-            # Correlation analysis
-            if numeric_data.shape[1] >= 2:
-                corr_matrix = numeric_data.corr()
-                report["correlation_analysis"] = {
-                    "matrix": corr_matrix.round(3).to_dict(),
-                    "strong_correlations": [],
-                }
-                
-                # Find strong correlations
-                for i in range(len(corr_matrix.columns)):
-                    for j in range(i+1, len(corr_matrix.columns)):
-                        corr_val = corr_matrix.iloc[i, j]
-                        if abs(corr_val) > 0.7:
-                            report["correlation_analysis"]["strong_correlations"].append({
-                                "col1": corr_matrix.columns[i],
-                                "col2": corr_matrix.columns[j],
-                                "correlation": float(corr_val),
-                            })
-            
+            report = worker_result.data
             self.reports["statistical_analysis"] = report
+            
             return report
         
         except Exception as e:
@@ -240,7 +188,7 @@ class Reporter:
         try:
             logger.info("Generating comprehensive report...")
             
-            # Generate all sub-reports
+            # Generate all sub-reports using workers
             executive = self.generate_executive_summary()
             profile = self.generate_data_profile()
             statistical = self.generate_statistical_report()
@@ -271,7 +219,7 @@ class Reporter:
             raise AgentError(f"Generation failed: {e}")
     
     def export_to_json(self, report_type: str, file_path: Optional[str] = None) -> Dict[str, Any]:
-        """Export report to JSON file.
+        """Delegate JSON export to worker.
         
         Args:
             report_type: Type of report to export
@@ -287,32 +235,25 @@ class Reporter:
             if report_type not in self.reports:
                 raise AgentError(f"Report '{report_type}' not found")
             
-            if file_path is None:
-                timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-                file_path = f"report_{report_type}_{timestamp}.json"
+            logger.info(f"Exporting {report_type} to JSON...")
             
-            logger.info(f"Exporting {report_type} to JSON: {file_path}")
+            # Delegate to worker
+            worker_result = self.json_exporter.safe_execute(
+                report_data=self.reports[report_type],
+                file_path=file_path
+            )
             
-            with open(file_path, 'w') as f:
-                json.dump(self.reports[report_type], f, indent=2, default=str)
+            if not worker_result.success:
+                raise AgentError(f"Worker failed: {worker_result.errors}")
             
-            file_size = Path(file_path).stat().st_size
-            
-            return {
-                "status": "success",
-                "format": "JSON",
-                "report_type": report_type,
-                "file_path": file_path,
-                "file_size": file_size,
-                "message": f"Report exported successfully to {file_path}",
-            }
+            return worker_result.data
         
         except Exception as e:
             logger.error(f"JSON export failed: {e}")
             raise AgentError(f"Export failed: {e}")
     
     def export_to_html(self, report_type: str, file_path: Optional[str] = None) -> Dict[str, Any]:
-        """Export report to HTML file.
+        """Delegate HTML export to worker.
         
         Args:
             report_type: Type of report to export
@@ -328,191 +269,22 @@ class Reporter:
             if report_type not in self.reports:
                 raise AgentError(f"Report '{report_type}' not found")
             
-            if file_path is None:
-                timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-                file_path = f"report_{report_type}_{timestamp}.html"
+            logger.info(f"Exporting {report_type} to HTML...")
             
-            logger.info(f"Exporting {report_type} to HTML: {file_path}")
+            # Delegate to worker
+            worker_result = self.html_exporter.safe_execute(
+                report_data=self.reports[report_type],
+                file_path=file_path
+            )
             
-            report = self.reports[report_type]
+            if not worker_result.success:
+                raise AgentError(f"Worker failed: {worker_result.errors}")
             
-            # Generate HTML
-            html_content = self._generate_html(report)
-            
-            with open(file_path, 'w') as f:
-                f.write(html_content)
-            
-            file_size = Path(file_path).stat().st_size
-            
-            return {
-                "status": "success",
-                "format": "HTML",
-                "report_type": report_type,
-                "file_path": file_path,
-                "file_size": file_size,
-                "message": f"Report exported successfully to {file_path}",
-            }
+            return worker_result.data
         
         except Exception as e:
             logger.error(f"HTML export failed: {e}")
             raise AgentError(f"Export failed: {e}")
-    
-    def _generate_html(self, report: Dict[str, Any]) -> str:
-        """Generate HTML content from report.
-        
-        Args:
-            report: Report dictionary
-            
-        Returns:
-            HTML content string
-        """
-        title = report.get("title", "Data Analysis Report")
-        timestamp = report.get("generated_at", datetime.utcnow().isoformat())
-        
-        html = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
-    <style>
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }}
-        .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-        }}
-        .header h1 {{
-            margin: 0;
-            font-size: 2.5em;
-        }}
-        .header p {{
-            margin: 10px 0 0 0;
-            opacity: 0.9;
-        }}
-        .section {{
-            background: white;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        .section h2 {{
-            color: #667eea;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-            margin-top: 0;
-        }}
-        .metric {{
-            display: inline-block;
-            background: #f0f4ff;
-            padding: 15px 20px;
-            margin: 10px 10px 10px 0;
-            border-radius: 6px;
-            border-left: 4px solid #667eea;
-        }}
-        .metric-label {{
-            font-size: 0.9em;
-            color: #666;
-        }}
-        .metric-value {{
-            font-size: 1.8em;
-            font-weight: bold;
-            color: #667eea;
-        }}
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-        }}
-        table th {{
-            background: #667eea;
-            color: white;
-            padding: 12px;
-            text-align: left;
-        }}
-        table td {{
-            padding: 12px;
-            border-bottom: 1px solid #ddd;
-        }}
-        table tr:hover {{
-            background: #f5f5f5;
-        }}
-        .footer {{
-            text-align: center;
-            color: #999;
-            padding: 20px;
-            font-size: 0.9em;
-        }}
-        .status-success {{
-            color: #27ae60;
-        }}
-        .status-warning {{
-            color: #e74c3c;
-        }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>{title}</h1>
-        <p>Generated: {timestamp}</p>
-    </div>
-"""
-        
-        # Add sections
-        if "sections" in report:
-            for section_name, section_data in report["sections"].items():
-                html += f'<div class="section">\n<h2>{section_name.replace("_", " ").title()}</h2>\n'
-                html += self._dict_to_html(section_data)
-                html += '</div>\n'
-        
-        html += """
-    <div class="footer">
-        <p>This report was generated by GOAT Data Analyst</p>
-    </div>
-</body>
-</html>
-"""
-        return html
-    
-    def _dict_to_html(self, data: Dict[str, Any], depth: int = 0) -> str:
-        """Convert dictionary to HTML representation.
-        
-        Args:
-            data: Dictionary to convert
-            depth: Recursion depth
-            
-        Returns:
-            HTML string
-        """
-        html = ""
-        for key, value in data.items():
-            if key in ["status", "report_type", "generated_at", "columns"]:
-                continue
-            
-            if isinstance(value, dict):
-                if len(value) > 0:
-                    html += f'<h3>{key.replace("_", " ").title()}</h3>\n'
-                    for k, v in list(value.items())[:10]:  # Limit to 10 items
-                        if isinstance(v, (int, float)):
-                            html += f'<div class="metric"><div class="metric-label">{k}</div><div class="metric-value">{v}</div></div>\n'
-            elif isinstance(value, (int, float)):
-                html += f'<div class="metric"><div class="metric-label">{key.replace("_", " ").title()}</div><div class="metric-value">{value}</div></div>\n'
-            elif isinstance(value, str):
-                html += f'<p><strong>{key.replace("_", " ").title()}:</strong> {value}</p>\n'
-        
-        return html
     
     def list_reports(self) -> Dict[str, Any]:
         """List all generated reports.
