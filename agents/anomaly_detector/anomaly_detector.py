@@ -2,6 +2,11 @@
 
 Detects anomalies using statistical methods, isolation forests,
 and multivariate analysis.
+
+Integrated with Week 1 Systems:
+- Structured logging with metrics
+- Automatic retry with exponential backoff
+- Error recovery and handling
 """
 
 from typing import Any, Dict, List, Optional
@@ -9,6 +14,8 @@ import pandas as pd
 from datetime import datetime
 
 from core.logger import get_logger
+from core.error_recovery import retry_on_error
+from core.structured_logger import get_structured_logger
 from core.exceptions import AgentError
 from .workers import (
     StatisticalWorker,
@@ -18,6 +25,7 @@ from .workers import (
 )
 
 logger = get_logger(__name__)
+structured_logger = get_structured_logger(__name__)
 
 
 class AnomalyDetector:
@@ -28,12 +36,18 @@ class AnomalyDetector:
     - ML detection: Isolation Forest
     - Multivariate detection: Mahalanobis distance
     - Summary reporting of all detections
+    
+    Week 1 Integration:
+    - Structured logging with metrics at each step
+    - Automatic retry on transient failures
+    - Error recovery and detailed error messages
     """
 
     def __init__(self) -> None:
         """Initialize the Anomaly Detector agent and all workers."""
         self.name = "Anomaly Detector"
         self.logger = get_logger("AnomalyDetector")
+        self.structured_logger = get_structured_logger("AnomalyDetector")
         self.data: Optional[pd.DataFrame] = None
         self.detection_results: Dict[str, WorkerResult] = {}
 
@@ -43,6 +57,14 @@ class AnomalyDetector:
         self.multivariate_worker = MultivariateWorker()
 
         self.logger.info("AnomalyDetector initialized with 3 detection workers")
+        self.structured_logger.info("AnomalyDetector initialized", {
+            "workers": 3,
+            "worker_names": [
+                "StatisticalWorker",
+                "IsolationForestWorker",
+                "MultivariateWorker"
+            ]
+        })
 
     # === SECTION 2: DATA MANAGEMENT ===
 
@@ -55,6 +77,12 @@ class AnomalyDetector:
         self.data = df.copy()
         self.detection_results = {}
         self.logger.info(f"Data set: {df.shape[0]} rows, {df.shape[1]} columns")
+        self.structured_logger.info("Data set for anomaly detection", {
+            "rows": df.shape[0],
+            "columns": df.shape[1],
+            "memory_mb": round(df.memory_usage(deep=True).sum() / 1024**2, 2),
+            "numeric_cols": len(df.select_dtypes(include=['number']).columns)
+        })
 
     def get_data(self) -> Optional[pd.DataFrame]:
         """Retrieve the stored DataFrame.
@@ -66,6 +94,7 @@ class AnomalyDetector:
 
     # === SECTION 3: STATISTICAL DETECTION METHODS ===
 
+    @retry_on_error(max_attempts=3, backoff=2)
     def detect_iqr(
         self,
         column: str,
@@ -86,16 +115,35 @@ class AnomalyDetector:
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
 
-        worker_result = self.statistical_worker.safe_execute(
-            df=self.data,
-            column=column,
-            method="iqr",
-            multiplier=multiplier,
-        )
+        self.structured_logger.info("IQR detection started", {
+            "column": column,
+            "multiplier": multiplier
+        })
 
-        self.detection_results[f"iqr_{column}"] = worker_result
-        return worker_result.to_dict()
+        try:
+            worker_result = self.statistical_worker.safe_execute(
+                df=self.data,
+                column=column,
+                method="iqr",
+                multiplier=multiplier,
+            )
 
+            self.detection_results[f"iqr_{column}"] = worker_result
+            
+            self.structured_logger.info("IQR detection completed", {
+                "column": column,
+                "success": worker_result.success
+            })
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("IQR detection failed", {
+                "column": column,
+                "error": str(e)
+            })
+            raise
+
+    @retry_on_error(max_attempts=3, backoff=2)
     def detect_zscore(
         self,
         column: str,
@@ -116,16 +164,35 @@ class AnomalyDetector:
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
 
-        worker_result = self.statistical_worker.safe_execute(
-            df=self.data,
-            column=column,
-            method="zscore",
-            threshold=threshold,
-        )
+        self.structured_logger.info("Z-score detection started", {
+            "column": column,
+            "threshold": threshold
+        })
 
-        self.detection_results[f"zscore_{column}"] = worker_result
-        return worker_result.to_dict()
+        try:
+            worker_result = self.statistical_worker.safe_execute(
+                df=self.data,
+                column=column,
+                method="zscore",
+                threshold=threshold,
+            )
 
+            self.detection_results[f"zscore_{column}"] = worker_result
+            
+            self.structured_logger.info("Z-score detection completed", {
+                "column": column,
+                "success": worker_result.success
+            })
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Z-score detection failed", {
+                "column": column,
+                "error": str(e)
+            })
+            raise
+
+    @retry_on_error(max_attempts=3, backoff=2)
     def detect_modified_zscore(
         self,
         column: str,
@@ -146,18 +213,37 @@ class AnomalyDetector:
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
 
-        worker_result = self.statistical_worker.safe_execute(
-            df=self.data,
-            column=column,
-            method="modified_zscore",
-            mod_threshold=threshold,
-        )
+        self.structured_logger.info("Modified Z-score detection started", {
+            "column": column,
+            "threshold": threshold
+        })
 
-        self.detection_results[f"mod_zscore_{column}"] = worker_result
-        return worker_result.to_dict()
+        try:
+            worker_result = self.statistical_worker.safe_execute(
+                df=self.data,
+                column=column,
+                method="modified_zscore",
+                mod_threshold=threshold,
+            )
+
+            self.detection_results[f"mod_zscore_{column}"] = worker_result
+            
+            self.structured_logger.info("Modified Z-score detection completed", {
+                "column": column,
+                "success": worker_result.success
+            })
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Modified Z-score detection failed", {
+                "column": column,
+                "error": str(e)
+            })
+            raise
 
     # === SECTION 4: ML DETECTION METHODS ===
 
+    @retry_on_error(max_attempts=3, backoff=2)
     def detect_isolation_forest(
         self,
         feature_cols: List[str],
@@ -180,18 +266,37 @@ class AnomalyDetector:
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
 
-        worker_result = self.isolation_forest_worker.safe_execute(
-            df=self.data,
-            feature_cols=feature_cols,
-            contamination=contamination,
-            n_estimators=n_estimators,
-        )
+        self.structured_logger.info("Isolation Forest detection started", {
+            "feature_cols": feature_cols,
+            "contamination": contamination,
+            "n_estimators": n_estimators
+        })
 
-        self.detection_results["isolation_forest"] = worker_result
-        return worker_result.to_dict()
+        try:
+            worker_result = self.isolation_forest_worker.safe_execute(
+                df=self.data,
+                feature_cols=feature_cols,
+                contamination=contamination,
+                n_estimators=n_estimators,
+            )
+
+            self.detection_results["isolation_forest"] = worker_result
+            
+            self.structured_logger.info("Isolation Forest detection completed", {
+                "success": worker_result.success,
+                "anomalies_found": worker_result.data.get("anomaly_count", 0) if worker_result.success else 0
+            })
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Isolation Forest detection failed", {
+                "error": str(e)
+            })
+            raise
 
     # === SECTION 5: MULTIVARIATE DETECTION METHODS ===
 
+    @retry_on_error(max_attempts=3, backoff=2)
     def detect_multivariate(
         self,
         feature_cols: List[str],
@@ -212,17 +317,35 @@ class AnomalyDetector:
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
 
-        worker_result = self.multivariate_worker.safe_execute(
-            df=self.data,
-            feature_cols=feature_cols,
-            percentile=percentile,
-        )
+        self.structured_logger.info("Multivariate detection started", {
+            "feature_cols": feature_cols,
+            "percentile": percentile
+        })
 
-        self.detection_results["multivariate"] = worker_result
-        return worker_result.to_dict()
+        try:
+            worker_result = self.multivariate_worker.safe_execute(
+                df=self.data,
+                feature_cols=feature_cols,
+                percentile=percentile,
+            )
+
+            self.detection_results["multivariate"] = worker_result
+            
+            self.structured_logger.info("Multivariate detection completed", {
+                "success": worker_result.success,
+                "anomalies_found": worker_result.data.get("anomaly_count", 0) if worker_result.success else 0
+            })
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Multivariate detection failed", {
+                "error": str(e)
+            })
+            raise
 
     # === SECTION 6: BATCH DETECTION METHODS ===
 
+    @retry_on_error(max_attempts=3, backoff=2)
     def detect_all_statistical(
         self,
         column: str,
@@ -244,14 +367,24 @@ class AnomalyDetector:
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
 
+        self.structured_logger.info("All statistical detections started", {
+            "column": column
+        })
+
         results = {
             "iqr": self.detect_iqr(column, iqr_multiplier),
             "zscore": self.detect_zscore(column, zscore_threshold),
             "modified_zscore": self.detect_modified_zscore(column, mod_zscore_threshold),
         }
+        
+        self.structured_logger.info("All statistical detections completed", {
+            "column": column,
+            "methods": len(results)
+        })
 
         return results
 
+    @retry_on_error(max_attempts=3, backoff=2)
     def detect_all(
         self,
         statistical_cols: List[str],
@@ -276,6 +409,12 @@ class AnomalyDetector:
         if multivariate_cols is None:
             multivariate_cols = ml_feature_cols
 
+        self.structured_logger.info("Comprehensive anomaly detection started", {
+            "statistical_cols": len(statistical_cols),
+            "ml_feature_cols": len(ml_feature_cols),
+            "multivariate_cols": len(multivariate_cols)
+        })
+
         results = {}
 
         # Statistical detection on each column
@@ -294,6 +433,10 @@ class AnomalyDetector:
         if multivariate_cols:
             results["multivariate"] = self.detect_multivariate(multivariate_cols)
 
+        self.structured_logger.info("Comprehensive anomaly detection completed", {
+            "detection_methods": len(results)
+        })
+
         return results
 
     # === SECTION 7: REPORTING ===
@@ -311,7 +454,7 @@ class AnomalyDetector:
             k for k, v in self.detection_results.items() if not v.success
         ]
 
-        return {
+        report = {
             "status": "success",
             "timestamp": datetime.now().isoformat(),
             "total_detections": len(self.detection_results),
@@ -323,6 +466,14 @@ class AnomalyDetector:
                 k: v.to_dict() for k, v in self.detection_results.items()
             },
         }
+        
+        self.structured_logger.info("Summary report generated", {
+            "total_detections": report["total_detections"],
+            "successful": report["successful"],
+            "failed": report["failed"]
+        })
+
+        return report
 
     def get_summary(self) -> str:
         """Get human-readable info about the agent state.
