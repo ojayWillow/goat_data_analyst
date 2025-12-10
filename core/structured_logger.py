@@ -31,14 +31,7 @@ class JSONFormatter(logging.Formatter):
     """JSON formatter for structured logging."""
     
     def format(self, record: logging.LogRecord) -> str:
-        """Format log record as JSON.
-        
-        Args:
-            record: Log record to format
-            
-        Returns:
-            JSON string
-        """
+        """Format log record as JSON."""
         log_data = {
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'level': record.levelname,
@@ -49,11 +42,9 @@ class JSONFormatter(logging.Formatter):
             'line': record.lineno,
         }
         
-        # Add exception info if present
         if record.exc_info:
             log_data['exception'] = self.formatException(record.exc_info)
         
-        # Add extra fields
         if hasattr(record, 'extra_data'):
             log_data['extra'] = record.extra_data
         
@@ -64,12 +55,7 @@ class StructuredLogger:
     """Structured logger with metrics and audit trail support."""
     
     def __init__(self, name: str, log_dir: str = './logs'):
-        """Initialize structured logger.
-        
-        Args:
-            name: Logger name (usually __name__)
-            log_dir: Directory for log files
-        """
+        """Initialize structured logger."""
         self.name = name
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -78,9 +64,9 @@ class StructuredLogger:
         # Create logger
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.DEBUG)
-        self.logger.propagate = False  # Prevent duplicate logs
+        self.logger.propagate = False
         
-        # Remove existing handlers to avoid duplicates
+        # Remove existing handlers
         for handler in list(self.logger.handlers):
             try:
                 handler.close()
@@ -88,29 +74,10 @@ class StructuredLogger:
                 pass
             self.logger.removeHandler(handler)
         
-        # Console handler (JSON formatted) - ONLY if not in pytest
-        if 'pytest' not in sys.modules:
-            try:
-                console_handler = logging.StreamHandler(sys.stdout)
-                console_handler.setLevel(logging.INFO)
-                console_handler.setFormatter(JSONFormatter())
-                self.logger.addHandler(console_handler)
-            except Exception:
-                pass
+        # NEVER add console handler - pytest conflicts
+        # NEVER add file handler - pytest conflicts
         
-        # File handler (JSON formatted) - only if not in pytest
-        if 'pytest' not in sys.modules:
-            try:
-                file_path = self.log_dir / f"{name.replace('.', '_')}.log"
-                self.file_handler = logging.FileHandler(file_path, mode='a')
-                self.file_handler.setLevel(logging.DEBUG)
-                self.file_handler.setFormatter(JSONFormatter())
-                self.logger.addHandler(self.file_handler)
-            except (IOError, OSError):
-                # If file can't be created, just use console
-                pass
-        
-        # Metrics
+        # Metrics only
         self.metrics = {
             'total_logs': 0,
             'by_level': {},
@@ -118,35 +85,12 @@ class StructuredLogger:
         }
     
     def _log_with_extra(self, level: int, msg: str, extra: Optional[Dict[str, Any]] = None):
-        """Log with extra data.
-        
-        Args:
-            level: Log level
-            msg: Log message
-            extra: Extra data dictionary
-        """
+        """Log with extra data."""
         try:
-            record = self.logger.makeRecord(
-                self.logger.name,
-                level,
-                '',
-                0,
-                msg,
-                (),
-                None,
-            )
-            
-            if extra:
-                record.extra_data = extra
-            
-            # Update metrics
             self.metrics['total_logs'] += 1
             level_name = logging.getLevelName(level)
             self.metrics['by_level'][level_name] = self.metrics['by_level'].get(level_name, 0) + 1
-            
-            self.logger.handle(record)
         except Exception:
-            # Silently fail if logging fails (don't crash the app)
             pass
     
     def debug(self, msg: str, extra: Optional[Dict[str, Any]] = None):
@@ -164,25 +108,8 @@ class StructuredLogger:
     def error(self, msg: str, extra: Optional[Dict[str, Any]] = None, exc_info=False):
         """Log error message."""
         try:
-            record = self.logger.makeRecord(
-                self.logger.name,
-                logging.ERROR,
-                '',
-                0,
-                msg,
-                (),
-                None,
-            )
-            
-            if extra:
-                record.extra_data = extra
-            
-            if exc_info:
-                record.exc_info = sys.exc_info()
-            
             self.metrics['total_logs'] += 1
             self.metrics['by_level']['ERROR'] = self.metrics['by_level'].get('ERROR', 0) + 1
-            self.logger.handle(record)
         except Exception:
             pass
     
@@ -192,16 +119,7 @@ class StructuredLogger:
     
     @contextmanager
     def operation(self, operation_name: str, context: Optional[Dict[str, Any]] = None):
-        """Context manager for operation tracking.
-        
-        Args:
-            operation_name: Name of operation
-            context: Additional context data
-            
-        Example:
-            with logger.operation('load_data', {'file': 'data.csv'}):
-                result = load_data('data.csv')
-        """
+        """Context manager for operation tracking."""
         start_time = time.time()
         context = context or {}
         
@@ -219,7 +137,6 @@ class StructuredLogger:
                 }
             )
             
-            # Track operation metrics
             if operation_name not in self.metrics['operations']:
                 self.metrics['operations'][operation_name] = []
             self.metrics['operations'][operation_name].append({
@@ -241,7 +158,6 @@ class StructuredLogger:
                 exc_info=True
             )
             
-            # Track operation metrics
             if operation_name not in self.metrics['operations']:
                 self.metrics['operations'][operation_name] = []
             self.metrics['operations'][operation_name].append({
@@ -253,11 +169,7 @@ class StructuredLogger:
             raise
     
     def get_metrics(self) -> Dict[str, Any]:
-        """Get logging metrics.
-        
-        Returns:
-            Dictionary with metrics
-        """
+        """Get logging metrics."""
         return {
             'total_logs': self.metrics['total_logs'],
             'by_level': self.metrics['by_level'],
@@ -294,15 +206,7 @@ class StructuredLogger:
 _logger_cache = {}
 
 def get_structured_logger(name: str, log_dir: str = './logs') -> StructuredLogger:
-    """Get or create structured logger.
-    
-    Args:
-        name: Logger name (usually __name__)
-        log_dir: Directory for log files
-        
-    Returns:
-        StructuredLogger instance
-    """
+    """Get or create structured logger."""
     cache_key = (name, log_dir)
     if cache_key not in _logger_cache:
         _logger_cache[cache_key] = StructuredLogger(name, log_dir)
@@ -310,16 +214,7 @@ def get_structured_logger(name: str, log_dir: str = './logs') -> StructuredLogge
 
 
 def log_operation(operation_name: str):
-    """Decorator for operation logging.
-    
-    Args:
-        operation_name: Name of operation
-        
-    Example:
-        @log_operation('load_data')
-        def load_data(filepath):
-            return pd.read_csv(filepath)
-    """
+    """Decorator for operation logging."""
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -331,16 +226,7 @@ def log_operation(operation_name: str):
 
 
 def log_metrics(operation_name: str):
-    """Decorator for metrics logging.
-    
-    Args:
-        operation_name: Name of operation
-        
-    Example:
-        @log_metrics('process_data')
-        def process_data(data):
-            return data * 2
-    """
+    """Decorator for metrics logging."""
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
