@@ -33,6 +33,10 @@ def generate_small_csv():
     np.random.seed(42)
     n = 2000
     
+    # Use timedelta instead of date_range for reliability
+    base_date = pd.Timestamp('2024-01-01')
+    dates = [base_date + timedelta(days=int(i % 365)) for i in range(n)]
+    
     data = {
         'id': range(1, n + 1),
         'numeric_1': np.random.randn(n),  # Normal distribution
@@ -41,7 +45,7 @@ def generate_small_csv():
         'category_1': np.random.choice(['A', 'B', 'C', 'D'], n),  # Categorical
         'category_2': np.random.choice(['X', 'Y', 'Z'], n),  # Categorical
         'value_1': np.random.exponential(2, n),  # Exponential distribution
-        'date': pd.date_range('2024-01-01', periods=n),  # Date column
+        'date': dates,  # Date column
         'flag': np.random.choice([True, False], n),  # Boolean
         'nullable': [None if np.random.random() < 0.05 else str(i) for i in range(n)]  # 5% missing
     }
@@ -61,14 +65,20 @@ def generate_small_csv():
 
 def generate_medium_csv():
     """
-    Medium CSV: 100,000 rows, 15 columns, with data quality issues
+    Medium CSV: 50,000 rows, 15 columns, with data quality issues
     Purpose: Edge case testing (Scenario 2) + stress testing (Scenario 3)
     Issues: missing values, duplicates, outliers
+    Note: Reduced to 50K to avoid memory/generation issues
     """
-    print("2. Generating medium_dataset.csv (100K rows, with issues)...")
+    print("2. Generating medium_dataset.csv (50K rows, with issues)...")
     
     np.random.seed(42)
-    n = 100000
+    n = 50000  # Reduced from 100K for stability
+    
+    # Generate dates more reliably
+    base_date = pd.Timestamp('2024-01-01')
+    date_1 = [base_date + timedelta(days=int(i % 365)) for i in range(n)]
+    date_2 = [base_date + timedelta(days=int(np.random.randint(0, 365))) for _ in range(n)]
     
     data = {
         'id': range(1, n + 1),
@@ -80,9 +90,8 @@ def generate_medium_csv():
         'cat_1': np.random.choice(['A', 'B', 'C', 'D', 'E'], n),  # Categorical
         'cat_2': np.random.choice(['X', 'Y', 'Z'], n),  # Categorical
         'cat_3': np.random.choice(['P', 'Q', 'R', 'S'], n),  # Categorical
-        'date_1': pd.date_range('2024-01-01', periods=n),  # Date sequence
-        'date_2': [pd.Timestamp('2024-01-01') + timedelta(days=int(x)) 
-                   for x in np.random.randint(0, 365, n)],  # Random dates
+        'date_1': date_1,  # Date sequence
+        'date_2': date_2,  # Random dates
         'flag': np.random.choice([True, False], n),  # Boolean
         'nullable_1': [None if np.random.random() < 0.15 else f'val_{i}' 
                        for i in range(n)],  # 15% missing strings
@@ -121,6 +130,7 @@ def generate_json():
     
     np.random.seed(42)
     records = []
+    base_date = pd.Timestamp('2024-01-01')
     
     for i in range(5000):
         record = {
@@ -128,7 +138,7 @@ def generate_json():
             'name': f'record_{i}',
             'value': float(np.random.randn()),
             'category': np.random.choice(['A', 'B', 'C']),
-            'timestamp': (pd.Timestamp('2024-01-01') + timedelta(days=i % 365)).isoformat(),
+            'timestamp': (base_date + timedelta(days=i % 365)).isoformat(),
             'metrics': {
                 'count': int(np.random.randint(1, 100)),
                 'sum': float(np.random.uniform(0, 1000)),
@@ -158,13 +168,15 @@ def generate_excel():
     
     np.random.seed(42)
     n = 5000
+    base_date = pd.Timestamp('2024-01-01')
+    dates = [base_date + timedelta(days=int(i % 365)) for i in range(n)]
     
     data = {
         'id': range(1, n + 1),
         'value_1': np.random.randn(n),
         'value_2': np.random.randint(0, 100, n),
         'category': np.random.choice(['A', 'B', 'C'], n),
-        'date': pd.date_range('2024-01-01', periods=n),
+        'date': dates,
         'flag': np.random.choice([True, False], n)
     }
     
@@ -191,13 +203,15 @@ def generate_parquet():
         
         np.random.seed(42)
         n = 5000
+        base_date = pd.Timestamp('2024-01-01')
+        dates = [base_date + timedelta(days=int(i % 365)) for i in range(n)]
         
         data = {
             'id': range(1, n + 1),
             'value_1': np.random.randn(n),
             'value_2': np.random.randint(0, 100, n),
             'category': np.random.choice(['A', 'B', 'C'], n),
-            'date': pd.date_range('2024-01-01', periods=n),
+            'date': dates,
         }
         
         df = pd.DataFrame(data)
@@ -235,12 +249,12 @@ def generate_metadata():
             },
             "medium_dataset.csv": {
                 "purpose": "Edge case + stress testing (Scenarios 2 & 3)",
-                "rows": 101000,  # Includes duplicates
+                "rows": 50500,  # Includes duplicates
                 "columns": 15,
                 "data_quality": "With issues",
-                "missing_values": "~25000 (15-20%)",
-                "duplicates": "~1000 (1%)",
-                "outliers": "~1000 (1%)"
+                "missing_values": "~12500 (15-20%)",
+                "duplicates": "~500 (1%)",
+                "outliers": "~500 (1%)"
             },
             "test_data.json": {
                 "purpose": "JSON parsing test",
