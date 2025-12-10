@@ -1,579 +1,400 @@
-"""Aggregator Agent - Orchestrator for data aggregation operations.
+"""Aggregator Agent - Coordinates data aggregation and time series operations.
 
-This agent ORCHESTRATES aggregation tasks by delegating to specialized workers:
-- GroupBy operations → GroupByWorker
-- Pivot operations → PivotWorker
-- CrossTab operations → CrosstabWorker
-- Rolling aggregations → RollingWorker
-- Statistical summaries → StatisticsWorker
-- Value counting → ValueCountWorker
+Aggregates and transforms data using 4 specialized workers:
+- WindowFunction: Rolling window operations
+- RollingAggregation: Multi-column rolling aggregations
+- ExponentialWeighted: EWMA calculations
+- LagLeadFunction: Time series lag/lead shifts
 
-Golden Rule: Manager = Thin orchestrator, Workers = Thick specialists
+Week 1 Day 4 - NEW AGENT IMPLEMENTATION:
+- Agent coordinates all workers (doesn't implement logic)
+- Each worker extends BaseWorker for standardization
+- Methods delegate to workers
+- Pure coordinator pattern consistent with DataLoader, Explorer, AnomalyDetector
+
+Integrated with Week 1 Systems:
+- Structured logging with metrics
+- Automatic retry with exponential backoff
+- Error recovery and handling
 """
 
 from typing import Any, Dict, List, Optional
 import pandas as pd
-import numpy as np
+from datetime import datetime
 
 from core.logger import get_logger
+from core.error_recovery import retry_on_error
 from core.structured_logger import get_structured_logger
 from core.exceptions import AgentError
-
-# Import ALL workers - STEP 1 OF FIX
-from agents.aggregator.workers import (
-    GroupByWorker,
-    PivotWorker,
-    CrosstabWorker,
-    RollingWorker,
-    StatisticsWorker,
-    ValueCountWorker,
+from .workers import (
+    WindowFunction,
+    RollingAggregation,
+    ExponentialWeighted,
+    LagLeadFunction,
+    WorkerResult,
 )
 
-logger = get_structured_logger(__name__)
+logger = get_logger(__name__)
+structured_logger = get_structured_logger(__name__)
 
 
 class Aggregator:
-    """Aggregator Manager: Thin orchestrator that delegates to workers.
+    """Aggregator Agent - coordinates data aggregation workers.
     
-    Pattern:
-    1. User calls aggregator method
-    2. Manager validates input
-    3. Manager delegates to appropriate worker
-    4. Worker executes and returns result
-    5. Manager returns result to user
+    Manages 4 workers:
+    - WindowFunction: Rolling window operations
+    - RollingAggregation: Multi-column rolling aggregations
+    - ExponentialWeighted: EWMA calculations
+    - LagLeadFunction: Time series lag/lead shifts
+    
+    Week 1 Day 4 Implementation:
+    - Agent coordinates all workers (doesn't implement)
+    - Each worker extends BaseWorker
+    - Methods delegate to workers
+    - Pure coordinator pattern
     """
 
-    def __init__(self):
-        """Initialize Aggregator with all worker instances."""
+    def __init__(self) -> None:
+        """Initialize the Aggregator agent and all workers."""
         self.name = "Aggregator"
         self.logger = get_logger("Aggregator")
-        self.data = None
-        
-        # STEP 2 OF FIX: INITIALIZE ALL WORKERS
-        self.groupby_worker = GroupByWorker()
-        self.pivot_worker = PivotWorker()
-        self.crosstab_worker = CrosstabWorker()
-        self.rolling_worker = RollingWorker()
-        self.statistics_worker = StatisticsWorker()
-        self.value_count_worker = ValueCountWorker()
-        
-        logger.info(
-            "Aggregator initialized with 6 workers",
-            extra={
-                "workers": 6,
-                "worker_list": [
-                    "GroupByWorker",
-                    "PivotWorker",
-                    "CrosstabWorker",
-                    "RollingWorker",
-                    "StatisticsWorker",
-                    "ValueCountWorker",
-                ]
-            }
-        )
+        self.structured_logger = get_structured_logger("Aggregator")
+        self.data: Optional[pd.DataFrame] = None
+        self.aggregation_results: Dict[str, WorkerResult] = {}
 
-    # ===== SECTION 1: Data Management =====
+        # === INITIALIZE ALL WORKERS ===
+        self.window_function = WindowFunction()
+        self.rolling_aggregation = RollingAggregation()
+        self.exponential_weighted = ExponentialWeighted()
+        self.lag_lead_function = LagLeadFunction()
 
-    def set_data(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Set data for aggregation operations."""
-        try:
-            if df is None or df.empty:
-                return {
-                    'status': 'error',
-                    'message': 'Data is empty',
-                    'data': None,
-                    'metadata': {},
-                    'errors': ['DataFrame is empty']
-                }
-            
-            self.data = df.copy()
-            logger.info(
-                "Data set",
-                extra={'rows': df.shape[0], 'columns': df.shape[1]}
-            )
-            
-            return {
-                'status': 'success',
-                'message': f"Data loaded: {df.shape[0]} rows, {df.shape[1]} columns",
-                'data': None,
-                'metadata': {
-                    'rows': df.shape[0],
-                    'columns': df.shape[1],
-                    'column_names': df.columns.tolist()
-                },
-                'errors': []
-            }
-        except Exception as e:
-            logger.error("Failed to set data", extra={'error': str(e)})
-            return {
-                'status': 'error',
-                'message': f"Failed to set data: {e}",
-                'data': None,
-                'metadata': {},
-                'errors': [str(e)]
-            }
+        self.workers = [
+            self.window_function,
+            self.rolling_aggregation,
+            self.exponential_weighted,
+            self.lag_lead_function,
+        ]
+
+        self.logger.info("Aggregator initialized with 4 aggregation workers")
+        self.structured_logger.info("Aggregator initialized", {
+            "workers": 4,
+            "worker_names": [
+                "WindowFunction",
+                "RollingAggregation",
+                "ExponentialWeighted",
+                "LagLeadFunction"
+            ]
+        })
+
+    # === DATA MANAGEMENT ===
+
+    def set_data(self, df: pd.DataFrame) -> None:
+        """Store the DataFrame for aggregation operations.
+        
+        Args:
+            df: DataFrame to process
+        """
+        self.data = df.copy()
+        self.aggregation_results = {}
+        self.logger.info(f"Data set: {df.shape[0]} rows, {df.shape[1]} columns")
+        self.structured_logger.info("Data set for aggregation", {
+            "rows": df.shape[0],
+            "columns": df.shape[1],
+            "memory_mb": round(df.memory_usage(deep=True).sum() / 1024**2, 2),
+            "numeric_cols": len(df.select_dtypes(include=['number']).columns)
+        })
 
     def get_data(self) -> Optional[pd.DataFrame]:
-        """Get currently loaded data."""
+        """Retrieve the stored DataFrame.
+        
+        Returns:
+            DataFrame or None if not set
+        """
         return self.data
 
-    # ===== SECTION 2: GroupBy Operations =====
-    # Manager: Validate and delegate to GroupByWorker
+    # === AGGREGATION METHODS - DELEGATE TO WORKERS ===
 
-    def groupby_single(self, group_col: str, agg_col: str, agg_func: str = "sum") -> Dict[str, Any]:
-        """Group by single column and aggregate.
+    @retry_on_error(max_attempts=3, backoff=2)
+    def apply_window_function(
+        self,
+        window_size: int = 3,
+        operations: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Apply rolling window functions.
         
-        Manager delegates to GroupByWorker.
+        Args:
+            window_size: Size of rolling window
+            operations: List of operations ('mean', 'sum', 'std', 'min', 'max')
+            
+        Returns:
+            Window function result as dictionary
+            
+        Raises:
+            AgentError: If no data set
         """
-        # Manager: VALIDATE INPUT
         if self.data is None:
-            return {
-                'status': 'error',
-                'message': 'No data loaded',
-                'data': None,
-                'metadata': {},
-                'errors': ['No data set. Use set_data() first.']
-            }
-        
-        if group_col not in self.data.columns:
-            return {
-                'status': 'error',
-                'message': f"Column '{group_col}' not found",
-                'data': None,
-                'metadata': {},
-                'errors': [f"Column '{group_col}' not found"]
-            }
-        
-        if agg_col not in self.data.columns:
-            return {
-                'status': 'error',
-                'message': f"Column '{agg_col}' not found",
-                'data': None,
-                'metadata': {},
-                'errors': [f"Column '{agg_col}' not found"]
-            }
-        
-        # Manager: DELEGATE TO WORKER
-        logger.info(
-            "Delegating to GroupByWorker",
-            extra={'group_col': group_col, 'agg_col': agg_col, 'agg_func': agg_func}
-        )
-        
-        worker_result = self.groupby_worker.safe_execute(
-            df=self.data,
-            group_col=group_col,
-            agg_col=agg_col,
-            agg_func=agg_func
-        )
-        
-        # Manager: CHECK RESULT
-        if not worker_result.success:
-            logger.error(
-                "GroupByWorker failed",
-                extra={'errors': [e['message'] for e in worker_result.errors]}
+            raise AgentError("No data set. Use set_data() first.")
+
+        self.structured_logger.info("Window function started", {
+            "window_size": window_size,
+            "operations": operations
+        })
+
+        try:
+            if operations is None:
+                operations = ['mean']
+                
+            worker_result = self.window_function.safe_execute(
+                df=self.data,
+                window_size=window_size,
+                operations=operations,
             )
-            return {
-                'status': 'error',
-                'message': 'GroupBy operation failed',
-                'data': None,
-                'metadata': {},
-                'errors': [e['message'] for e in worker_result.errors]
-            }
+
+            self.aggregation_results["window_function"] = worker_result
+            self.structured_logger.info("Window function completed", {"success": worker_result.success})
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Window function failed", {"error": str(e)})
+            raise
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def apply_rolling_aggregation(
+        self,
+        window_size: int = 5,
+        columns: Optional[List[str]] = None,
+        agg_dict: Optional[dict] = None,
+    ) -> Dict[str, Any]:
+        """Apply multi-column rolling aggregations.
         
-        # Manager: RETURN RESULT
-        return {
-            'status': 'success',
-            'message': f"Grouped by '{group_col}' into {len(worker_result.data)} groups",
-            'data': worker_result.data,
-            'metadata': {
-                'groups': len(worker_result.data),
-                'group_column': group_col,
-                'aggregated_column': agg_col,
-                'function': agg_func
+        Args:
+            window_size: Size of rolling window
+            columns: Columns to aggregate (None = all numeric)
+            agg_dict: Dict mapping columns to operations
+            
+        Returns:
+            Rolling aggregation result as dictionary
+            
+        Raises:
+            AgentError: If no data set
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+
+        self.structured_logger.info("Rolling aggregation started", {"window_size": window_size})
+
+        try:
+            worker_result = self.rolling_aggregation.safe_execute(
+                df=self.data,
+                window_size=window_size,
+                columns=columns,
+                agg_dict=agg_dict,
+            )
+
+            self.aggregation_results["rolling_aggregation"] = worker_result
+            self.structured_logger.info("Rolling aggregation completed", {"success": worker_result.success})
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Rolling aggregation failed", {"error": str(e)})
+            raise
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def apply_exponential_weighted(
+        self,
+        span: int = 10,
+        adjust: bool = True,
+    ) -> Dict[str, Any]:
+        """Apply exponential weighted moving average.
+        
+        Args:
+            span: Span for exponential weighting
+            adjust: Whether to apply exponential scaling
+            
+        Returns:
+            EWMA result as dictionary
+            
+        Raises:
+            AgentError: If no data set
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+
+        self.structured_logger.info("Exponential weighted started", {
+            "span": span,
+            "adjust": adjust
+        })
+
+        try:
+            worker_result = self.exponential_weighted.safe_execute(
+                df=self.data,
+                span=span,
+                adjust=adjust,
+            )
+
+            self.aggregation_results["exponential_weighted"] = worker_result
+            self.structured_logger.info("Exponential weighted completed", {"success": worker_result.success})
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Exponential weighted failed", {"error": str(e)})
+            raise
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def apply_lag_lead_function(
+        self,
+        lag_periods: int = 1,
+        lead_periods: int = 0,
+        columns: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Apply lag and lead time shifts.
+        
+        Args:
+            lag_periods: Number of periods to lag
+            lead_periods: Number of periods to lead
+            columns: Columns to apply lag/lead (None = all numeric)
+            
+        Returns:
+            Lag/lead function result as dictionary
+            
+        Raises:
+            AgentError: If no data set
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+
+        self.structured_logger.info("Lag/Lead function started", {
+            "lag_periods": lag_periods,
+            "lead_periods": lead_periods
+        })
+
+        try:
+            worker_result = self.lag_lead_function.safe_execute(
+                df=self.data,
+                lag_periods=lag_periods,
+                lead_periods=lead_periods,
+                columns=columns,
+            )
+
+            self.aggregation_results["lag_lead_function"] = worker_result
+            self.structured_logger.info("Lag/Lead function completed", {"success": worker_result.success})
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Lag/Lead function failed", {"error": str(e)})
+            raise
+
+    # === BATCH AGGREGATION ===
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def aggregate_all(
+        self,
+        window_params: Optional[Dict[str, Any]] = None,
+        rolling_params: Optional[Dict[str, Any]] = None,
+        ewma_params: Optional[Dict[str, Any]] = None,
+        lag_lead_params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Run all 4 aggregation methods.
+        
+        Args:
+            window_params: Parameters for window function
+            rolling_params: Parameters for rolling aggregation
+            ewma_params: Parameters for exponential weighted
+            lag_lead_params: Parameters for lag/lead
+            
+        Returns:
+            Dictionary with all aggregation results
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+
+        self.structured_logger.info("Comprehensive aggregation started")
+
+        results = {}
+
+        # Default parameters
+        window_params = window_params or {}
+        rolling_params = rolling_params or {}
+        ewma_params = ewma_params or {}
+        lag_lead_params = lag_lead_params or {}
+
+        # Run all aggregations
+        try:
+            results["window_function"] = self.apply_window_function(**window_params)
+        except Exception as e:
+            self.logger.warning(f"Window function failed: {e}")
+
+        try:
+            results["rolling_aggregation"] = self.apply_rolling_aggregation(**rolling_params)
+        except Exception as e:
+            self.logger.warning(f"Rolling aggregation failed: {e}")
+
+        try:
+            results["exponential_weighted"] = self.apply_exponential_weighted(**ewma_params)
+        except Exception as e:
+            self.logger.warning(f"Exponential weighted failed: {e}")
+
+        try:
+            results["lag_lead_function"] = self.apply_lag_lead_function(**lag_lead_params)
+        except Exception as e:
+            self.logger.warning(f"Lag/Lead function failed: {e}")
+
+        self.structured_logger.info("Comprehensive aggregation completed", {
+            "methods": len(results)
+        })
+
+        return results
+
+    # === REPORTING ===
+
+    def summary_report(self) -> Dict[str, Any]:
+        """Get summary of all aggregations performed.
+        
+        Returns:
+            Dictionary with aggregation summary
+        """
+        successful_aggregations = [
+            k for k, v in self.aggregation_results.items() if v.success
+        ]
+        failed_aggregations = [
+            k for k, v in self.aggregation_results.items() if not v.success
+        ]
+
+        report = {
+            "status": "success",
+            "timestamp": datetime.now().isoformat(),
+            "total_aggregations": len(self.aggregation_results),
+            "successful": len(successful_aggregations),
+            "failed": len(failed_aggregations),
+            "successful_methods": successful_aggregations,
+            "failed_methods": failed_aggregations,
+            "results": {
+                k: v.to_dict() for k, v in self.aggregation_results.items()
             },
-            'errors': []
         }
+        
+        self.structured_logger.info("Summary report generated", {
+            "total_aggregations": report["total_aggregations"],
+            "successful": report["successful"],
+            "failed": report["failed"]
+        })
 
-    def groupby_multiple(self, group_cols: List[str], agg_specs: Dict[str, str]) -> Dict[str, Any]:
-        """Group by multiple columns with multiple aggregations.
-        
-        Manager delegates to GroupByWorker.
-        """
-        # Manager: VALIDATE INPUT
-        if self.data is None:
-            return {
-                'status': 'error',
-                'message': 'No data loaded',
-                'data': None,
-                'metadata': {},
-                'errors': ['No data set']
-            }
-        
-        for col in group_cols:
-            if col not in self.data.columns:
-                return {
-                    'status': 'error',
-                    'message': f"Column '{col}' not found",
-                    'data': None,
-                    'metadata': {},
-                    'errors': [f"Column '{col}' not found"]
-                }
-        
-        for col in agg_specs.keys():
-            if col not in self.data.columns:
-                return {
-                    'status': 'error',
-                    'message': f"Column '{col}' not found",
-                    'data': None,
-                    'metadata': {},
-                    'errors': [f"Column '{col}' not found"]
-                }
-        
-        # Manager: DELEGATE TO WORKER
-        logger.info(
-            "Delegating to GroupByWorker (multiple)",
-            extra={'group_cols': group_cols, 'agg_specs': agg_specs}
-        )
-        
-        worker_result = self.groupby_worker.safe_execute(
-            df=self.data,
-            group_cols=group_cols,
-            agg_specs=agg_specs
-        )
-        
-        # Manager: CHECK AND RETURN
-        if not worker_result.success:
-            return {
-                'status': 'error',
-                'message': 'Multi-level GroupBy failed',
-                'data': None,
-                'metadata': {},
-                'errors': [e['message'] for e in worker_result.errors]
-            }
-        
-        return {
-            'status': 'success',
-            'message': f"Grouped into {len(worker_result.data)} groups",
-            'data': worker_result.data,
-            'metadata': {
-                'groups': len(worker_result.data),
-                'group_columns': group_cols,
-                'aggregation_specs': agg_specs
-            },
-            'errors': []
-        }
-
-    # ===== SECTION 3: Pivot Operations =====
-    # Manager: Validate and delegate to PivotWorker
-
-    def pivot_table(self, index: str, columns: str, values: str, aggfunc: str = "sum") -> Dict[str, Any]:
-        """Create pivot table.
-        
-        Manager delegates to PivotWorker.
-        """
-        # Manager: VALIDATE INPUT
-        if self.data is None:
-            return {
-                'status': 'error',
-                'message': 'No data loaded',
-                'data': None,
-                'metadata': {},
-                'errors': ['No data set']
-            }
-        
-        for col in [index, columns, values]:
-            if col not in self.data.columns:
-                return {
-                    'status': 'error',
-                    'message': f"Column '{col}' not found",
-                    'data': None,
-                    'metadata': {},
-                    'errors': [f"Column '{col}' not found"]
-                }
-        
-        # Manager: DELEGATE TO WORKER
-        logger.info(
-            "Delegating to PivotWorker",
-            extra={'index': index, 'columns': columns, 'values': values}
-        )
-        
-        worker_result = self.pivot_worker.safe_execute(
-            df=self.data,
-            index=index,
-            columns=columns,
-            values=values,
-            aggfunc=aggfunc
-        )
-        
-        # Manager: CHECK AND RETURN
-        if not worker_result.success:
-            return {
-                'status': 'error',
-                'message': 'Pivot table creation failed',
-                'data': None,
-                'metadata': {},
-                'errors': [e['message'] for e in worker_result.errors]
-            }
-        
-        return {
-            'status': 'success',
-            'message': f"Pivot table created: {worker_result.metadata['shape']}",
-            'data': worker_result.data,
-            'metadata': worker_result.metadata,
-            'errors': []
-        }
-
-    # ===== SECTION 4: CrossTab Operations =====
-    # Manager: Validate and delegate to CrosstabWorker
-
-    def crosstab(self, row_col: str, col_col: str, values: Optional[str] = None, aggfunc: str = "count") -> Dict[str, Any]:
-        """Create cross-tabulation.
-        
-        Manager delegates to CrosstabWorker.
-        """
-        # Manager: VALIDATE INPUT
-        if self.data is None:
-            return {
-                'status': 'error',
-                'message': 'No data loaded',
-                'data': None,
-                'metadata': {},
-                'errors': ['No data set']
-            }
-        
-        for col in [row_col, col_col]:
-            if col not in self.data.columns:
-                return {
-                    'status': 'error',
-                    'message': f"Column '{col}' not found",
-                    'data': None,
-                    'metadata': {},
-                    'errors': [f"Column '{col}' not found"]
-                }
-        
-        if values and values not in self.data.columns:
-            return {
-                'status': 'error',
-                'message': f"Column '{values}' not found",
-                'data': None,
-                'metadata': {},
-                'errors': [f"Column '{values}' not found"]
-            }
-        
-        # Manager: DELEGATE TO WORKER
-        logger.info(
-            "Delegating to CrosstabWorker",
-            extra={'row_col': row_col, 'col_col': col_col, 'values': values}
-        )
-        
-        worker_result = self.crosstab_worker.safe_execute(
-            df=self.data,
-            row_col=row_col,
-            col_col=col_col,
-            values=values,
-            aggfunc=aggfunc
-        )
-        
-        # Manager: CHECK AND RETURN
-        if not worker_result.success:
-            return {
-                'status': 'error',
-                'message': 'Crosstab creation failed',
-                'data': None,
-                'metadata': {},
-                'errors': [e['message'] for e in worker_result.errors]
-            }
-        
-        return {
-            'status': 'success',
-            'message': f"Crosstab created: {worker_result.metadata['shape']}",
-            'data': worker_result.data,
-            'metadata': worker_result.metadata,
-            'errors': []
-        }
-
-    # ===== SECTION 5: Rolling Operations =====
-    # Manager: Validate and delegate to RollingWorker
-
-    def rolling_aggregation(self, col: str, window: int, aggfunc: str = "mean") -> Dict[str, Any]:
-        """Apply rolling aggregation.
-        
-        Manager delegates to RollingWorker.
-        """
-        # Manager: VALIDATE INPUT
-        if self.data is None:
-            return {
-                'status': 'error',
-                'message': 'No data loaded',
-                'data': None,
-                'metadata': {},
-                'errors': ['No data set']
-            }
-        
-        if col not in self.data.columns:
-            return {
-                'status': 'error',
-                'message': f"Column '{col}' not found",
-                'data': None,
-                'metadata': {},
-                'errors': [f"Column '{col}' not found"]
-            }
-        
-        # Manager: DELEGATE TO WORKER
-        logger.info(
-            "Delegating to RollingWorker",
-            extra={'col': col, 'window': window, 'aggfunc': aggfunc}
-        )
-        
-        worker_result = self.rolling_worker.safe_execute(
-            df=self.data,
-            col=col,
-            window=window,
-            aggfunc=aggfunc
-        )
-        
-        # Manager: CHECK AND RETURN
-        if not worker_result.success:
-            return {
-                'status': 'error',
-                'message': 'Rolling aggregation failed',
-                'data': None,
-                'metadata': {},
-                'errors': [e['message'] for e in worker_result.errors]
-            }
-        
-        return {
-            'status': 'success',
-            'message': f"Rolling aggregation applied",
-            'data': worker_result.data,
-            'metadata': worker_result.metadata,
-            'errors': []
-        }
-
-    # ===== SECTION 6: Statistical Operations =====
-    # Manager: Validate and delegate to StatisticsWorker
-
-    def summary_statistics(self, group_col: str) -> Dict[str, Any]:
-        """Get comprehensive summary statistics.
-        
-        Manager delegates to StatisticsWorker.
-        """
-        # Manager: VALIDATE INPUT
-        if self.data is None:
-            return {
-                'status': 'error',
-                'message': 'No data loaded',
-                'data': None,
-                'metadata': {},
-                'errors': ['No data set']
-            }
-        
-        if group_col not in self.data.columns:
-            return {
-                'status': 'error',
-                'message': f"Column '{group_col}' not found",
-                'data': None,
-                'metadata': {},
-                'errors': [f"Column '{group_col}' not found"]
-            }
-        
-        # Manager: DELEGATE TO WORKER
-        logger.info(
-            "Delegating to StatisticsWorker",
-            extra={'group_col': group_col}
-        )
-        
-        worker_result = self.statistics_worker.safe_execute(
-            df=self.data,
-            group_col=group_col
-        )
-        
-        # Manager: CHECK AND RETURN
-        if not worker_result.success:
-            return {
-                'status': 'error',
-                'message': 'Summary statistics failed',
-                'data': None,
-                'metadata': {},
-                'errors': [e['message'] for e in worker_result.errors]
-            }
-        
-        return {
-            'status': 'success',
-            'message': f"Summary statistics computed",
-            'data': worker_result.data,
-            'metadata': worker_result.metadata,
-            'errors': []
-        }
-
-    # ===== SECTION 7: Value Counting =====
-    # Manager: Validate and delegate to ValueCountWorker
-
-    def value_counts(self, col: str, top_n: int = 10) -> Dict[str, Any]:
-        """Get value counts for a column.
-        
-        Manager delegates to ValueCountWorker.
-        """
-        # Manager: VALIDATE INPUT
-        if self.data is None:
-            return {
-                'status': 'error',
-                'message': 'No data loaded',
-                'data': None,
-                'metadata': {},
-                'errors': ['No data set']
-            }
-        
-        if col not in self.data.columns:
-            return {
-                'status': 'error',
-                'message': f"Column '{col}' not found",
-                'data': None,
-                'metadata': {},
-                'errors': [f"Column '{col}' not found"]
-            }
-        
-        # Manager: DELEGATE TO WORKER
-        logger.info(
-            "Delegating to ValueCountWorker",
-            extra={'col': col, 'top_n': top_n}
-        )
-        
-        worker_result = self.value_count_worker.safe_execute(
-            df=self.data,
-            col=col,
-            top_n=top_n
-        )
-        
-        # Manager: CHECK AND RETURN
-        if not worker_result.success:
-            return {
-                'status': 'error',
-                'message': 'Value counts failed',
-                'data': None,
-                'metadata': {},
-                'errors': [e['message'] for e in worker_result.errors]
-            }
-        
-        return {
-            'status': 'success',
-            'message': f"Value counts computed",
-            'data': worker_result.data,
-            'metadata': worker_result.metadata,
-            'errors': []
-        }
-
-    # ===== SECTION 8: Utilities =====
+        return report
 
     def get_summary(self) -> str:
-        """Get human-readable summary."""
-        if self.data is None:
-            return "Aggregator: No data loaded"
+        """Get human-readable info about the agent state.
         
+        Returns:
+            Summary string
+        """
+        if self.data is None:
+            return "Aggregator: no data loaded"
+
         return (
             f"Aggregator Summary:\n"
-            f"  Data: {self.data.shape[0]} rows x {self.data.shape[1]} columns\n"
-            f"  Columns: {', '.join(self.data.columns[:5])}{'...' if len(self.data.columns) > 5 else ''}\n"
-            f"  Numeric: {len(self.data.select_dtypes(include=[np.number]).columns)}\n"
-            f"  Categorical: {len(self.data.select_dtypes(include=['object']).columns)}"
+            f"  Rows: {self.data.shape[0]}\n"
+            f"  Columns: {self.data.shape[1]}\n"
+            f"  Workers: {len(self.workers)}\n"
+            f"  Aggregations run: {len(self.aggregation_results)}\n"
+            f"  Successful: {sum(1 for v in self.aggregation_results.values() if v.success)}"
         )
