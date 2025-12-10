@@ -13,9 +13,9 @@ import psutil
 import os
 from pathlib import Path
 
-from agents.dataloader.dataloader import DataLoader
-from agents.explorer.explorer import Explorer
-from agents.aggregator.aggregator import Aggregator
+from agents.data_loader import DataLoader
+from agents.explorer import Explorer
+from agents.aggregator import Aggregator
 from core.structured_logger import get_structured_logger
 
 
