@@ -15,8 +15,13 @@ from .workers import (
     WorkerResult,
     ErrorType,
 )
+from core.structured_logger import get_structured_logger
+from core.error_recovery import retry_on_error
+from core.exceptions import AgentError
+import pandas as pd
+from datetime import datetime
+from typing import Dict, Any, List, Optional
 
-logger = get_logger(__name__)
 structured_logger = get_structured_logger(__name__)
 
 
@@ -50,7 +55,6 @@ class Explorer:
     def __init__(self):
         """Initialize Explorer agent with all workers."""
         self.name = "Explorer"
-        self.logger = get_logger("Explorer")
         self.structured_logger = get_structured_logger("Explorer")
         self.data = None
         
@@ -91,7 +95,6 @@ class Explorer:
         self.all_workers = self.core_workers + self.statistical_workers
         
         self.analysis_cache = {}
-        self.logger.info(f"{self.name} initialized with {len(self.all_workers)} workers")
         self.structured_logger.info("Explorer initialized", {
             "core_workers": len(self.core_workers),
             "statistical_workers": len(self.statistical_workers),
@@ -109,7 +112,6 @@ class Explorer:
         
         self.data = df
         self.analysis_cache = {}  # Clear cache
-        self.logger.info(f"Data set: {df.shape[0]} rows, {df.shape[1]} columns")
         self.structured_logger.info("Data set for exploration", {
             "rows": df.shape[0],
             "columns": df.shape[1],
@@ -133,10 +135,10 @@ class Explorer:
         Returns:
             Dictionary with all analysis results
         """
-        return self.get_summary_report()
+        return self.summary_report()
     
     @retry_on_error(max_attempts=3, backoff=2)
-    def get_summary_report(self) -> Dict[str, Any]:
+    def summary_report(self) -> Dict[str, Any]:
         """Get comprehensive summary report using core workers.
         
         Coordinates core workers, validates quality, reports findings.
@@ -151,7 +153,6 @@ class Explorer:
             raise AgentError("No data set. Use set_data() first.")
         
         try:
-            self.logger.info("Starting comprehensive data exploration...")
             self.structured_logger.info("Summary report generation started", {
                 "rows": self.data.shape[0],
                 "columns": self.data.shape[1]
@@ -176,6 +177,7 @@ class Explorer:
                 "quality_validation": validation_report,
                 "overall_quality_score": self._calculate_overall_quality(worker_results),
                 "summary": self._build_summary(worker_results),
+                "columns": list(self.data.columns)
             }
             
             self.structured_logger.info("Summary report generated successfully", {
@@ -183,11 +185,9 @@ class Explorer:
                 "quality_score": report["overall_quality_score"]
             })
             
-            self.logger.info("Exploration complete")
             return report
         
         except Exception as e:
-            self.logger.error(f"Exploration failed: {e}")
             self.structured_logger.error("Summary report generation failed", {
                 "error": str(e),
                 "error_type": type(e).__name__
@@ -299,12 +299,10 @@ class Explorer:
     
     def _execute_workers(self, workers: List) -> List[Dict[str, Any]]:
         """Execute a list of workers and collect results."""
-        self.logger.info(f"Executing {len(workers)} workers...")
         self.structured_logger.info("Executing workers", {"worker_count": len(workers)})
         
         results = []
         for worker in workers:
-            self.logger.info(f"Executing {worker.worker_name}...")
             result = worker.safe_execute(df=self.data)
             results.append(result.to_dict())
         
@@ -312,8 +310,6 @@ class Explorer:
     
     def _validate_worker_quality(self, worker_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Validate quality of worker outputs."""
-        self.logger.info("Validating worker quality...")
-        
         validation = {
             "total_workers": len(worker_results),
             "successful_workers": sum(1 for r in worker_results if r['success']),
