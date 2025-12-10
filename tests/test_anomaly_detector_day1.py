@@ -92,7 +92,8 @@ class TestLOFDetection:
         """Test LOF detection runs successfully."""
         result = detector_with_data.detect_lof()
         assert result is not None
-        assert 'status' in result or 'anomalies' in result or 'scores' in result
+        assert isinstance(result, dict)
+        assert 'data' in result or 'anomalies' in result or 'scores' in result
 
     def test_lof_with_parameters(self, detector_with_data):
         """Test LOF with custom parameters."""
@@ -123,6 +124,7 @@ class TestOCSVMDetection:
         """Test One-Class SVM detection runs successfully."""
         result = detector_with_data.detect_ocsvm()
         assert result is not None
+        assert isinstance(result, dict)
 
     def test_ocsvm_with_parameters(self, detector_with_data):
         """Test One-Class SVM with custom parameters."""
@@ -149,6 +151,7 @@ class TestIsolationForestDetection:
         """Test Isolation Forest detection runs successfully."""
         result = detector_with_data.detect_isolation_forest()
         assert result is not None
+        assert isinstance(result, dict)
 
     def test_isolation_forest_with_parameters(self, detector_with_data):
         """Test Isolation Forest with custom parameters."""
@@ -177,6 +180,7 @@ class TestEnsembleDetection:
         """Test ensemble detection runs successfully."""
         result = detector_with_data.detect_ensemble()
         assert result is not None
+        assert isinstance(result, dict)
 
     def test_ensemble_with_threshold(self, detector_with_data):
         """Test ensemble with custom threshold."""
