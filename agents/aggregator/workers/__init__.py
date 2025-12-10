@@ -1,28 +1,26 @@
 """Aggregator Workers - Collection of specialized aggregation workers.
 
-IMPORTANT: If you get ImportError for CrossTabWorker:
-  1. This file has 'CrossTabWorker' (capital 'TAB')
-  2. Clear Python cache: delete __pycache__ folders
-  3. Restart Python interpreter
-  4. Clear sys.modules cache before re-importing
+Week 1 Day 4 Workers (4):
+- WindowFunctionWorker: Rolling window operations
+- RollingAggregationWorker: Multi-column rolling aggregations
+- ExponentialWeightedWorker: EWMA and exponential std
+- LagLeadFunctionWorker: Lag/lead time shifts
+
+Note: If you get ImportError, clear __pycache__ and restart interpreter.
 """
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
-from .groupby import GroupByWorker
-from .pivot import PivotWorker
-from .crosstab import CrossTabWorker
-from .rolling import RollingWorker
-from .statistics import StatisticsWorker
-from .value_count import ValueCountWorker
+from .window_function_worker import WindowFunctionWorker
+from .rolling_aggregation_worker import RollingAggregationWorker
+from .exponential_weighted_worker import ExponentialWeightedWorker
+from .lag_lead_function_worker import LagLeadFunctionWorker
 
 __all__ = [
     "BaseWorker",
     "WorkerResult",
     "ErrorType",
-    "GroupByWorker",
-    "PivotWorker",
-    "CrossTabWorker",
-    "RollingWorker",
-    "StatisticsWorker",
-    "ValueCountWorker",
+    "WindowFunctionWorker",
+    "RollingAggregationWorker",
+    "ExponentialWeightedWorker",
+    "LagLeadFunctionWorker",
 ]
