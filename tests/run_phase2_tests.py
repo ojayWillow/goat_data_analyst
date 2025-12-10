@@ -18,8 +18,13 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
 # ============================================================================
-# FIX: Add project root to Python path
+# FIX: Clear Python import cache and add project root to Python path
 # ============================================================================
+
+# Remove all cached aggregator imports to prevent stale cache
+for key in list(sys.modules.keys()):
+    if 'aggregator' in key or 'agents' in key:
+        del sys.modules[key]
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
