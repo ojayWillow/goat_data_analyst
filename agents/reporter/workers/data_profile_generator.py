@@ -3,7 +3,7 @@
 import pandas as pd
 import numpy as np
 from typing import Any, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 
 
@@ -41,7 +41,7 @@ class DataProfileGenerator(BaseWorker):
             
             profile = {
                 "report_type": "data_profile",
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
                 "columns": {},
             }
             

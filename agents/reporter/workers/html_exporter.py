@@ -1,8 +1,8 @@
 """HTMLExporter - Exports reports to HTML format."""
 
-from typing import Any, Dict
-from pathlib import Path
-from datetime import datetime
+import pandas as pd
+from typing import Any, Dict, Optional
+from datetime import datetime, timezone
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 
 
@@ -12,12 +12,12 @@ class HTMLExporter(BaseWorker):
     def __init__(self):
         super().__init__("html_exporter")
     
-    def execute(self, report_data: Dict[str, Any], file_path: str = None, **kwargs) -> WorkerResult:
+    def execute(self, report_data: Dict[str, Any], file_path: Optional[str] = None, **kwargs) -> WorkerResult:
         """Export report to HTML.
         
         Args:
-            report_data: Report dictionary to export
-            file_path: Output file path
+            report_data: Report data to export
+            file_path: Optional file path to save to
             **kwargs: Additional parameters
             
         Returns:
@@ -30,35 +30,31 @@ class HTMLExporter(BaseWorker):
         )
         
         try:
-            if report_data is None or not isinstance(report_data, dict):
+            if not report_data:
                 self._add_error(
                     result,
                     ErrorType.DATA_VALIDATION_ERROR,
-                    "Report data must be a dictionary",
+                    "Report data is empty",
                     severity="error"
                 )
                 return result
             
-            if file_path is None:
-                timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-                file_path = f"report_{timestamp}.html"
-            
-            self.logger.info(f"Exporting to HTML: {file_path}")
-            
+            # Generate HTML
             html_content = self._generate_html(report_data)
             
-            with open(file_path, 'w') as f:
-                f.write(html_content)
-            
-            file_size = Path(file_path).stat().st_size
+            # Determine file path
+            if file_path is None:
+                timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                file_path = f"report_{timestamp}.html"
             
             result.data = {
-                "status": "success",
-                "format": "HTML",
-                "file_path": str(file_path),
-                "file_size": file_size,
-                "message": f"Report exported successfully to {file_path}",
+                "html": html_content,
+                "file_path": file_path,
+                "file_size": len(html_content),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
+            
+            self.logger.info(f"HTML export generated: {file_path}")
             
         except Exception as e:
             self._add_error(
@@ -71,88 +67,36 @@ class HTMLExporter(BaseWorker):
         
         return result
     
-    def _generate_html(self, report: Dict[str, Any]) -> str:
-        """Generate HTML content from report.
+    def _generate_html(self, report_data: Dict[str, Any]) -> str:
+        """Generate HTML from report data."""
+        html = "<html><head><title>Data Analysis Report</title></head><body>"
+        html += "<h1>Data Analysis Report</h1>"
+        html += f"<p>Generated: {datetime.now(timezone.utc).isoformat()}</p>"
         
-        Args:
-            report: Report dictionary
-            
-        Returns:
-            HTML content string
-        """
-        title = "Data Analysis Report"
-        timestamp = datetime.utcnow().isoformat()
+        # Add content based on report structure
+        for key, value in report_data.items():
+            if isinstance(value, dict):
+                html += f"<h2>{key.replace('_', ' ').title()}</h2>"
+                html += self._dict_to_html(value)
+            elif isinstance(value, str):
+                html += f"<p><strong>{key}:</strong> {value}</p>"
         
-        html = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
-    <style>
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }}
-        .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-        }}
-        .header h1 {{
-            margin: 0;
-            font-size: 2.5em;
-        }}
-        .section {{
-            background: white;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        .metric {{
-            display: inline-block;
-            background: #f0f4ff;
-            padding: 15px 20px;
-            margin: 10px 10px 10px 0;
-            border-radius: 6px;
-            border-left: 4px solid #667eea;
-        }}
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-        }}
-        table th {{
-            background: #667eea;
-            color: white;
-            padding: 12px;
-            text-align: left;
-        }}
-        table td {{
-            padding: 12px;
-            border-bottom: 1px solid #ddd;
-        }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>{title}</h1>
-        <p>Generated: {timestamp}</p>
-    </div>
-    <div class="section">
-        <h2>Report Summary</h2>
-        <p>This report was generated by GOAT Data Analyst</p>
-    </div>
-</body>
-</html>
-"""
+        html += "</body></html>"
+        return html
+    
+    def _dict_to_html(self, data: Dict[str, Any], depth: int = 0) -> str:
+        """Convert dictionary to HTML table."""
+        if not data:
+            return ""
+        
+        html = "<table border='1'>"
+        for key, value in data.items():
+            html += "<tr>"
+            html += f"<td><strong>{key}</strong></td>"
+            if isinstance(value, dict):
+                html += f"<td>{self._dict_to_html(value, depth+1)}</td>"
+            else:
+                html += f"<td>{value}</td>"
+            html += "</tr>"
+        html += "</table>"
         return html

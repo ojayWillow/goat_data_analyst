@@ -3,7 +3,7 @@
 import pandas as pd
 import numpy as np
 from typing import Any, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 
 
@@ -25,7 +25,7 @@ class StatisticalReportGenerator(BaseWorker):
         """
         result = self._create_result(
             success=True,
-            task_type="statistical_analysis",
+            task_type="statistical_report",
             data={}
         )
         
@@ -39,36 +39,39 @@ class StatisticalReportGenerator(BaseWorker):
                 )
                 return result
             
-            numeric_data = df.select_dtypes(include=[np.number])
-            
             report = {
                 "report_type": "statistical_analysis",
-                "generated_at": datetime.utcnow().isoformat(),
-                "summary_statistics": numeric_data.describe().round(2).to_dict(),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "statistics": {},
                 "correlation_analysis": {},
             }
             
-            # Correlation analysis
-            if numeric_data.shape[1] >= 2:
-                corr_matrix = numeric_data.corr()
-                report["correlation_analysis"] = {
-                    "matrix": corr_matrix.round(3).to_dict(),
-                    "strong_correlations": [],
-                }
+            # Get numeric columns
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            
+            if len(numeric_cols) > 0:
+                # Basic statistics
+                report["statistics"] = df[numeric_cols].describe().to_dict()
                 
-                # Find strong correlations
-                for i in range(len(corr_matrix.columns)):
-                    for j in range(i+1, len(corr_matrix.columns)):
-                        corr_val = corr_matrix.iloc[i, j]
-                        if abs(corr_val) > 0.7:
-                            report["correlation_analysis"]["strong_correlations"].append({
-                                "col1": corr_matrix.columns[i],
-                                "col2": corr_matrix.columns[j],
-                                "correlation": float(corr_val),
-                            })
+                # Correlation matrix
+                if len(numeric_cols) > 1:
+                    corr_matrix = df[numeric_cols].corr()
+                    report["correlation_analysis"]["matrix"] = corr_matrix.to_dict()
+                    
+                    # High correlations
+                    high_corr = []
+                    for i in range(len(numeric_cols)):
+                        for j in range(i+1, len(numeric_cols)):
+                            corr_val = corr_matrix.iloc[i, j]
+                            if abs(corr_val) > 0.7:
+                                high_corr.append({
+                                    "pair": (numeric_cols[i], numeric_cols[j]),
+                                    "correlation": float(corr_val)
+                                })
+                    report["correlation_analysis"]["high_correlations"] = high_corr
             
             result.data = report
-            self.logger.info(f"Statistical report generated for {numeric_data.shape[1]} numeric columns")
+            self.logger.info(f"Statistical report generated for {len(numeric_cols)} numeric columns")
             
         except Exception as e:
             self._add_error(
