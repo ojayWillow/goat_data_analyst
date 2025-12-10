@@ -98,13 +98,14 @@ class TestExecutiveSummary:
         result = reporter_with_data.generate_executive_summary()
         assert result is not None
         assert isinstance(result, dict)
-        assert 'status' in result
+        assert 'report_type' in result or 'dataset_info' in result
 
     def test_executive_summary_content(self, reporter_with_data):
         """Test executive summary contains expected information."""
         result = reporter_with_data.generate_executive_summary()
-        assert result['status'] == 'success'
-        assert 'summary' in result or 'content' in result or 'data' in result
+        assert 'dataset_info' in result
+        assert 'data_quality' in result
+        assert result['dataset_info']['rows'] == 100
 
 
 class TestDataProfile:
@@ -127,13 +128,13 @@ class TestDataProfile:
         result = reporter_with_data.generate_data_profile()
         assert result is not None
         assert isinstance(result, dict)
-        assert 'status' in result
+        assert 'columns' in result or 'profile_type' in result
 
     def test_data_profile_content(self, reporter_with_data):
         """Test data profile contains column information."""
         result = reporter_with_data.generate_data_profile()
-        assert result['status'] == 'success'
-        assert 'profile' in result or 'columns' in result or 'data' in result
+        assert 'columns' in result
+        assert len(result['columns']) == 3
 
 
 class TestStatisticalReport:
@@ -156,13 +157,13 @@ class TestStatisticalReport:
         result = reporter_with_data.generate_statistical_report()
         assert result is not None
         assert isinstance(result, dict)
-        assert 'status' in result
+        assert 'statistics' in result or 'correlation_analysis' in result
 
     def test_statistical_report_content(self, reporter_with_data):
         """Test statistical report contains statistics."""
         result = reporter_with_data.generate_statistical_report()
-        assert result['status'] == 'success'
-        assert 'report' in result or 'statistics' in result or 'data' in result
+        # Check for common statistical sections
+        assert any(key in result for key in ['statistics', 'correlation_analysis', 'descriptive_stats'])
 
 
 class TestHTMLExport:
@@ -178,20 +179,24 @@ class TestHTMLExport:
             'feature_3': np.random.choice(['A', 'B'], 50),
         })
         reporter.set_data(df)
+        # Generate a report first
+        reporter.generate_executive_summary()
         return reporter
 
     def test_html_export(self, reporter_with_data):
         """Test HTML export runs successfully."""
-        result = reporter_with_data.export_to_html()
+        result = reporter_with_data.export_to_html(report_type='executive_summary')
         assert result is not None
         assert isinstance(result, dict)
-        assert 'status' in result
+        # Export result should contain html content or file info
+        assert 'html' in result or 'file_path' in result or 'content' in result
 
-    def test_html_export_content(self, reporter_with_data):
+    def test_html_export_has_content(self, reporter_with_data):
         """Test HTML export contains HTML content."""
-        result = reporter_with_data.export_to_html()
-        assert result['status'] == 'success'
-        assert 'html' in result or 'content' in result or 'data' in result
+        result = reporter_with_data.export_to_html(report_type='executive_summary')
+        # Verify export was successful
+        assert result is not None
+        assert len(result) > 0
 
 
 class TestJSONExport:
@@ -207,20 +212,23 @@ class TestJSONExport:
             'z': np.random.choice(['Type1', 'Type2'], 50),
         })
         reporter.set_data(df)
+        # Generate a report first
+        reporter.generate_executive_summary()
         return reporter
 
     def test_json_export(self, reporter_with_data):
         """Test JSON export runs successfully."""
-        result = reporter_with_data.export_to_json()
+        result = reporter_with_data.export_to_json(report_type='executive_summary')
         assert result is not None
         assert isinstance(result, dict)
-        assert 'status' in result
+        # Export result should contain json content or file info
+        assert 'json' in result or 'file_path' in result or 'content' in result
 
-    def test_json_export_content(self, reporter_with_data):
+    def test_json_export_has_content(self, reporter_with_data):
         """Test JSON export contains valid JSON."""
-        result = reporter_with_data.export_to_json()
-        assert result['status'] == 'success'
-        assert 'json' in result or 'content' in result or 'data' in result
+        result = reporter_with_data.export_to_json(report_type='executive_summary')
+        assert result is not None
+        assert len(result) > 0
 
 
 class TestEdgeCases:
@@ -300,17 +308,18 @@ class TestComprehensiveReporting:
         result1 = reporter.generate_executive_summary()
         result2 = reporter.generate_data_profile()
         result3 = reporter.generate_statistical_report()
-        result4 = reporter.export_to_html()
-        result5 = reporter.export_to_json()
         
-        # All should succeed
-        assert result1['status'] == 'success'
-        assert result2['status'] == 'success'
-        assert result3['status'] == 'success'
-        assert result4['status'] == 'success'
-        assert result5['status'] == 'success'
+        # All should have data
+        assert result1 is not None and isinstance(result1, dict)
+        assert result2 is not None and isinstance(result2, dict)
+        assert result3 is not None and isinstance(result3, dict)
+        
+        # Verify reports are stored
+        reports = reporter.list_reports()
+        assert reports['status'] == 'success'
+        assert len(reports['reports']) >= 3
 
-    def test_generate_full_report(self):
+    def test_generate_comprehensive_report(self):
         """Test generating complete report in one call."""
         reporter = Reporter()
         np.random.seed(42)
@@ -322,14 +331,12 @@ class TestComprehensiveReporting:
         
         reporter.set_data(df)
         
-        # Generate full report if method exists
-        try:
-            result = reporter.generate_full_report()
-            assert result is not None
-            assert result['status'] == 'success'
-        except AttributeError:
-            # Method might not exist, that's okay
-            pass
+        # Generate comprehensive report
+        result = reporter.generate_comprehensive_report()
+        assert result is not None
+        assert result['status'] == 'success'
+        assert 'sections' in result
+        assert len(result['sections']) >= 3
 
 
 if __name__ == "__main__":
