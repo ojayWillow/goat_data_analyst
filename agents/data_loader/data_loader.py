@@ -1,14 +1,18 @@
 """DataLoader Agent - Coordinates data loading workers.
 
 Loads and validates data from multiple file formats:
-CSV, JSON, Excel (XLSX, XLS), Parquet
+CSV, JSON, Excel (XLSX, XLS), Parquet, JSONL, HDF5, SQLite
 """
 
 from typing import Any, Dict, Optional, List
 from pathlib import Path
 import pandas as pd
+import os
+import sqlite3
 
 from core.logger import get_logger
+from core.error_recovery import retry_on_error
+from core.structured_logger import get_structured_logger
 from .workers import (
     CSVLoaderWorker,
     JSONExcelLoaderWorker,
@@ -18,6 +22,7 @@ from .workers import (
 )
 
 logger = get_logger(__name__)
+structured_logger = get_structured_logger(__name__)
 
 
 class DataLoader:
@@ -27,12 +32,15 @@ class DataLoader:
     - Load CSV files
     - Load JSON files
     - Load Excel files (XLSX, XLS)
-    - Load Parquet files
+    - Load Parquet files (with streaming)
+    - Load JSONL files (Week 2)
+    - Load HDF5 files (Week 2)
+    - Load SQLite databases (Week 2)
     - Validate loaded data
     - Extract metadata
     """
 
-    SUPPORTED_FORMATS = ['csv', 'json', 'xlsx', 'xls', 'parquet']
+    SUPPORTED_FORMATS = ['csv', 'json', 'xlsx', 'xls', 'parquet', 'jsonl', 'h5', 'hdf5', 'db', 'sqlite']
     MAX_FILE_SIZE_MB = 100
 
     def __init__(self) -> None:
@@ -49,6 +57,10 @@ class DataLoader:
         self.validator = ValidatorWorker()
 
         self.logger.info("DataLoader initialized with 4 workers")
+        structured_logger.info("DataLoader initialized", {
+            "workers": 4,
+            "supported_formats": self.SUPPORTED_FORMATS
+        })
 
     # === SECTION 1: MAIN LOADING ===
 
@@ -93,7 +105,13 @@ class DataLoader:
                 file_format=file_format
             )
         elif file_format == 'parquet':
-            load_result = self.parquet_loader.safe_execute(file_path=str(file_path))
+            load_result = self._load_parquet_streaming(file_path=str(file_path), **kwargs)
+        elif file_format == 'jsonl':
+            load_result = self._load_jsonl_worker(file_path=str(file_path))
+        elif file_format in ['h5', 'hdf5']:
+            load_result = self._load_hdf5_worker(file_path=str(file_path))
+        elif file_format in ['db', 'sqlite']:
+            load_result = self._load_sqlite_worker(file_path=str(file_path), **kwargs)
         else:
             return self._error_result(f"Unsupported format: {file_format}")
 
@@ -128,6 +146,11 @@ class DataLoader:
         self.metadata = validator_result.metadata
 
         self.logger.info(f"Successfully loaded {file_format}: {df.shape[0]} rows, {df.shape[1]} columns")
+        structured_logger.info("File loaded successfully", {
+            "format": file_format,
+            "rows": df.shape[0],
+            "columns": df.shape[1]
+        })
 
         return {
             'status': 'success',
@@ -137,7 +160,215 @@ class DataLoader:
             'errors': []
         }
 
-    # === SECTION 2: FILE VALIDATION ===
+    # === SECTION 2: WEEK 2 FORMAT LOADERS ===
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def _load_jsonl_worker(self, file_path: str) -> WorkerResult:
+        """Load JSONL format using worker pattern.
+        
+        Args:
+            file_path: Path to JSONL file
+            
+        Returns:
+            WorkerResult with loaded DataFrame
+        """
+        structured_logger.info("Loading JSONL file", {
+            "filepath": file_path,
+            "format": "jsonl"
+        })
+        
+        try:
+            df = pd.read_json(file_path, lines=True)
+            structured_logger.info("JSONL loaded successfully", {
+                "shape": str(df.shape),
+                "columns": len(df.columns)
+            })
+            return WorkerResult(
+                worker="DataLoaderJSONL",
+                task_type="load_jsonl",
+                success=True,
+                data=df,
+                errors=[],
+                warnings=[]
+            )
+        except Exception as e:
+            structured_logger.error("Failed to load JSONL", {
+                "filepath": file_path,
+                "error": str(e)
+            })
+            return WorkerResult(
+                worker="DataLoaderJSONL",
+                task_type="load_jsonl",
+                success=False,
+                data=None,
+                errors=[{"message": str(e), "type": "load_error"}],
+                warnings=[]
+            )
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def _load_hdf5_worker(self, file_path: str, key: str = 'data') -> WorkerResult:
+        """Load HDF5 format using worker pattern.
+        
+        Args:
+            file_path: Path to HDF5 file
+            key: HDF5 key/group name
+            
+        Returns:
+            WorkerResult with loaded DataFrame
+        """
+        structured_logger.info("Loading HDF5 file", {
+            "filepath": file_path,
+            "format": "hdf5",
+            "key": key
+        })
+        
+        try:
+            df = pd.read_hdf(file_path, key)
+            structured_logger.info("HDF5 loaded successfully", {
+                "shape": str(df.shape),
+                "columns": len(df.columns)
+            })
+            return WorkerResult(
+                worker="DataLoaderHDF5",
+                task_type="load_hdf5",
+                success=True,
+                data=df,
+                errors=[],
+                warnings=[]
+            )
+        except Exception as e:
+            structured_logger.error("Failed to load HDF5", {
+                "filepath": file_path,
+                "error": str(e)
+            })
+            return WorkerResult(
+                worker="DataLoaderHDF5",
+                task_type="load_hdf5",
+                success=False,
+                data=None,
+                errors=[{"message": str(e), "type": "load_error"}],
+                warnings=[]
+            )
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def _load_sqlite_worker(self, file_path: str, table_name: str = 'data', query: Optional[str] = None) -> WorkerResult:
+        """Load SQLite database using worker pattern.
+        
+        Args:
+            file_path: Path to SQLite database file
+            table_name: Table name to load
+            query: Optional SQL query to execute
+            
+        Returns:
+            WorkerResult with loaded DataFrame
+        """
+        structured_logger.info("Loading SQLite database", {
+            "filepath": file_path,
+            "format": "sqlite",
+            "table": table_name,
+            "query": query
+        })
+        
+        try:
+            conn = sqlite3.connect(file_path)
+            
+            if query:
+                df = pd.read_sql(query, conn)
+            else:
+                df = pd.read_sql(f'SELECT * FROM {table_name}', conn)
+            
+            conn.close()
+            
+            structured_logger.info("SQLite loaded successfully", {
+                "shape": str(df.shape),
+                "columns": len(df.columns)
+            })
+            return WorkerResult(
+                worker="DataLoaderSQLite",
+                task_type="load_sqlite",
+                success=True,
+                data=df,
+                errors=[],
+                warnings=[]
+            )
+        except Exception as e:
+            structured_logger.error("Failed to load SQLite", {
+                "filepath": file_path,
+                "error": str(e)
+            })
+            return WorkerResult(
+                worker="DataLoaderSQLite",
+                task_type="load_sqlite",
+                success=False,
+                data=None,
+                errors=[{"message": str(e), "type": "load_error"}],
+                warnings=[]
+            )
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def _load_parquet_streaming(self, file_path: str, columns: Optional[List[str]] = None, chunk_size: int = 50000) -> WorkerResult:
+        """Load Parquet format with streaming/chunking support.
+        
+        Args:
+            file_path: Path to Parquet file
+            columns: Optional columns to read
+            chunk_size: Number of rows per chunk
+            
+        Returns:
+            WorkerResult with loaded DataFrame
+        """
+        structured_logger.info("Loading Parquet file with streaming", {
+            "filepath": file_path,
+            "format": "parquet",
+            "columns": columns,
+            "chunk_size": chunk_size
+        })
+        
+        try:
+            import pyarrow.parquet as pq
+            
+            # Read parquet file with streaming
+            parquet_file = pq.ParquetFile(file_path)
+            
+            # Read all batches
+            batches = []
+            for batch in parquet_file.iter_batches(batch_size=chunk_size, columns=columns):
+                batches.append(batch.to_pandas())
+            
+            # Concatenate all batches
+            if batches:
+                df = pd.concat(batches, ignore_index=True)
+            else:
+                df = pd.DataFrame()
+            
+            structured_logger.info("Parquet loaded successfully", {
+                "shape": str(df.shape),
+                "columns": len(df.columns),
+                "batches_read": len(batches)
+            })
+            return WorkerResult(
+                worker="DataLoaderParquet",
+                task_type="load_parquet_streaming",
+                success=True,
+                data=df,
+                errors=[],
+                warnings=[]
+            )
+        except Exception as e:
+            structured_logger.error("Failed to load Parquet", {
+                "filepath": file_path,
+                "error": str(e)
+            })
+            return WorkerResult(
+                worker="DataLoaderParquet",
+                task_type="load_parquet_streaming",
+                success=False,
+                data=None,
+                errors=[{"message": str(e), "type": "load_error"}],
+                warnings=[]
+            )
+
+    # === SECTION 3: FILE VALIDATION ===
 
     def _validate_file(self, file_path: Path, file_format: str) -> Dict[str, Any]:
         """Validate file before loading.
@@ -164,7 +395,7 @@ class DataLoader:
 
         return {'valid': True, 'message': 'OK'}
 
-    # === SECTION 3: DATA ACCESS ===
+    # === SECTION 4: DATA ACCESS ===
 
     def get_data(self) -> Optional[pd.DataFrame]:
         """Get currently loaded data.
@@ -255,7 +486,7 @@ class DataLoader:
             f"  Memory: {self.metadata.get('memory_usage_mb', 0)}MB"
         )
 
-    # === SECTION 4: UTILITIES ===
+    # === SECTION 5: UTILITIES ===
 
     def _error_result(self, message: str) -> Dict[str, Any]:
         """Create error result dictionary.
