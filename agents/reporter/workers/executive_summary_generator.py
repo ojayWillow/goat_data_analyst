@@ -3,7 +3,7 @@
 import pandas as pd
 import numpy as np
 from typing import Any, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 
 
@@ -57,7 +57,7 @@ class ExecutiveSummaryGenerator(BaseWorker):
             
             summary = {
                 "report_type": "executive_summary",
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
                 "dataset_info": {
                     "rows": rows,
                     "columns": cols,
