@@ -1,7 +1,10 @@
 """Anomaly Detector Agent - Coordinates anomaly detection workers.
 
-Detects anomalies using statistical methods, isolation forests,
-and multivariate analysis.
+Detects anomalies using 4 different algorithms:
+- Local Outlier Factor (LOF)
+- One-Class SVM
+- Isolation Forest
+- Ensemble (voting from all 3)
 
 Integrated with Week 1 Systems:
 - Structured logging with metrics
@@ -18,9 +21,10 @@ from core.error_recovery import retry_on_error
 from core.structured_logger import get_structured_logger
 from core.exceptions import AgentError
 from .workers import (
-    StatisticalWorker,
-    IsolationForestWorker,
-    MultivariateWorker,
+    LOFAnomalyDetector,
+    OneClassSVMAnomalyDetector,
+    IsolationForestAnomalyDetector,
+    EnsembleAnomalyDetector,
     WorkerResult,
 )
 
@@ -31,42 +35,52 @@ structured_logger = get_structured_logger(__name__)
 class AnomalyDetector:
     """Anomaly Detector Agent - coordinates anomaly detection workers.
     
-    Capabilities:
-    - Statistical detection: IQR, Z-score, Modified Z-score
-    - ML detection: Isolation Forest
-    - Multivariate detection: Mahalanobis distance
-    - Summary reporting of all detections
+    Manages 4 workers:
+    - LOFAnomalyDetector: Local Outlier Factor algorithm
+    - OneClassSVMAnomalyDetector: One-Class SVM algorithm
+    - IsolationForestAnomalyDetector: Isolation Forest algorithm
+    - EnsembleAnomalyDetector: Ensemble voting method
     
-    Week 1 Integration:
-    - Structured logging with metrics at each step
-    - Automatic retry on transient failures
-    - Error recovery and detailed error messages
+    Week 1 Day 3 Implementation:
+    - Agent coordinates all workers (doesn't implement)
+    - Each worker extends BaseWorker
+    - Methods delegate to workers
+    - Pure coordinator pattern
     """
 
     def __init__(self) -> None:
         """Initialize the Anomaly Detector agent and all workers."""
-        self.name = "Anomaly Detector"
+        self.name = "AnomalyDetector"
         self.logger = get_logger("AnomalyDetector")
         self.structured_logger = get_structured_logger("AnomalyDetector")
         self.data: Optional[pd.DataFrame] = None
         self.detection_results: Dict[str, WorkerResult] = {}
 
-        # === SECTION 1: INITIALIZE ALL WORKERS ===
-        self.statistical_worker = StatisticalWorker()
-        self.isolation_forest_worker = IsolationForestWorker()
-        self.multivariate_worker = MultivariateWorker()
+        # === INITIALIZE ALL WORKERS ===
+        self.lof_detector = LOFAnomalyDetector()
+        self.ocsvm_detector = OneClassSVMAnomalyDetector()
+        self.isolation_forest_detector = IsolationForestAnomalyDetector()
+        self.ensemble_detector = EnsembleAnomalyDetector()
 
-        self.logger.info("AnomalyDetector initialized with 3 detection workers")
+        self.workers = [
+            self.lof_detector,
+            self.ocsvm_detector,
+            self.isolation_forest_detector,
+            self.ensemble_detector,
+        ]
+
+        self.logger.info("AnomalyDetector initialized with 4 detection workers")
         self.structured_logger.info("AnomalyDetector initialized", {
-            "workers": 3,
+            "workers": 4,
             "worker_names": [
-                "StatisticalWorker",
-                "IsolationForestWorker",
-                "MultivariateWorker"
+                "LOFAnomalyDetector",
+                "OneClassSVMAnomalyDetector",
+                "IsolationForestAnomalyDetector",
+                "EnsembleAnomalyDetector"
             ]
         })
 
-    # === SECTION 2: DATA MANAGEMENT ===
+    # === DATA MANAGEMENT ===
 
     def set_data(self, df: pd.DataFrame) -> None:
         """Store the DataFrame for anomaly detection.
@@ -92,19 +106,15 @@ class AnomalyDetector:
         """
         return self.data
 
-    # === SECTION 3: STATISTICAL DETECTION METHODS ===
+    # === DETECTION METHODS - DELEGATE TO WORKERS ===
 
     @retry_on_error(max_attempts=3, backoff=2)
-    def detect_iqr(
-        self,
-        column: str,
-        multiplier: float = 1.5,
-    ) -> Dict[str, Any]:
-        """Detect outliers using IQR method.
+    def detect_lof(self, n_neighbors: int = 20, contamination: float = 0.1) -> Dict[str, Any]:
+        """Detect anomalies using Local Outlier Factor.
         
         Args:
-            column: Column to analyze
-            multiplier: IQR multiplier (default 1.5)
+            n_neighbors: Number of neighbors to use
+            contamination: Expected proportion of anomalies
             
         Returns:
             Detection result as dictionary
@@ -115,45 +125,33 @@ class AnomalyDetector:
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
 
-        self.structured_logger.info("IQR detection started", {
-            "column": column,
-            "multiplier": multiplier
+        self.structured_logger.info("LOF detection started", {
+            "n_neighbors": n_neighbors,
+            "contamination": contamination
         })
 
         try:
-            worker_result = self.statistical_worker.safe_execute(
+            worker_result = self.lof_detector.safe_execute(
                 df=self.data,
-                column=column,
-                method="iqr",
-                multiplier=multiplier,
+                n_neighbors=n_neighbors,
+                contamination=contamination,
             )
 
-            self.detection_results[f"iqr_{column}"] = worker_result
-            
-            self.structured_logger.info("IQR detection completed", {
-                "column": column,
-                "success": worker_result.success
-            })
+            self.detection_results["lof"] = worker_result
+            self.structured_logger.info("LOF detection completed", {"success": worker_result.success})
             
             return worker_result.to_dict()
         except Exception as e:
-            self.structured_logger.error("IQR detection failed", {
-                "column": column,
-                "error": str(e)
-            })
+            self.structured_logger.error("LOF detection failed", {"error": str(e)})
             raise
 
     @retry_on_error(max_attempts=3, backoff=2)
-    def detect_zscore(
-        self,
-        column: str,
-        threshold: float = 3.0,
-    ) -> Dict[str, Any]:
-        """Detect outliers using Z-score method.
+    def detect_ocsvm(self, nu: float = 0.05, kernel: str = 'rbf') -> Dict[str, Any]:
+        """Detect anomalies using One-Class SVM.
         
         Args:
-            column: Column to analyze
-            threshold: Z-score threshold (default 3.0)
+            nu: Upper bound on fraction of anomalies
+            kernel: Kernel type ('rbf', 'linear', 'poly')
             
         Returns:
             Detection result as dictionary
@@ -164,96 +162,35 @@ class AnomalyDetector:
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
 
-        self.structured_logger.info("Z-score detection started", {
-            "column": column,
-            "threshold": threshold
+        self.structured_logger.info("One-Class SVM detection started", {
+            "nu": nu,
+            "kernel": kernel
         })
 
         try:
-            worker_result = self.statistical_worker.safe_execute(
+            worker_result = self.ocsvm_detector.safe_execute(
                 df=self.data,
-                column=column,
-                method="zscore",
-                threshold=threshold,
+                nu=nu,
+                kernel=kernel,
             )
 
-            self.detection_results[f"zscore_{column}"] = worker_result
-            
-            self.structured_logger.info("Z-score detection completed", {
-                "column": column,
-                "success": worker_result.success
-            })
+            self.detection_results["ocsvm"] = worker_result
+            self.structured_logger.info("One-Class SVM detection completed", {"success": worker_result.success})
             
             return worker_result.to_dict()
         except Exception as e:
-            self.structured_logger.error("Z-score detection failed", {
-                "column": column,
-                "error": str(e)
-            })
+            self.structured_logger.error("One-Class SVM detection failed", {"error": str(e)})
             raise
-
-    @retry_on_error(max_attempts=3, backoff=2)
-    def detect_modified_zscore(
-        self,
-        column: str,
-        threshold: float = 3.5,
-    ) -> Dict[str, Any]:
-        """Detect outliers using Modified Z-score method (more robust).
-        
-        Args:
-            column: Column to analyze
-            threshold: Modified Z-score threshold (default 3.5)
-            
-        Returns:
-            Detection result as dictionary
-            
-        Raises:
-            AgentError: If no data set
-        """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
-
-        self.structured_logger.info("Modified Z-score detection started", {
-            "column": column,
-            "threshold": threshold
-        })
-
-        try:
-            worker_result = self.statistical_worker.safe_execute(
-                df=self.data,
-                column=column,
-                method="modified_zscore",
-                mod_threshold=threshold,
-            )
-
-            self.detection_results[f"mod_zscore_{column}"] = worker_result
-            
-            self.structured_logger.info("Modified Z-score detection completed", {
-                "column": column,
-                "success": worker_result.success
-            })
-            
-            return worker_result.to_dict()
-        except Exception as e:
-            self.structured_logger.error("Modified Z-score detection failed", {
-                "column": column,
-                "error": str(e)
-            })
-            raise
-
-    # === SECTION 4: ML DETECTION METHODS ===
 
     @retry_on_error(max_attempts=3, backoff=2)
     def detect_isolation_forest(
         self,
-        feature_cols: List[str],
         contamination: float = 0.1,
         n_estimators: int = 100,
     ) -> Dict[str, Any]:
         """Detect anomalies using Isolation Forest.
         
         Args:
-            feature_cols: Columns to use for detection
             contamination: Expected fraction of outliers (0.0-1.0)
             n_estimators: Number of trees (default 100)
             
@@ -267,46 +204,31 @@ class AnomalyDetector:
             raise AgentError("No data set. Use set_data() first.")
 
         self.structured_logger.info("Isolation Forest detection started", {
-            "feature_cols": feature_cols,
             "contamination": contamination,
             "n_estimators": n_estimators
         })
 
         try:
-            worker_result = self.isolation_forest_worker.safe_execute(
+            worker_result = self.isolation_forest_detector.safe_execute(
                 df=self.data,
-                feature_cols=feature_cols,
                 contamination=contamination,
                 n_estimators=n_estimators,
             )
 
             self.detection_results["isolation_forest"] = worker_result
-            
-            self.structured_logger.info("Isolation Forest detection completed", {
-                "success": worker_result.success,
-                "anomalies_found": worker_result.data.get("anomaly_count", 0) if worker_result.success else 0
-            })
+            self.structured_logger.info("Isolation Forest detection completed", {"success": worker_result.success})
             
             return worker_result.to_dict()
         except Exception as e:
-            self.structured_logger.error("Isolation Forest detection failed", {
-                "error": str(e)
-            })
+            self.structured_logger.error("Isolation Forest detection failed", {"error": str(e)})
             raise
 
-    # === SECTION 5: MULTIVARIATE DETECTION METHODS ===
-
     @retry_on_error(max_attempts=3, backoff=2)
-    def detect_multivariate(
-        self,
-        feature_cols: List[str],
-        percentile: int = 95,
-    ) -> Dict[str, Any]:
-        """Perform multivariate outlier detection (Mahalanobis distance).
+    def detect_ensemble(self, threshold: float = 0.5) -> Dict[str, Any]:
+        """Detect anomalies using ensemble voting method.
         
         Args:
-            feature_cols: Columns to analyze
-            percentile: Percentile threshold for outliers (default 95)
+            threshold: Voting threshold (0-1)
             
         Returns:
             Detection result as dictionary
@@ -317,88 +239,39 @@ class AnomalyDetector:
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
 
-        self.structured_logger.info("Multivariate detection started", {
-            "feature_cols": feature_cols,
-            "percentile": percentile
-        })
+        self.structured_logger.info("Ensemble detection started", {"threshold": threshold})
 
         try:
-            worker_result = self.multivariate_worker.safe_execute(
+            worker_result = self.ensemble_detector.safe_execute(
                 df=self.data,
-                feature_cols=feature_cols,
-                percentile=percentile,
+                threshold=threshold,
             )
 
-            self.detection_results["multivariate"] = worker_result
-            
-            self.structured_logger.info("Multivariate detection completed", {
-                "success": worker_result.success,
-                "anomalies_found": worker_result.data.get("anomaly_count", 0) if worker_result.success else 0
-            })
+            self.detection_results["ensemble"] = worker_result
+            self.structured_logger.info("Ensemble detection completed", {"success": worker_result.success})
             
             return worker_result.to_dict()
         except Exception as e:
-            self.structured_logger.error("Multivariate detection failed", {
-                "error": str(e)
-            })
+            self.structured_logger.error("Ensemble detection failed", {"error": str(e)})
             raise
 
-    # === SECTION 6: BATCH DETECTION METHODS ===
-
-    @retry_on_error(max_attempts=3, backoff=2)
-    def detect_all_statistical(
-        self,
-        column: str,
-        iqr_multiplier: float = 1.5,
-        zscore_threshold: float = 3.0,
-        mod_zscore_threshold: float = 3.5,
-    ) -> Dict[str, Any]:
-        """Run all statistical detection methods on a column.
-        
-        Args:
-            column: Column to analyze
-            iqr_multiplier: IQR multiplier
-            zscore_threshold: Z-score threshold
-            mod_zscore_threshold: Modified Z-score threshold
-            
-        Returns:
-            Dictionary with results from all methods
-        """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
-
-        self.structured_logger.info("All statistical detections started", {
-            "column": column
-        })
-
-        results = {
-            "iqr": self.detect_iqr(column, iqr_multiplier),
-            "zscore": self.detect_zscore(column, zscore_threshold),
-            "modified_zscore": self.detect_modified_zscore(column, mod_zscore_threshold),
-        }
-        
-        self.structured_logger.info("All statistical detections completed", {
-            "column": column,
-            "methods": len(results)
-        })
-
-        return results
+    # === BATCH DETECTION ===
 
     @retry_on_error(max_attempts=3, backoff=2)
     def detect_all(
         self,
-        statistical_cols: List[str],
-        ml_feature_cols: List[str],
-        multivariate_cols: Optional[List[str]] = None,
-        contamination: float = 0.1,
+        lof_params: Optional[Dict[str, Any]] = None,
+        ocsvm_params: Optional[Dict[str, Any]] = None,
+        iforest_params: Optional[Dict[str, Any]] = None,
+        ensemble_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Run all detection methods (statistical, ML, multivariate).
+        """Run all 4 anomaly detection methods.
         
         Args:
-            statistical_cols: Columns for statistical detection
-            ml_feature_cols: Columns for Isolation Forest
-            multivariate_cols: Columns for multivariate (default: ml_feature_cols)
-            contamination: Contamination for Isolation Forest
+            lof_params: Parameters for LOF
+            ocsvm_params: Parameters for One-Class SVM
+            iforest_params: Parameters for Isolation Forest
+            ensemble_params: Parameters for Ensemble
             
         Returns:
             Dictionary with all detection results
@@ -406,40 +279,44 @@ class AnomalyDetector:
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
 
-        if multivariate_cols is None:
-            multivariate_cols = ml_feature_cols
-
-        self.structured_logger.info("Comprehensive anomaly detection started", {
-            "statistical_cols": len(statistical_cols),
-            "ml_feature_cols": len(ml_feature_cols),
-            "multivariate_cols": len(multivariate_cols)
-        })
+        self.structured_logger.info("Comprehensive anomaly detection started")
 
         results = {}
 
-        # Statistical detection on each column
-        for col in statistical_cols:
-            if col in self.data.columns:
-                results[f"statistical_{col}"] = self.detect_all_statistical(col)
+        # Default parameters
+        lof_params = lof_params or {}
+        ocsvm_params = ocsvm_params or {}
+        iforest_params = iforest_params or {}
+        ensemble_params = ensemble_params or {}
 
-        # Isolation Forest on feature columns
-        if ml_feature_cols:
-            results["isolation_forest"] = self.detect_isolation_forest(
-                ml_feature_cols,
-                contamination,
-            )
+        # Run all detections
+        try:
+            results["lof"] = self.detect_lof(**lof_params)
+        except Exception as e:
+            self.logger.warning(f"LOF detection failed: {e}")
 
-        # Multivariate detection
-        if multivariate_cols:
-            results["multivariate"] = self.detect_multivariate(multivariate_cols)
+        try:
+            results["ocsvm"] = self.detect_ocsvm(**ocsvm_params)
+        except Exception as e:
+            self.logger.warning(f"One-Class SVM detection failed: {e}")
+
+        try:
+            results["isolation_forest"] = self.detect_isolation_forest(**iforest_params)
+        except Exception as e:
+            self.logger.warning(f"Isolation Forest detection failed: {e}")
+
+        try:
+            results["ensemble"] = self.detect_ensemble(**ensemble_params)
+        except Exception as e:
+            self.logger.warning(f"Ensemble detection failed: {e}")
 
         self.structured_logger.info("Comprehensive anomaly detection completed", {
-            "detection_methods": len(results)
+            "methods": len(results)
         })
 
         return results
 
-    # === SECTION 7: REPORTING ===
+    # === REPORTING ===
 
     def summary_report(self) -> Dict[str, Any]:
         """Get summary of all anomaly detections.
@@ -488,6 +365,7 @@ class AnomalyDetector:
             f"AnomalyDetector Summary:\n"
             f"  Rows: {self.data.shape[0]}\n"
             f"  Columns: {self.data.shape[1]}\n"
+            f"  Workers: {len(self.workers)}\n"
             f"  Detections run: {len(self.detection_results)}\n"
             f"  Successful: {sum(1 for v in self.detection_results.values() if v.success)}"
         )
