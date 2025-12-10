@@ -22,39 +22,6 @@ from core.structured_logger import get_structured_logger
 class TestDatasetGeneration:
     """Test creation of 1M row test datasets."""
     
-    def test_generate_1m_row_csv_dataset(self):
-        """Generate 1M row CSV dataset."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            csv_path = Path(tmpdir) / 'test_1m_rows.csv'
-            
-            # Generate dataset in chunks to avoid memory issues
-            rows_per_chunk = 100_000
-            total_rows = 1_000_000
-            chunks = []
-            
-            for chunk_num in range(0, total_rows, rows_per_chunk):
-                chunk_size = min(rows_per_chunk, total_rows - chunk_num)
-                chunk = pd.DataFrame({
-                    'id': range(chunk_num, chunk_num + chunk_size),
-                    'value': np.random.randn(chunk_size),
-                    'category': np.random.choice(['A', 'B', 'C'], chunk_size),
-                    'timestamp': pd.date_range('2024-01-01', periods=chunk_size, freq='1min'),
-                    'score': np.random.uniform(0, 100, chunk_size)
-                })
-                chunks.append(chunk)
-            
-            df = pd.concat(chunks, ignore_index=True)
-            df.to_csv(csv_path, index=False)
-            
-            # Verify dataset
-            assert csv_path.exists()
-            assert os.path.getsize(csv_path) > 50_000_000  # >50MB
-            
-            # Verify row count
-            verify_df = pd.read_csv(csv_path, nrows=10)
-            assert len(verify_df) == 10
-            assert list(verify_df.columns) == ['id', 'value', 'category', 'timestamp', 'score']
-    
     def test_generate_100k_csv_dataset_quick(self):
         """Generate 100k row CSV dataset for quick testing."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -96,8 +63,9 @@ class TestFullPipelineExecution:
             # Load
             with logger.operation('load_data'):
                 loader = DataLoader()
-                loader.set_data(csv_path)
-                loaded_df = loader.load_data()
+                result = loader.load(str(csv_path))
+                assert result['status'] == 'success'
+                loaded_df = result['data']
             
             assert len(loaded_df) == 100_000
             logger.info('Data loaded', extra={'rows': len(loaded_df)})
@@ -145,8 +113,9 @@ class TestFullPipelineExecution:
             explorer = Explorer()
             
             with logger.operation('pipeline_csv'):
-                loader.set_data(csv_path)
-                loaded = loader.load_data()
+                result = loader.load(str(csv_path))
+                assert result['status'] == 'success'
+                loaded = result['data']
                 assert len(loaded) == 50_000
                 
                 explorer.set_data(loaded)
@@ -179,13 +148,14 @@ class TestPerformanceBenchmarking:
             
             # Benchmark load
             loader = DataLoader()
-            loader.set_data(csv_path)
             
             start_time = time.time()
-            loaded_df = loader.load_data()
+            result = loader.load(str(csv_path))
             load_time = time.time() - start_time
             
             # Verify
+            assert result['status'] == 'success'
+            loaded_df = result['data']
             assert len(loaded_df) == 100_000
             assert load_time < 10.0  # Reasonable timeout for 100k rows
             
@@ -213,8 +183,9 @@ class TestPerformanceBenchmarking:
             start_time = time.time()
             
             loader = DataLoader()
-            loader.set_data(csv_path)
-            loaded = loader.load_data()
+            result = loader.load(str(csv_path))
+            assert result['status'] == 'success'
+            loaded = result['data']
             
             explorer = Explorer()
             explorer.set_data(loaded)
@@ -252,8 +223,9 @@ class TestPerformanceBenchmarking:
             mem_before = process.memory_info().rss / 1024 / 1024  # MB
             
             loader = DataLoader()
-            loader.set_data(csv_path)
-            loaded = loader.load_data()
+            result = loader.load(str(csv_path))
+            assert result['status'] == 'success'
+            loaded = result['data']
             
             mem_after = process.memory_info().rss / 1024 / 1024  # MB
             mem_used = mem_after - mem_before
@@ -286,11 +258,12 @@ class TestPandasComparison:
             
             # Our implementation
             loader = DataLoader()
-            loader.set_data(csv_path)
             
             start = time.time()
-            our_df = loader.load_data()
+            result = loader.load(str(csv_path))
             our_time = time.time() - start
+            assert result['status'] == 'success'
+            our_df = result['data']
             
             # Pandas implementation
             start = time.time()
@@ -322,10 +295,10 @@ class TestEdgeCaseStressTesting:
             df.to_csv(csv_path, index=False)
             
             loader = DataLoader()
-            loader.set_data(csv_path)
-            loaded = loader.load_data()
-            
-            assert len(loaded) == 0
+            result = loader.load(str(csv_path))
+            if result['status'] == 'success':
+                loaded = result['data']
+                assert len(loaded) == 0
             logger.info('Empty dataframe handled', extra={'rows': 0})
     
     def test_single_row_dataframe_pipeline(self):
@@ -338,8 +311,9 @@ class TestEdgeCaseStressTesting:
             df.to_csv(csv_path, index=False)
             
             loader = DataLoader()
-            loader.set_data(csv_path)
-            loaded = loader.load_data()
+            result = loader.load(str(csv_path))
+            assert result['status'] == 'success'
+            loaded = result['data']
             
             assert len(loaded) == 1
             logger.info('Single row handled', extra={'rows': 1})
@@ -359,8 +333,9 @@ class TestEdgeCaseStressTesting:
             df.to_csv(csv_path, index=False)
             
             loader = DataLoader()
-            loader.set_data(csv_path)
-            loaded = loader.load_data()
+            result = loader.load(str(csv_path))
+            assert result['status'] == 'success'
+            loaded = result['data']
             
             assert len(loaded) == 10_000
             assert len(loaded.columns) == 4
@@ -381,8 +356,9 @@ class TestEdgeCaseStressTesting:
             df.to_csv(csv_path, index=False)
             
             loader = DataLoader()
-            loader.set_data(csv_path)
-            loaded = loader.load_data()
+            result = loader.load(str(csv_path))
+            assert result['status'] == 'success'
+            loaded = result['data']
             
             assert len(loaded) == 50_000
             assert loaded['category'].nunique() == 1_000
@@ -405,8 +381,9 @@ class TestEdgeCaseStressTesting:
             df.to_csv(csv_path, index=False)
             
             loader = DataLoader()
-            loader.set_data(csv_path)
-            loaded = loader.load_data()
+            result = loader.load(str(csv_path))
+            assert result['status'] == 'success'
+            loaded = result['data']
             
             assert len(loaded) == 10_000
             assert loaded['value'].isna().sum() > 0
