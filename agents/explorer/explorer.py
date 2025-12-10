@@ -111,6 +111,16 @@ class Explorer:
         """
         return self.data
     
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze data (alias for get_summary_report).
+        
+        Convenience method for testing and general use.
+        
+        Returns:
+            Dictionary with all analysis results
+        """
+        return self.get_summary_report()
+    
     @retry_on_error(max_attempts=3, backoff=2)
     def get_summary_report(self) -> Dict[str, Any]:
         """Get comprehensive summary report.
