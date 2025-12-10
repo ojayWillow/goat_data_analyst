@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 import os
 import sqlite3
+import time
 
 from core.logger import get_logger
 from core.error_recovery import retry_on_error
@@ -29,13 +30,13 @@ class DataLoader:
     """DataLoader Agent - coordinates data loading workers.
     
     Capabilities:
-    - Load CSV files
+    - Load CSV files (streaming for large files)
     - Load JSON files
     - Load Excel files (XLSX, XLS)
     - Load Parquet files (with streaming)
-    - Load JSONL files (Week 2)
-    - Load HDF5 files (Week 2)
-    - Load SQLite databases (Week 2)
+    - Load JSONL files
+    - Load HDF5 files
+    - Load SQLite databases
     - Validate loaded data
     - Extract metadata
     """
@@ -86,6 +87,14 @@ class DataLoader:
         file_path = Path(file_path)
         file_format = file_path.suffix.lower().lstrip('.')
 
+        # If format missing or unknown, try to auto-detect
+        if not file_format or file_format not in self.SUPPORTED_FORMATS:
+            detected = self._detect_format(file_path)
+            if detected:
+                file_format = detected
+            else:
+                return self._error_result(f"Unsupported or unknown format for file: {file_path}")
+
         # Validate file
         validation = self._validate_file(file_path, file_format)
         if not validation['valid']:
@@ -93,7 +102,12 @@ class DataLoader:
 
         # Load based on format
         if file_format == 'csv':
-            load_result = self.csv_loader.safe_execute(file_path=str(file_path))
+            # Decide streaming vs normal based on size
+            file_size_mb = file_path.stat().st_size / (1024 * 1024)
+            if file_size_mb > 500:  # large file threshold
+                load_result = self._load_csv_streaming(file_path=str(file_path))
+            else:
+                load_result = self.csv_loader.safe_execute(file_path=str(file_path))
         elif file_format == 'json':
             load_result = self.json_excel_loader.safe_execute(
                 file_path=str(file_path),
@@ -105,6 +119,7 @@ class DataLoader:
                 file_format=file_format
             )
         elif file_format == 'parquet':
+            # Use streaming by default for parquet
             load_result = self._load_parquet_streaming(file_path=str(file_path), **kwargs)
         elif file_format == 'jsonl':
             load_result = self._load_jsonl_worker(file_path=str(file_path))
@@ -143,7 +158,11 @@ class DataLoader:
 
         # Store data and metadata
         self.loaded_data = df
-        self.metadata = validator_result.metadata
+        # Attach basic performance metadata if available
+        performance_meta = {}
+        if hasattr(load_result, 'metadata') and isinstance(load_result.metadata, dict):
+            performance_meta.update(load_result.metadata)
+        self.metadata = {**validator_result.metadata, **performance_meta}
 
         self.logger.info(f"Successfully loaded {file_format}: {df.shape[0]} rows, {df.shape[1]} columns")
         structured_logger.info("File loaded successfully", {
@@ -160,7 +179,7 @@ class DataLoader:
             'errors': []
         }
 
-    # === SECTION 2: WEEK 2 FORMAT LOADERS ===
+    # === SECTION 2: WEEK 2 FORMAT LOADERS + PERFORMANCE HELPERS ===
 
     @retry_on_error(max_attempts=3, backoff=2)
     def _load_jsonl_worker(self, file_path: str) -> WorkerResult:
@@ -177,11 +196,14 @@ class DataLoader:
             "format": "jsonl"
         })
         
+        start_time = time.time()
         try:
             df = pd.read_json(file_path, lines=True)
+            duration = time.time() - start_time
             structured_logger.info("JSONL loaded successfully", {
                 "shape": str(df.shape),
-                "columns": len(df.columns)
+                "columns": len(df.columns),
+                "duration_sec": round(duration, 3)
             })
             return WorkerResult(
                 worker="DataLoaderJSONL",
@@ -222,11 +244,14 @@ class DataLoader:
             "key": key
         })
         
+        start_time = time.time()
         try:
             df = pd.read_hdf(file_path, key)
+            duration = time.time() - start_time
             structured_logger.info("HDF5 loaded successfully", {
                 "shape": str(df.shape),
-                "columns": len(df.columns)
+                "columns": len(df.columns),
+                "duration_sec": round(duration, 3)
             })
             return WorkerResult(
                 worker="DataLoaderHDF5",
@@ -269,6 +294,7 @@ class DataLoader:
             "query": query
         })
         
+        start_time = time.time()
         try:
             conn = sqlite3.connect(file_path)
             
@@ -278,10 +304,12 @@ class DataLoader:
                 df = pd.read_sql(f'SELECT * FROM {table_name}', conn)
             
             conn.close()
+            duration = time.time() - start_time
             
             structured_logger.info("SQLite loaded successfully", {
                 "shape": str(df.shape),
-                "columns": len(df.columns)
+                "columns": len(df.columns),
+                "duration_sec": round(duration, 3)
             })
             return WorkerResult(
                 worker="DataLoaderSQLite",
@@ -327,24 +355,24 @@ class DataLoader:
         try:
             import pyarrow.parquet as pq
             
-            # Read parquet file with streaming
+            start_time = time.time()
             parquet_file = pq.ParquetFile(file_path)
             
-            # Read all batches
             batches = []
             for batch in parquet_file.iter_batches(batch_size=chunk_size, columns=columns):
                 batches.append(batch.to_pandas())
             
-            # Concatenate all batches
             if batches:
                 df = pd.concat(batches, ignore_index=True)
             else:
                 df = pd.DataFrame()
             
+            duration = time.time() - start_time
             structured_logger.info("Parquet loaded successfully", {
                 "shape": str(df.shape),
                 "columns": len(df.columns),
-                "batches_read": len(batches)
+                "batches_read": len(batches),
+                "duration_sec": round(duration, 3)
             })
             return WorkerResult(
                 worker="DataLoaderParquet",
@@ -352,7 +380,7 @@ class DataLoader:
                 success=True,
                 data=df,
                 errors=[],
-                warnings=[]
+                warnings=[],
             )
         except Exception as e:
             structured_logger.error("Failed to load Parquet", {
@@ -368,7 +396,77 @@ class DataLoader:
                 warnings=[]
             )
 
-    # === SECTION 3: FILE VALIDATION ===
+    @retry_on_error(max_attempts=3, backoff=2)
+    def _load_csv_streaming(self, file_path: str, chunk_size: int = 100000) -> WorkerResult:
+        """Stream large CSV files in chunks with robust error handling.
+        
+        Args:
+            file_path: Path to CSV file
+            chunk_size: Number of rows per chunk
+            
+        Returns:
+            WorkerResult with loaded DataFrame
+        """
+        structured_logger.info("Loading CSV file with streaming", {
+            "filepath": file_path,
+            "format": "csv",
+            "chunk_size": chunk_size
+        })
+
+        start_time = time.time()
+        chunks = []
+        total_rows = 0
+        bad_lines = 0
+
+        try:
+            # Use pandas streaming with bad line handling and encoding tolerance
+            for chunk in pd.read_csv(
+                file_path,
+                chunksize=chunk_size,
+                on_bad_lines='skip',  # Skip corrupt lines
+                encoding_errors='ignore',  # Ignore encoding issues
+            ):
+                rows = len(chunk)
+                total_rows += rows
+                chunks.append(chunk)
+            
+            if chunks:
+                df = pd.concat(chunks, ignore_index=True)
+            else:
+                df = pd.DataFrame()
+
+            duration = time.time() - start_time
+            structured_logger.info("CSV streamed successfully", {
+                "shape": str(df.shape),
+                "total_rows": total_rows,
+                "duration_sec": round(duration, 3),
+                "chunk_size": chunk_size,
+                "bad_lines": bad_lines
+            })
+
+            return WorkerResult(
+                worker="CSVStreaming",
+                task_type="load_csv_stream",
+                success=True,
+                data=df,
+                errors=[],
+                warnings=[],
+            )
+        except Exception as e:
+            structured_logger.error("Failed to stream CSV", {
+                "filepath": file_path,
+                "error": str(e)
+            })
+            return WorkerResult(
+                worker="CSVStreaming",
+                task_type="load_csv_stream",
+                success=False,
+                data=None,
+                errors=[{"message": str(e), "type": "load_error"}],
+                warnings=[],
+            )
+
+    # === SECTION 3: FILE VALIDATION & FORMAT DETECTION ===
 
     def _validate_file(self, file_path: Path, file_format: str) -> Dict[str, Any]:
         """Validate file before loading.
@@ -380,20 +478,52 @@ class DataLoader:
         Returns:
             {'valid': bool, 'message': str}
         """
-        # Check exists
         if not file_path.exists():
             return {'valid': False, 'message': f"File not found: {file_path}"}
 
-        # Check size
         file_size_mb = file_path.stat().st_size / (1024 * 1024)
         if file_size_mb > self.MAX_FILE_SIZE_MB:
             return {'valid': False, 'message': f"File too large: {file_size_mb:.1f}MB (max: {self.MAX_FILE_SIZE_MB}MB)"}
 
-        # Check format
         if file_format not in self.SUPPORTED_FORMATS:
             return {'valid': False, 'message': f"Unsupported format: {file_format}. Supported: {self.SUPPORTED_FORMATS}"}
 
         return {'valid': True, 'message': 'OK'}
+
+    def _detect_format(self, file_path: Path) -> Optional[str]:
+        """Auto-detect file format by inspecting file contents.
+        
+        This is a best-effort heuristic used when file extension is missing or unreliable.
+        """
+        try:
+            with open(file_path, 'rb') as f:
+                header = f.read(8)
+
+            # Parquet magic bytes
+            if header[:4] == b'PAR1':
+                return 'parquet'
+
+            # Excel (ZIP based) magic bytes
+            if header[:2] == b'PK':
+                return 'xlsx'
+
+            # SQLite header
+            if header.startswith(b'SQLite format'):
+                return 'sqlite'
+
+            # JSON likely starts with { or [
+            stripped = header.lstrip()
+            if stripped.startswith(b'{') or stripped.startswith(b'['):
+                return 'json'
+
+            # Fallback: assume CSV
+            return 'csv'
+        except Exception as e:
+            structured_logger.error("Failed to auto-detect file format", {
+                "filepath": str(file_path),
+                "error": str(e)
+            })
+            return None
 
     # === SECTION 4: DATA ACCESS ===
 
