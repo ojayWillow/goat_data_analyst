@@ -88,11 +88,15 @@ class StructuredLogger:
                 pass
             self.logger.removeHandler(handler)
         
-        # Console handler (JSON formatted)
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(JSONFormatter())
-        self.logger.addHandler(console_handler)
+        # Console handler (JSON formatted) - ONLY if not in pytest
+        if 'pytest' not in sys.modules:
+            try:
+                console_handler = logging.StreamHandler(sys.stdout)
+                console_handler.setLevel(logging.INFO)
+                console_handler.setFormatter(JSONFormatter())
+                self.logger.addHandler(console_handler)
+            except Exception:
+                pass
         
         # File handler (JSON formatted) - only if not in pytest
         if 'pytest' not in sys.modules:
