@@ -15,9 +15,9 @@ Statistical Workers (Week 1 Day 2):
 - DistributionFitter: Distribution fitting
 - SkewnessKurtosisAnalyzer: Skewness/kurtosis analysis
 - OutlierDetector: Z-score outlier detection
-- CorrelationMatrixWorker: Correlation matrix
-- StatisticalSummaryWorker: Comprehensive statistical summary
-- PerformanceTestWorker: Performance testing
+- CorrelationMatrix: Correlation matrix
+- StatisticalSummary: Comprehensive statistical summary
+- PerformanceTest: Performance testing
 """
 
 from .base_worker import BaseWorker, WorkerResult, WorkerError, ErrorType
@@ -32,9 +32,9 @@ from .distribution_comparison import DistributionComparison
 from .distribution_fitter import DistributionFitter
 from .skewness_kurtosis_analyzer import SkewnessKurtosisAnalyzer
 from .outlier_detector import OutlierDetector
-from .correlation_matrix_worker import CorrelationMatrixWorker
-from .statistical_summary_worker import StatisticalSummaryWorker
-from .performance_test_worker import PerformanceTestWorker
+from .correlation_matrix import CorrelationMatrix
+from .statistical_summary import StatisticalSummary
+from .performance_test import PerformanceTest
 
 __all__ = [
     # Base
@@ -53,7 +53,7 @@ __all__ = [
     'DistributionFitter',
     'SkewnessKurtosisAnalyzer',
     'OutlierDetector',
-    'CorrelationMatrixWorker',
-    'StatisticalSummaryWorker',
-    'PerformanceTestWorker',
+    'CorrelationMatrix',
+    'StatisticalSummary',
+    'PerformanceTest',
 ]
