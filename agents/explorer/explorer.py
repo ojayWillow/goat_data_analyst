@@ -1,40 +1,3 @@
-"""Explorer Agent - Data exploration with worker coordination and statistical analysis.
-
-Manages 12 specialized workers for different analysis tasks:
-
-Core Workers (4):
-- NumericAnalyzer: Analyzes numeric columns
-- CategoricalAnalyzer: Analyzes categorical columns
-- CorrelationAnalyzer: Analyzes correlations
-- QualityAssessor: Assesses data quality
-
-Statistical Workers (8):
-- NormalityTester: Shapiro-Wilk normality test
-- DistributionComparison: Kolmogorov-Smirnov test
-- DistributionFitter: Distribution fitting
-- SkewnessKurtosisAnalyzer: Skewness/kurtosis analysis
-- OutlierDetector: Z-score outlier detection
-- CorrelationMatrixWorker: Correlation matrix calculation
-- StatisticalSummaryWorker: Comprehensive statistical summary
-- PerformanceTestWorker: Performance testing on large datasets
-
-Validates quality and reports findings.
-
-Integrated with Week 1 Systems:
-- Structured logging with metrics
-- Automatic retry with exponential backoff
-- Error recovery and handling
-"""
-
-from typing import Any, Dict, List, Optional
-from datetime import datetime
-import pandas as pd
-
-from core.logger import get_logger
-from core.error_recovery import retry_on_error
-from core.structured_logger import get_structured_logger
-from core.exceptions import AgentError
-
 from .workers import (
     NumericAnalyzer,
     CategoricalAnalyzer,
@@ -46,9 +9,9 @@ from .workers import (
     DistributionFitter,
     SkewnessKurtosisAnalyzer,
     OutlierDetector,
-    CorrelationMatrixWorker,
-    StatisticalSummaryWorker,
-    PerformanceTestWorker,
+    CorrelationMatrix,
+    StatisticalSummary,
+    PerformanceTest,
     WorkerResult,
     ErrorType,
 )
@@ -74,9 +37,9 @@ class Explorer:
     - DistributionFitter: Distribution fitting
     - SkewnessKurtosisAnalyzer: Skewness/kurtosis analysis
     - OutlierDetector: Z-score outlier detection
-    - CorrelationMatrixWorker: Correlation matrix
-    - StatisticalSummaryWorker: Comprehensive stats
-    - PerformanceTestWorker: Performance testing
+    - CorrelationMatrix: Correlation matrix
+    - StatisticalSummary: Comprehensive stats
+    - PerformanceTest: Performance testing
     
     Week 1 Integration:
     - Structured logging with metrics at each step
@@ -103,9 +66,9 @@ class Explorer:
         self.distribution_fitter = DistributionFitter()
         self.skewness_kurtosis = SkewnessKurtosisAnalyzer()
         self.outlier_detector = OutlierDetector()
-        self.correlation_matrix = CorrelationMatrixWorker()
-        self.statistical_summary = StatisticalSummaryWorker()
-        self.performance_test = PerformanceTestWorker()
+        self.correlation_matrix = CorrelationMatrix()
+        self.statistical_summary = StatisticalSummary()
+        self.performance_test = PerformanceTest()
         
         self.core_workers = [
             self.numeric_worker,
@@ -280,7 +243,7 @@ class Explorer:
     
     @retry_on_error(max_attempts=3, backoff=2)
     def correlation_matrix(self) -> pd.DataFrame:
-        """Get correlation matrix using CorrelationMatrixWorker."""
+        """Get correlation matrix using CorrelationMatrix."""
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
         
@@ -289,7 +252,7 @@ class Explorer:
     
     @retry_on_error(max_attempts=3, backoff=2)
     def get_statistical_summary(self) -> Dict[str, Any]:
-        """Get statistical summary using StatisticalSummaryWorker."""
+        """Get statistical summary using StatisticalSummary."""
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
         
