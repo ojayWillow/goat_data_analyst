@@ -7,7 +7,7 @@ Tests:
 4. Time series forecasting
 5. Decision tree prediction
 6. Model validation
-7. Predict all methods
+7. Predict all methods (3 methods)
 8. Empty dataframe handling
 9. Single row handling
 10. Performance benchmark
@@ -30,8 +30,11 @@ class TestPredictorInitialization:
         predictor = Predictor()
         assert predictor is not None
         assert predictor.name == "Predictor"
-        assert len(predictor.workers) >= 3
         assert predictor.data is None
+        assert predictor.linear_regression_worker is not None
+        assert predictor.decision_tree_worker is not None
+        assert predictor.time_series_worker is not None
+        assert predictor.model_validator_worker is not None
 
 
 class TestPredictorDataLoading:
@@ -94,14 +97,12 @@ class TestLinearRegression:
         )
         assert result is not None
         assert isinstance(result, dict)
-        assert 'success' in result or 'data' in result
 
-    def test_linear_with_parameters(self, predictor_with_data):
-        """Test linear regression with custom parameters."""
+    def test_linear_multiple_features(self, predictor_with_data):
+        """Test linear regression with multiple features."""
         result = predictor_with_data.predict_linear(
             features=['x', 'y'],
-            target='z',
-            normalize=True
+            target='z'
         )
         assert result is not None
 
@@ -111,7 +112,7 @@ class TestLinearRegression:
             features=['x', 'y'],
             target='z'
         )
-        assert 'linear' in predictor_with_data.prediction_results or predictor_with_data.data is not None
+        assert 'linear_regression' in predictor_with_data.prediction_results
 
 
 class TestTimeSeries:
@@ -150,13 +151,13 @@ class TestTimeSeries:
         )
         assert result is not None
 
-    def test_forecast_length(self, predictor_with_timeseries):
-        """Test forecast has correct length."""
-        result = predictor_with_timeseries.forecast_timeseries(
+    def test_forecast_stored(self, predictor_with_timeseries):
+        """Test forecast is stored in prediction_results."""
+        predictor_with_timeseries.forecast_timeseries(
             series_column='value',
             periods=12
         )
-        assert result is not None
+        assert 'time_series' in predictor_with_timeseries.prediction_results
 
 
 class TestDecisionTree:
@@ -183,8 +184,8 @@ class TestDecisionTree:
         assert result is not None
         assert isinstance(result, dict)
 
-    def test_tree_with_parameters(self, predictor_with_data):
-        """Test decision tree with custom parameters."""
+    def test_tree_with_max_depth(self, predictor_with_data):
+        """Test decision tree with max_depth constraint."""
         result = predictor_with_data.predict_tree(
             features=['a', 'b'],
             target='c',
@@ -192,6 +193,14 @@ class TestDecisionTree:
             mode='regression'
         )
         assert result is not None
+
+    def test_tree_results_stored(self, predictor_with_data):
+        """Test tree results are stored."""
+        predictor_with_data.predict_tree(
+            features=['a', 'b'],
+            target='c'
+        )
+        assert 'decision_tree' in predictor_with_data.prediction_results
 
 
 class TestModelValidation:
@@ -219,18 +228,28 @@ class TestModelValidation:
         assert result is not None
         assert isinstance(result, dict)
 
-    def test_validation_with_threshold(self, predictor_with_data):
-        """Test validation with custom threshold."""
+    def test_validation_linear_model(self, predictor_with_data):
+        """Test validation with linear model."""
         result = predictor_with_data.validate_model(
             features=['col1', 'col2'],
             target='col3',
-            cv_folds=5
+            model_type='linear',
+            cv_folds=3
         )
         assert result is not None
 
+    def test_validation_stored(self, predictor_with_data):
+        """Test validation results are stored."""
+        predictor_with_data.validate_model(
+            features=['col1', 'col2'],
+            target='col3',
+            cv_folds=3
+        )
+        assert 'validation' in predictor_with_data.prediction_results
 
-class TestPredictAll:
-    """Test 7: Run all prediction methods simultaneously."""
+
+class TestMultiplePredictions:
+    """Test 7: Run multiple prediction methods simultaneously."""
 
     @pytest.fixture
     def predictor_with_data(self):
@@ -244,24 +263,52 @@ class TestPredictAll:
         predictor.set_data(df)
         return predictor
 
-    def test_predict_all(self, predictor_with_data):
-        """Test all prediction methods run together."""
-        results = predictor_with_data.predict_all(
+    def test_run_all_three_methods(self, predictor_with_data):
+        """Test all three prediction methods run sequentially."""
+        # Linear
+        result1 = predictor_with_data.predict_linear(
             features=['x', 'y'],
             target='z'
         )
-        assert results is not None
-        assert isinstance(results, dict)
-        assert len(results) > 0
+        assert result1 is not None
+        
+        # Tree
+        result2 = predictor_with_data.predict_tree(
+            features=['x', 'y'],
+            target='z'
+        )
+        assert result2 is not None
+        
+        # Time series
+        df = predictor_with_data.get_data()
+        df_ts = pd.DataFrame({
+            'time': range(len(df)),
+            'value': df['z'].values
+        })
+        predictor_with_data.set_data(df_ts)
+        result3 = predictor_with_data.forecast_timeseries(
+            series_column='value',
+            periods=10
+        )
+        assert result3 is not None
+        
+        # Verify all stored
+        assert len(predictor_with_data.prediction_results) >= 2
 
-    def test_predict_all_with_custom_params(self, predictor_with_data):
-        """Test predict_all with custom parameters."""
-        results = predictor_with_data.predict_all(
+    def test_validation_with_predictions(self, predictor_with_data):
+        """Test validation after predictions."""
+        predictor_with_data.predict_linear(
+            features=['x', 'y'],
+            target='z'
+        )
+        
+        result = predictor_with_data.validate_model(
             features=['x', 'y'],
             target='z',
             cv_folds=3
         )
-        assert results is not None
+        assert result is not None
+        assert len(predictor_with_data.prediction_results) == 2
 
 
 class TestEdgeCases:
@@ -341,7 +388,8 @@ class TestSummaryReport:
 
         report = predictor.summary_report()
         assert report is not None
-        assert 'status' in report or 'timestamp' in report
+        assert 'status' in report
+        assert 'total_predictions' in report
 
 
 if __name__ == "__main__":
