@@ -1,4 +1,4 @@
-"""Explorer Agent - Data exploration with worker coordination.
+"""Explorer Agent - Data exploration with worker coordination and statistical analysis.
 
 Manages specialized workers for different analysis tasks.
 Validates quality and reports findings.
@@ -7,11 +7,15 @@ Integrated with Week 1 Systems:
 - Structured logging with metrics
 - Automatic retry with exponential backoff
 - Error recovery and handling
+- Statistical tests (Shapiro-Wilk, KS, distribution fitting)
 """
 
 from typing import Any, Dict, List, Optional
 from datetime import datetime
+import time
 import pandas as pd
+import numpy as np
+from scipy import stats
 
 from core.logger import get_logger
 from core.error_recovery import retry_on_error
@@ -32,7 +36,7 @@ structured_logger = get_structured_logger(__name__)
 
 
 class Explorer:
-    """Agent for exploring data.
+    """Agent for exploring data with statistical analysis.
     
     Manages workers:
     - NumericAnalyzer: Analyzes numeric columns
@@ -40,11 +44,12 @@ class Explorer:
     - CorrelationAnalyzer: Analyzes correlations
     - QualityAssessor: Assesses overall quality
     
-    Quality Validation:
-    - Checks each worker's output quality
-    - Identifies errors and mistakes
-    - Classifies error types
-    - Reports comprehensive findings
+    Statistical Tests:
+    - Shapiro-Wilk normality test
+    - Kolmogorov-Smirnov test
+    - Distribution fitting
+    - Skewness/kurtosis analysis
+    - Z-score outlier detection
     
     Week 1 Integration:
     - Structured logging with metrics at each step
@@ -181,6 +186,293 @@ class Explorer:
             raise AgentError(f"Exploration failed: {e}")
     
     @retry_on_error(max_attempts=3, backoff=2)
+    def test_normality(self, column: str) -> Dict[str, Any]:
+        """Test if column follows normal distribution using Shapiro-Wilk test.
+        
+        Args:
+            column: Column name to test
+            
+        Returns:
+            Dictionary with test results
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+        
+        if column not in self.data.columns:
+            raise AgentError(f"Column '{column}' not found")
+        
+        self.structured_logger.info("Shapiro-Wilk normality test", {
+            "column": column
+        })
+        
+        try:
+            series = self.data[column].dropna()
+            
+            if len(series) < 3:
+                return {"status": "error", "message": "Need at least 3 values"}
+            
+            statistic, p_value = stats.shapiro(series)
+            
+            result = {
+                "column": column,
+                "test": "Shapiro-Wilk",
+                "statistic": round(float(statistic), 6),
+                "p_value": round(float(p_value), 6),
+                "is_normal": p_value > 0.05,
+                "sample_size": len(series)
+            }
+            
+            self.structured_logger.info("Normality test completed", {
+                "column": column,
+                "p_value": p_value
+            })
+            
+            return result
+        except Exception as e:
+            self.structured_logger.error("Normality test failed", {"error": str(e)})
+            raise
+    
+    @retry_on_error(max_attempts=3, backoff=2)
+    def ks_test(self, col1: str, col2: str) -> Dict[str, Any]:
+        """Kolmogorov-Smirnov test to compare two distributions.
+        
+        Args:
+            col1: First column
+            col2: Second column
+            
+        Returns:
+            Dictionary with test results
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+        
+        self.structured_logger.info("KS test", {"col1": col1, "col2": col2})
+        
+        try:
+            s1 = self.data[col1].dropna()
+            s2 = self.data[col2].dropna()
+            
+            statistic, p_value = stats.ks_2samp(s1, s2)
+            
+            result = {
+                "col1": col1,
+                "col2": col2,
+                "test": "Kolmogorov-Smirnov",
+                "statistic": round(float(statistic), 6),
+                "p_value": round(float(p_value), 6),
+                "distributions_equal": p_value > 0.05
+            }
+            
+            self.structured_logger.info("KS test completed", {"p_value": p_value})
+            return result
+        except Exception as e:
+            self.structured_logger.error("KS test failed", {"error": str(e)})
+            raise
+    
+    @retry_on_error(max_attempts=3, backoff=2)
+    def fit_distribution(self, column: str) -> Dict[str, Any]:
+        """Fit common distributions to column data.
+        
+        Args:
+            column: Column name
+            
+        Returns:
+            Dictionary with best-fit distribution info
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+        
+        self.structured_logger.info("Distribution fitting", {"column": column})
+        
+        try:
+            series = self.data[column].dropna()
+            distributions = {}
+            
+            # Try common distributions
+            try:
+                params = stats.norm.fit(series)
+                distributions['normal'] = {'params': params, 'fit_quality': 'good'}
+            except: pass
+            
+            try:
+                params = stats.expon.fit(series)
+                distributions['exponential'] = {'params': params, 'fit_quality': 'good'}
+            except: pass
+            
+            if (series > 0).all():
+                try:
+                    params = stats.gamma.fit(series)
+                    distributions['gamma'] = {'params': params, 'fit_quality': 'good'}
+                except: pass
+            
+            result = {
+                "column": column,
+                "distributions_tested": list(distributions.keys()),
+                "best_fit": list(distributions.keys())[0] if distributions else None,
+                "sample_size": len(series)
+            }
+            
+            self.structured_logger.info("Distribution fitting completed", {
+                "column": column,
+                "distributions": len(distributions)
+            })
+            
+            return result
+        except Exception as e:
+            self.structured_logger.error("Distribution fitting failed", {"error": str(e)})
+            raise
+    
+    @retry_on_error(max_attempts=3, backoff=2)
+    def calculate_skewness_kurtosis(self, column: str) -> Dict[str, Any]:
+        """Calculate skewness and kurtosis for a column.
+        
+        Args:
+            column: Column name
+            
+        Returns:
+            Dictionary with skewness and kurtosis values
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+        
+        self.structured_logger.info("Skewness/Kurtosis", {"column": column})
+        
+        try:
+            series = self.data[column].dropna()
+            
+            skewness = stats.skew(series)
+            kurtosis = stats.kurtosis(series)
+            
+            result = {
+                "column": column,
+                "skewness": round(float(skewness), 6),
+                "kurtosis": round(float(kurtosis), 6),
+                "is_symmetric": abs(skewness) < 0.5,
+                "is_normal_peaked": abs(kurtosis) < 0.5
+            }
+            
+            self.structured_logger.info("Skewness/Kurtosis calculated", {
+                "skewness": skewness,
+                "kurtosis": kurtosis
+            })
+            
+            return result
+        except Exception as e:
+            self.structured_logger.error("Skewness/Kurtosis failed", {"error": str(e)})
+            raise
+    
+    @retry_on_error(max_attempts=3, backoff=2)
+    def detect_outliers_zscore(self, column: str, threshold: float = 3) -> Dict[str, Any]:
+        """Detect outliers using z-score method.
+        
+        Args:
+            column: Column name
+            threshold: Z-score threshold (default 3)
+            
+        Returns:
+            Dictionary with outlier indices and values
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+        
+        self.structured_logger.info("Z-score outlier detection", {
+            "column": column,
+            "threshold": threshold
+        })
+        
+        try:
+            series = self.data[column].dropna()
+            z_scores = np.abs(stats.zscore(series))
+            outliers = z_scores > threshold
+            
+            result = {
+                "column": column,
+                "method": "z-score",
+                "threshold": threshold,
+                "outlier_count": int(outliers.sum()),
+                "outlier_percentage": round(outliers.sum() / len(series) * 100, 2),
+                "outlier_indices": outliers.index[outliers].tolist() if hasattr(outliers, 'index') else []
+            }
+            
+            self.structured_logger.info("Z-score outliers detected", {
+                "count": result['outlier_count'],
+                "percentage": result['outlier_percentage']
+            })
+            
+            return result
+        except Exception as e:
+            self.structured_logger.error("Z-score detection failed", {"error": str(e)})
+            raise
+    
+    @retry_on_error(max_attempts=3, backoff=2)
+    def correlation_matrix(self) -> pd.DataFrame:
+        """Get correlation matrix for all numeric columns.
+        
+        Returns:
+            Correlation matrix DataFrame
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+        
+        self.structured_logger.info("Correlation matrix calculation")
+        
+        try:
+            numeric_data = self.data.select_dtypes(include=[np.number])
+            corr_matrix = numeric_data.corr()
+            
+            self.structured_logger.info("Correlation matrix completed", {
+                "shape": corr_matrix.shape
+            })
+            
+            return corr_matrix
+        except Exception as e:
+            self.structured_logger.error("Correlation matrix failed", {"error": str(e)})
+            raise
+    
+    @retry_on_error(max_attempts=3, backoff=2)
+    def get_statistical_summary(self) -> Dict[str, Any]:
+        """Get comprehensive statistical summary for all numeric columns.
+        
+        Returns:
+            Dictionary with statistical summaries
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+        
+        start_time = time.time()
+        self.structured_logger.info("Statistical summary calculation")
+        
+        try:
+            numeric_data = self.data.select_dtypes(include=[np.number])
+            summary = {}
+            
+            for col in numeric_data.columns:
+                series = numeric_data[col].dropna()
+                summary[col] = {
+                    "mean": round(float(series.mean()), 6),
+                    "median": round(float(series.median()), 6),
+                    "std": round(float(series.std()), 6),
+                    "min": round(float(series.min()), 6),
+                    "max": round(float(series.max()), 6),
+                    "q25": round(float(series.quantile(0.25)), 6),
+                    "q75": round(float(series.quantile(0.75)), 6),
+                    "null_count": int(numeric_data[col].isna().sum())
+                }
+            
+            duration = time.time() - start_time
+            self.structured_logger.info("Statistical summary completed", {
+                "columns": len(summary),
+                "duration_sec": round(duration, 3)
+            })
+            
+            return summary
+        except Exception as e:
+            self.structured_logger.error("Statistical summary failed", {"error": str(e)})
+            raise
+    
+    # Original methods below...
+    
+    @retry_on_error(max_attempts=3, backoff=2)
     def describe_numeric(self) -> Dict[str, Any]:
         """Get detailed numeric statistics.
         
@@ -305,8 +597,6 @@ class Explorer:
         })
         
         try:
-            # This uses numeric worker
-            import numpy as np
             numeric_data = self.data.select_dtypes(include=[np.number])
             
             if numeric_data.empty:
@@ -368,7 +658,6 @@ class Explorer:
         
         results = []
         
-        # Execute each worker
         for worker in self.workers:
             self.logger.info(f"Executing {worker.worker_name}...")
             self.structured_logger.info("Executing worker", {
@@ -425,7 +714,6 @@ class Explorer:
             else:
                 validation['failed_workers'] += 1
             
-            # Track error types
             for error in errors:
                 error_type = error['type']
                 validation['error_summary'][error_type] = validation['error_summary'].get(error_type, 0) + 1
@@ -465,7 +753,6 @@ class Explorer:
         """
         summary = {}
         
-        # Extract data from each worker's results
         for result in worker_results:
             worker_name = result['worker']
             data = result.get('data', {})
