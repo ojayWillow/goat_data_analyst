@@ -7,8 +7,8 @@ Core Workers:
 - ValidatorWorker: Validates loaded data
 
 Performance/Format Workers (Week 1 Day 1):
-- CSVStreamingWorker: Streams large CSV files
-- FormatDetectionWorker: Auto-detects file format
+- CSVStreaming: Streams large CSV files
+- FormatDetection: Auto-detects file format
 """
 
 from typing import List
@@ -17,8 +17,8 @@ from .csv_loader import CSVLoaderWorker
 from .json_excel_loader import JSONExcelLoaderWorker
 from .parquet_loader import ParquetLoaderWorker
 from .validator_worker import ValidatorWorker
-from .csv_streaming_worker import CSVStreamingWorker
-from .format_detection_worker import FormatDetectionWorker
+from .csv_streaming import CSVStreaming
+from .format_detection import FormatDetection
 
 __all__ = [
     "BaseWorker",
@@ -28,6 +28,6 @@ __all__ = [
     "JSONExcelLoaderWorker",
     "ParquetLoaderWorker",
     "ValidatorWorker",
-    "CSVStreamingWorker",
-    "FormatDetectionWorker",
+    "CSVStreaming",
+    "FormatDetection",
 ]
