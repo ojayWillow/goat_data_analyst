@@ -1,0 +1,57 @@
+{
+  "generated_at": "2025-12-10T14:29:06.466141",
+  "test_datasets": {
+    "small_dataset.csv": {
+      "purpose": "Happy path testing (Scenario 1)",
+      "rows": 2000,
+      "columns": 10,
+      "data_quality": "Clean",
+      "missing_values": "~100 (5%)",
+      "duplicates": 0,
+      "outliers": 0
+    },
+    "medium_dataset.csv": {
+      "purpose": "Edge case + stress testing (Scenarios 2 & 3)",
+      "rows": 50500,
+      "columns": 15,
+      "data_quality": "With issues",
+      "missing_values": "~12500 (15-20%)",
+      "duplicates": "~500 (1%)",
+      "outliers": "~500 (1%)"
+    },
+    "test_data.json": {
+      "purpose": "JSON parsing test",
+      "records": 5000,
+      "structure": "List of nested objects",
+      "fields": 5
+    },
+    "test_data.xlsx": {
+      "purpose": "Excel parsing test",
+      "rows": 5000,
+      "columns": 6,
+      "sheets": 1
+    },
+    "test_data.parquet": {
+      "purpose": "Parquet parsing test (optional)",
+      "rows": 5000,
+      "columns": 5
+    }
+  },
+  "test_scenarios": {
+    "scenario_1_happy_path": {
+      "data": "small_dataset.csv",
+      "focus": "Normal operation, clean data",
+      "expected": "All agents pass without errors"
+    },
+    "scenario_2_edge_cases": {
+      "data": "medium_dataset.csv",
+      "focus": "Data quality issues",
+      "expected": "Agents handle missing values, duplicates, outliers"
+    },
+    "scenario_3_stress": {
+      "data": "medium_dataset.csv",
+      "focus": "Performance under load",
+      "expected": "Agents complete within performance targets"
+    }
+  }
+}
