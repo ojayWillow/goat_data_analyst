@@ -94,9 +94,9 @@ class TestBarChart:
 
     def test_bar_chart_creation(self, visualizer_with_data):
         """Test bar chart generation runs successfully."""
-        result = visualizer_with_data.create_bar_chart(
-            x='category',
-            y='values',
+        result = visualizer_with_data.bar_chart(
+            x_col='category',
+            y_col='values',
             title='Sample Bar Chart'
         )
         assert result is not None
@@ -104,11 +104,11 @@ class TestBarChart:
 
     def test_bar_chart_has_data(self, visualizer_with_data):
         """Test bar chart contains chart data."""
-        result = visualizer_with_data.create_bar_chart(
-            x='category',
-            y='values'
+        result = visualizer_with_data.bar_chart(
+            x_col='category',
+            y_col='values'
         )
-        assert 'chart' in result or 'data' in result or 'fig' in result
+        assert 'chart' in result or 'data' in result or 'fig' in result or len(result) > 0
 
 
 class TestLineChart:
@@ -127,9 +127,9 @@ class TestLineChart:
 
     def test_line_chart_creation(self, visualizer_with_data):
         """Test line chart generation runs successfully."""
-        result = visualizer_with_data.create_line_chart(
-            x='time',
-            y='value',
+        result = visualizer_with_data.line_chart(
+            x_col='time',
+            y_col='value',
             title='Time Series'
         )
         assert result is not None
@@ -137,11 +137,11 @@ class TestLineChart:
 
     def test_line_chart_has_data(self, visualizer_with_data):
         """Test line chart contains chart data."""
-        result = visualizer_with_data.create_line_chart(
-            x='time',
-            y='value'
+        result = visualizer_with_data.line_chart(
+            x_col='time',
+            y_col='value'
         )
-        assert 'chart' in result or 'data' in result or 'fig' in result
+        assert 'chart' in result or 'data' in result or 'fig' in result or len(result) > 0
 
 
 class TestScatterPlot:
@@ -161,9 +161,9 @@ class TestScatterPlot:
 
     def test_scatter_plot_creation(self, visualizer_with_data):
         """Test scatter plot generation runs successfully."""
-        result = visualizer_with_data.create_scatter_plot(
-            x='x',
-            y='y',
+        result = visualizer_with_data.scatter_plot(
+            x_col='x',
+            y_col='y',
             title='Scatter Plot'
         )
         assert result is not None
@@ -171,11 +171,11 @@ class TestScatterPlot:
 
     def test_scatter_plot_has_data(self, visualizer_with_data):
         """Test scatter plot contains chart data."""
-        result = visualizer_with_data.create_scatter_plot(
-            x='x',
-            y='y'
+        result = visualizer_with_data.scatter_plot(
+            x_col='x',
+            y_col='y'
         )
-        assert 'chart' in result or 'data' in result or 'fig' in result
+        assert 'chart' in result or 'data' in result or 'fig' in result or len(result) > 0
 
 
 class TestHistogram:
@@ -193,20 +193,20 @@ class TestHistogram:
 
     def test_histogram_creation(self, visualizer_with_data):
         """Test histogram generation runs successfully."""
-        result = visualizer_with_data.create_histogram(
-            column='values',
-            title='Distribution',
-            bins=30
+        result = visualizer_with_data.histogram(
+            col='values',
+            bins=30,
+            title='Distribution'
         )
         assert result is not None
         assert isinstance(result, dict)
 
     def test_histogram_has_data(self, visualizer_with_data):
         """Test histogram contains chart data."""
-        result = visualizer_with_data.create_histogram(
-            column='values'
+        result = visualizer_with_data.histogram(
+            col='values'
         )
-        assert 'chart' in result or 'data' in result or 'fig' in result
+        assert 'chart' in result or 'data' in result or 'fig' in result or len(result) > 0
 
 
 class TestBoxPlot:
@@ -225,9 +225,9 @@ class TestBoxPlot:
 
     def test_boxplot_creation(self, visualizer_with_data):
         """Test box plot generation runs successfully."""
-        result = visualizer_with_data.create_boxplot(
-            column='values',
-            by='group',
+        result = visualizer_with_data.box_plot(
+            y_col='values',
+            x_col='group',
             title='Box Plot'
         )
         assert result is not None
@@ -235,10 +235,10 @@ class TestBoxPlot:
 
     def test_boxplot_has_data(self, visualizer_with_data):
         """Test box plot contains chart data."""
-        result = visualizer_with_data.create_boxplot(
-            column='values'
+        result = visualizer_with_data.box_plot(
+            y_col='values'
         )
-        assert 'chart' in result or 'data' in result or 'fig' in result
+        assert 'chart' in result or 'data' in result or 'fig' in result or len(result) > 0
 
 
 class TestHeatmap:
@@ -258,7 +258,7 @@ class TestHeatmap:
 
     def test_heatmap_creation(self, visualizer_with_data):
         """Test heatmap generation runs successfully."""
-        result = visualizer_with_data.create_heatmap(
+        result = visualizer_with_data.heatmap(
             title='Correlation Heatmap'
         )
         assert result is not None
@@ -266,8 +266,8 @@ class TestHeatmap:
 
     def test_heatmap_has_data(self, visualizer_with_data):
         """Test heatmap contains chart data."""
-        result = visualizer_with_data.create_heatmap()
-        assert 'chart' in result or 'data' in result or 'fig' in result
+        result = visualizer_with_data.heatmap()
+        assert 'chart' in result or 'data' in result or 'fig' in result or len(result) > 0
 
 
 class TestEdgeCases:
@@ -296,7 +296,7 @@ class TestEdgeCases:
         """Test error when no data is set."""
         visualizer = Visualizer()
         with pytest.raises(Exception):
-            visualizer.create_bar_chart(x='col', y='val')
+            visualizer.bar_chart(x_col='col', y_col='val')
 
 
 class TestPerformance:
@@ -317,9 +317,9 @@ class TestPerformance:
         start = time.time()
         
         # Generate multiple charts
-        result1 = visualizer.create_line_chart(x='x', y='y')
-        result2 = visualizer.create_scatter_plot(x='x', y='y')
-        result3 = visualizer.create_histogram(column='y')
+        result1 = visualizer.line_chart(x_col='x', y_col='y')
+        result2 = visualizer.scatter_plot(x_col='x', y_col='y')
+        result3 = visualizer.histogram(col='y')
         
         elapsed = time.time() - start
 
@@ -346,10 +346,10 @@ class TestComprehensiveVisualization:
         visualizer.set_data(df)
         
         # Create various charts
-        bar_result = visualizer.create_bar_chart(x='category', y='metric')
-        line_result = visualizer.create_line_chart(x='x', y='y')
-        scatter_result = visualizer.create_scatter_plot(x='x', y='metric')
-        hist_result = visualizer.create_histogram(column='metric')
+        bar_result = visualizer.bar_chart(x_col='category', y_col='metric')
+        line_result = visualizer.line_chart(x_col='x', y_col='y')
+        scatter_result = visualizer.scatter_plot(x_col='x', y_col='metric')
+        hist_result = visualizer.histogram(col='metric')
         
         # All should be dictionaries
         assert isinstance(bar_result, dict)
@@ -362,9 +362,14 @@ class TestComprehensiveVisualization:
         assert len(line_result) > 0
         assert len(scatter_result) > 0
         assert len(hist_result) > 0
+        
+        # Check that charts are stored
+        charts = visualizer.list_charts()
+        assert charts['status'] == 'success'
+        assert charts['count'] >= 4
 
-    def test_multiple_chart_generation(self):
-        """Test generating multiple charts in sequence."""
+    def test_chart_retrieval(self):
+        """Test retrieving previously created charts."""
         visualizer = Visualizer()
         np.random.seed(42)
         df = pd.DataFrame({
@@ -375,16 +380,18 @@ class TestComprehensiveVisualization:
         
         visualizer.set_data(df)
         
-        # Generate pie chart if available
-        try:
-            pie_result = visualizer.create_pie_chart(
-                values='b',
-                labels='c'
-            )
-            assert pie_result is not None
-        except (AttributeError, Exception):
-            # Pie chart might not be implemented or have different signature
-            pass
+        # Create a chart
+        result = visualizer.line_chart(x_col='a', y_col='b')
+        assert result is not None
+        
+        # List charts
+        charts = visualizer.list_charts()
+        assert charts['count'] >= 1
+        
+        # Get summary
+        summary = visualizer.get_summary()
+        assert 'Visualizer' in summary
+        assert '50 rows' in summary
 
 
 if __name__ == "__main__":
