@@ -1,20 +1,3 @@
-"""DataLoader Agent - Coordinates data loading workers.
-
-Loads and validates data from multiple file formats:
-CSV, JSON, Excel (XLSX, XLS), Parquet, JSONL, HDF5, SQLite
-
-Workers (9 total):
-Core Workers (4):
-- CSVLoaderWorker: Loads CSV files
-- JSONExcelLoaderWorker: Loads JSON and Excel files
-- ParquetLoaderWorker: Loads Parquet files
-- ValidatorWorker: Validates loaded data
-
-Performance/Format Workers (2) - Week 1 Day 1:
-- CSVStreamingWorker: Streams large CSV files (>500MB)
-- FormatDetectionWorker: Auto-detects file format via magic bytes
-"""
-
 from typing import Any, Dict, Optional, List
 from pathlib import Path
 import pandas as pd
@@ -30,8 +13,8 @@ from .workers import (
     JSONExcelLoaderWorker,
     ParquetLoaderWorker,
     ValidatorWorker,
-    CSVStreamingWorker,
-    FormatDetectionWorker,
+    CSVStreaming,
+    FormatDetection,
     WorkerResult,
 )
 
@@ -47,8 +30,8 @@ class DataLoader:
     - JSONExcelLoaderWorker: Loads JSON and Excel
     - ParquetLoaderWorker: Loads Parquet files
     - ValidatorWorker: Validates data
-    - CSVStreamingWorker: Streams large CSVs (>500MB)
-    - FormatDetectionWorker: Auto-detects formats
+    - CSVStreaming: Streams large CSVs (>500MB)
+    - FormatDetection: Auto-detects formats
     
     Capabilities:
     - Load CSV files (streaming for large files)
@@ -81,8 +64,8 @@ class DataLoader:
         self.validator = ValidatorWorker()
         
         # Performance/Format workers (Week 1 Day 1)
-        self.csv_streaming = CSVStreamingWorker()
-        self.format_detector = FormatDetectionWorker()
+        self.csv_streaming = CSVStreaming()
+        self.format_detector = FormatDetection()
         
         self.core_workers = [
             self.csv_loader,
@@ -110,8 +93,8 @@ class DataLoader:
         """Load data from a file.
         
         Delegates to appropriate worker based on format.
-        Uses CSVStreamingWorker for >500MB CSV files.
-        Uses FormatDetectionWorker for format auto-detection.
+        Uses CSVStreaming for >500MB CSV files.
+        Uses FormatDetection for format auto-detection.
         
         Args:
             file_path: Path to data file
@@ -132,7 +115,7 @@ class DataLoader:
         file_path = Path(file_path)
         file_format = file_path.suffix.lower().lstrip('.')
 
-        # If format missing or unknown, use FormatDetectionWorker
+        # If format missing or unknown, use FormatDetection
         if not file_format or file_format not in self.SUPPORTED_FORMATS:
             detection_result = self.format_detector.safe_execute(file_path=str(file_path))
             if detection_result.success and detection_result.data:
@@ -147,7 +130,7 @@ class DataLoader:
 
         # Load based on format
         if file_format == 'csv':
-            # Use CSVStreamingWorker for >500MB files
+            # Use CSVStreaming for >500MB files
             file_size_mb = file_path.stat().st_size / (1024 * 1024)
             if file_size_mb > 500:
                 load_result = self.csv_streaming.safe_execute(file_path=str(file_path))
