@@ -18,11 +18,24 @@ def pytest_configure(config):
     # Disable pytest's log capture to avoid conflicts with our logging
     logging.getLogger().setLevel(logging.WARNING)
     
-    # Disable pytest's capture for stdout/stderr to prevent file handle issues
-    config.option.capture = 'no'
+    # DO NOT disable capture - causes issues
+    # Let pytest handle its own capture
     
-    # Disable pytest's log capture plugin
-    config.pluginmanager.set_blocked("logging")
+    # Safely disable the logging plugin
+    try:
+        config.pluginmanager.set_blocked("logging")
+    except Exception:
+        pass
+    
+    # Close any existing file handlers to prevent I/O issues
+    root_logger = logging.getLogger()
+    for handler in list(root_logger.handlers):
+        if isinstance(handler, logging.FileHandler):
+            try:
+                handler.close()
+                root_logger.removeHandler(handler)
+            except Exception:
+                pass
 
 
 @pytest.fixture(autouse=True)
