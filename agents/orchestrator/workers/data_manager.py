@@ -12,6 +12,7 @@ import pandas as pd
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import DataLoadError
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class DataManager:
@@ -26,6 +27,7 @@ class DataManager:
         self.name = "DataManager"
         self.logger = get_logger("DataManager")
         self.structured_logger = get_structured_logger("DataManager")
+        self.error_intelligence = ErrorIntelligence()
         self.cache: Dict[str, Any] = {}
         self.logger.info("DataManager initialized")
 
@@ -44,8 +46,23 @@ class DataManager:
                 'data_type': type(data).__name__,
                 'total_cached': len(self.cache)
             })
+            
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="orchestrator",
+                worker_name="DataManager",
+                operation="cache_data",
+                context={"cache_key": key, "data_type": type(data).__name__}
+            )
         except Exception as e:
             self.logger.error(f"Error caching data: {e}")
+            self.error_intelligence.track_error(
+                agent_name="orchestrator",
+                worker_name="DataManager",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"cache_key": key}
+            )
             raise DataLoadError(f"Failed to cache data with key '{key}': {e}")
 
     def get(self, key: str) -> Optional[Any]:
@@ -175,34 +192,77 @@ class DataManager:
         Raises:
             DataLoadError: If no data available
         """
-        # Priority 1: Data provided directly
-        if 'data' in params and isinstance(params['data'], pd.DataFrame):
-            self.logger.info("Using provided data")
-            return params['data']
-        
-        # Priority 2: Cached data by key
-        if 'data_key' in params:
-            cached = self.get_dataframe(params['data_key'])
+        try:
+            # Priority 1: Data provided directly
+            if 'data' in params and isinstance(params['data'], pd.DataFrame):
+                self.logger.info("Using provided data")
+                self.error_intelligence.track_success(
+                    agent_name="orchestrator",
+                    worker_name="DataManager",
+                    operation="get_data_for_task",
+                    context={"source": "provided"}
+                )
+                return params['data']
+            
+            # Priority 2: Cached data by key
+            if 'data_key' in params:
+                cached = self.get_dataframe(params['data_key'])
+                if cached is not None:
+                    self.logger.info(f"Using cached data: {params['data_key']}")
+                    self.error_intelligence.track_success(
+                        agent_name="orchestrator",
+                        worker_name="DataManager",
+                        operation="get_data_for_task",
+                        context={"source": "cached", "cache_key": params['data_key']}
+                    )
+                    return cached
+            
+            # Priority 3: Default cached data
+            cached = self.get_dataframe('loaded_data')
             if cached is not None:
-                self.logger.info(f"Using cached data: {params['data_key']}")
+                self.logger.info("Using default cached data")
+                self.error_intelligence.track_success(
+                    agent_name="orchestrator",
+                    worker_name="DataManager",
+                    operation="get_data_for_task",
+                    context={"source": "default_cached"}
+                )
                 return cached
-        
-        # Priority 3: Default cached data
-        cached = self.get_dataframe('loaded_data')
-        if cached is not None:
-            self.logger.info("Using default cached data")
-            return cached
-        
-        # Priority 4: Load from file
-        if 'file_path' in params and loader_agent is not None:
-            try:
-                result = loader_agent.load(params['file_path'])
-                if result.get('status') == 'success':
-                    data = result['data']
-                    self.set('loaded_data', data)
-                    self.logger.info(f"Loaded and cached data from: {params['file_path']}")
-                    return data
-            except Exception as e:
-                self.logger.error(f"Error loading data from file: {e}")
-        
-        raise DataLoadError("No data available for task execution")
+            
+            # Priority 4: Load from file
+            if 'file_path' in params and loader_agent is not None:
+                try:
+                    result = loader_agent.load(params['file_path'])
+                    if result.get('status') == 'success':
+                        data = result['data']
+                        self.set('loaded_data', data)
+                        self.logger.info(f"Loaded and cached data from: {params['file_path']}")
+                        self.error_intelligence.track_success(
+                            agent_name="orchestrator",
+                            worker_name="DataManager",
+                            operation="get_data_for_task",
+                            context={"source": "file_load", "file_path": params['file_path']}
+                        )
+                        return data
+                except Exception as e:
+                    self.logger.error(f"Error loading data from file: {e}")
+                    self.error_intelligence.track_error(
+                        agent_name="orchestrator",
+                        worker_name="DataManager",
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        context={"source": "file_load", "file_path": params.get('file_path')}
+                    )
+            
+            raise DataLoadError("No data available for task execution")
+            
+        except Exception as e:
+            self.logger.error(f"Error in get_data_for_task: {e}")
+            self.error_intelligence.track_error(
+                agent_name="orchestrator",
+                worker_name="DataManager",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"operation": "get_data_for_task"}
+            )
+            raise
