@@ -8,6 +8,7 @@ from .missing_data_analyzer import MissingDataAnalyzer
 from .duplicate_analyzer import DuplicateAnalyzer
 from .distribution_analyzer import DistributionAnalyzer
 from .correlation_analyzer import CorrelationAnalyzer
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class ActionPlanGenerator(BaseWorker):
