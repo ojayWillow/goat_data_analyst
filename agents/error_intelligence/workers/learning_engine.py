@@ -13,6 +13,14 @@ class LearningEngine:
     def __init__(self):
         """Initialize learning engine."""
         self.learned_fixes = []
+        
+        # Import here to avoid circular dependency
+        try:
+            from agents.error_intelligence.main import ErrorIntelligence
+            self.error_intelligence = ErrorIntelligence()
+        except ImportError:
+            self.error_intelligence = None
+        
         logger.info("LearningEngine worker initialized")
 
     def record_fix(
@@ -32,17 +40,47 @@ class LearningEngine:
             fix_applied: Description of fix
             success: Whether fix worked
         """
-        fix_record = {
-            'timestamp': datetime.now().isoformat(),
-            'agent': agent_name,
-            'worker': worker_name,
-            'error_type': error_type,
-            'fix_applied': fix_applied,
-            'success': success,
-        }
+        try:
+            fix_record = {
+                'timestamp': datetime.now().isoformat(),
+                'agent': agent_name,
+                'worker': worker_name,
+                'error_type': error_type,
+                'fix_applied': fix_applied,
+                'success': success,
+            }
+            
+            self.learned_fixes.append(fix_record)
+            logger.info(f"Recorded fix: {agent_name}.{worker_name} - {error_type} - {'SUCCESS' if success else 'FAILED'}")
+            
+            # Track in error intelligence
+            if self.error_intelligence:
+                if success:
+                    self.error_intelligence.track_success(
+                        agent_name="error_intelligence",
+                        worker_name="LearningEngine",
+                        operation="record_successful_fix",
+                        context={"original_agent": agent_name, "fix": fix_applied}
+                    )
+                else:
+                    self.error_intelligence.track_error(
+                        agent_name="error_intelligence",
+                        worker_name="LearningEngine",
+                        error_type="fix_failed",
+                        error_message=f"Fix failed for {error_type}: {fix_applied}",
+                        context={"original_agent": agent_name}
+                    )
         
-        self.learned_fixes.append(fix_record)
-        logger.info(f"Recorded fix: {agent_name}.{worker_name} - {error_type} - {'SUCCESS' if success else 'FAILED'}")
+        except Exception as e:
+            logger.error(f"LearningEngine.record_fix failed: {e}")
+            
+            if self.error_intelligence:
+                self.error_intelligence.track_error(
+                    agent_name="error_intelligence",
+                    worker_name="LearningEngine",
+                    error_type="record_fix_error",
+                    error_message=str(e),
+                )
 
     def get_learned_fixes(self, success_only: bool = True) -> List[Dict[str, Any]]:
         """Get learned fixes.
@@ -53,9 +91,36 @@ class LearningEngine:
         Returns:
             List of learned fixes
         """
-        if success_only:
-            return [f for f in self.learned_fixes if f['success']]
-        return self.learned_fixes
+        try:
+            result = []
+            if success_only:
+                result = [f for f in self.learned_fixes if f['success']]
+            else:
+                result = self.learned_fixes
+            
+            # Track success
+            if self.error_intelligence:
+                self.error_intelligence.track_success(
+                    agent_name="error_intelligence",
+                    worker_name="LearningEngine",
+                    operation="get_learned_fixes",
+                    context={"fixes_retrieved": len(result)}
+                )
+            
+            return result
+        
+        except Exception as e:
+            logger.error(f"LearningEngine.get_learned_fixes failed: {e}")
+            
+            if self.error_intelligence:
+                self.error_intelligence.track_error(
+                    agent_name="error_intelligence",
+                    worker_name="LearningEngine",
+                    error_type="get_learned_fixes_error",
+                    error_message=str(e),
+                )
+            
+            return []
 
     def get_fix_effectiveness(
         self,
@@ -73,35 +138,60 @@ class LearningEngine:
         Returns:
             Effectiveness metrics
         """
-        relevant_fixes = [
-            f for f in self.learned_fixes
-            if f['agent'] == agent_name
-            and f['worker'] == worker_name
-            and f['error_type'] == error_type
-        ]
+        try:
+            relevant_fixes = [
+                f for f in self.learned_fixes
+                if f['agent'] == agent_name
+                and f['worker'] == worker_name
+                and f['error_type'] == error_type
+            ]
+            
+            if not relevant_fixes:
+                result = {
+                    'no_fixes_recorded': True,
+                    'agent': agent_name,
+                    'worker': worker_name,
+                    'error_type': error_type,
+                }
+            else:
+                successful = sum(1 for f in relevant_fixes if f['success'])
+                total = len(relevant_fixes)
+                
+                result = {
+                    'agent': agent_name,
+                    'worker': worker_name,
+                    'error_type': error_type,
+                    'total_attempts': total,
+                    'successful': successful,
+                    'failed': total - successful,
+                    'success_rate': round(successful / total * 100, 2),
+                    'last_fix': relevant_fixes[-1]['fix_applied'],
+                    'last_timestamp': relevant_fixes[-1]['timestamp'],
+                }
+            
+            # Track success
+            if self.error_intelligence:
+                self.error_intelligence.track_success(
+                    agent_name="error_intelligence",
+                    worker_name="LearningEngine",
+                    operation="get_fix_effectiveness",
+                    context={"agent": agent_name, "error_type": error_type}
+                )
+            
+            return result
         
-        if not relevant_fixes:
-            return {
-                'no_fixes_recorded': True,
-                'agent': agent_name,
-                'worker': worker_name,
-                'error_type': error_type,
-            }
-        
-        successful = sum(1 for f in relevant_fixes if f['success'])
-        total = len(relevant_fixes)
-        
-        return {
-            'agent': agent_name,
-            'worker': worker_name,
-            'error_type': error_type,
-            'total_attempts': total,
-            'successful': successful,
-            'failed': total - successful,
-            'success_rate': round(successful / total * 100, 2),
-            'last_fix': relevant_fixes[-1]['fix_applied'],
-            'last_timestamp': relevant_fixes[-1]['timestamp'],
-        }
+        except Exception as e:
+            logger.error(f"LearningEngine.get_fix_effectiveness failed: {e}")
+            
+            if self.error_intelligence:
+                self.error_intelligence.track_error(
+                    agent_name="error_intelligence",
+                    worker_name="LearningEngine",
+                    error_type="get_fix_effectiveness_error",
+                    error_message=str(e),
+                )
+            
+            return {}
 
     def get_best_practices(self) -> List[str]:
         """Get best practices learned from fixes.
@@ -109,16 +199,40 @@ class LearningEngine:
         Returns:
             List of best practices
         """
-        successful_fixes = self.get_learned_fixes(success_only=True)
+        try:
+            successful_fixes = self.get_learned_fixes(success_only=True)
+            
+            if not successful_fixes:
+                return []
+            
+            # Extract unique successful fixes
+            practices = list(set(f['fix_applied'] for f in successful_fixes))
+            
+            logger.info(f"Identified {len(practices)} best practices")
+            
+            # Track success
+            if self.error_intelligence:
+                self.error_intelligence.track_success(
+                    agent_name="error_intelligence",
+                    worker_name="LearningEngine",
+                    operation="get_best_practices",
+                    context={"practices_identified": len(practices)}
+                )
+            
+            return practices
         
-        if not successful_fixes:
+        except Exception as e:
+            logger.error(f"LearningEngine.get_best_practices failed: {e}")
+            
+            if self.error_intelligence:
+                self.error_intelligence.track_error(
+                    agent_name="error_intelligence",
+                    worker_name="LearningEngine",
+                    error_type="get_best_practices_error",
+                    error_message=str(e),
+                )
+            
             return []
-        
-        # Extract unique successful fixes
-        practices = list(set(f['fix_applied'] for f in successful_fixes))
-        
-        logger.info(f"Identified {len(practices)} best practices")
-        return practices
 
     def suggest_fix_for_error(self, error_type: str) -> str:
         """Suggest a fix for an error type based on what worked before.
@@ -129,15 +243,40 @@ class LearningEngine:
         Returns:
             Suggested fix or message if none found
         """
-        successful_fixes = self.get_learned_fixes(success_only=True)
+        try:
+            successful_fixes = self.get_learned_fixes(success_only=True)
+            
+            for fix in successful_fixes:
+                if fix['error_type'] == error_type:
+                    return fix['fix_applied']
+            
+            return f"No learned fixes for {error_type}. Suggest: Add error handling for {error_type}"
         
-        for fix in successful_fixes:
-            if fix['error_type'] == error_type:
-                return fix['fix_applied']
-        
-        return f"No learned fixes for {error_type}. Suggest: Add error handling for {error_type}"
+        except Exception as e:
+            logger.error(f"LearningEngine.suggest_fix_for_error failed: {e}")
+            
+            if self.error_intelligence:
+                self.error_intelligence.track_error(
+                    agent_name="error_intelligence",
+                    worker_name="LearningEngine",
+                    error_type="suggest_fix_error",
+                    error_message=str(e),
+                )
+            
+            return f"Error suggesting fix: {str(e)}"
 
     def clear_history(self) -> None:
         """Clear learning history."""
-        self.learned_fixes = []
-        logger.info("Learning history cleared")
+        try:
+            self.learned_fixes = []
+            logger.info("Learning history cleared")
+            
+            if self.error_intelligence:
+                self.error_intelligence.track_success(
+                    agent_name="error_intelligence",
+                    worker_name="LearningEngine",
+                    operation="clear_history",
+                )
+        
+        except Exception as e:
+            logger.error(f"LearningEngine.clear_history failed: {e}")
