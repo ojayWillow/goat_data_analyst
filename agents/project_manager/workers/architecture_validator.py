@@ -128,6 +128,8 @@ class ArchitectureValidator:
             with open(file_path, "r") as f:
                 content = f.read()
             # Simple check for docstring at start
-            return """\"\"\"" in content or "'''" in content
+            has_triple_double = '"""' in content
+            has_triple_single = "'''" in content
+            return has_triple_double or has_triple_single
         except:
             return False
