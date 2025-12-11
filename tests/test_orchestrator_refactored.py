@@ -102,10 +102,10 @@ class TestDataManager:
         """Create DataManager instance."""
         return DataManager()
 
-    def test_cache_data(self, manager):
-        """Test caching data."""
+    def test_set_data(self, manager):
+        """Test setting (caching) data."""
         data = {'key': 'value'}
-        manager.cache('test_key', data)
+        manager.set('test_key', data)
         
         assert manager.get('test_key') == data
 
@@ -117,13 +117,13 @@ class TestDataManager:
         """Test get_or_default with fallback."""
         assert manager.get_or_default('nonexistent', 'default') == 'default'
         
-        manager.cache('test', 'value')
+        manager.set('test', 'value')
         assert manager.get_or_default('test', 'default') == 'value'
 
     def test_get_dataframe(self, manager):
         """Test retrieving cached DataFrame."""
         df = pd.DataFrame({'a': [1, 2, 3]})
-        manager.cache('df', df)
+        manager.set('df', df)
         
         result = manager.get_dataframe('df')
         assert isinstance(result, pd.DataFrame)
@@ -131,7 +131,7 @@ class TestDataManager:
 
     def test_get_dataframe_wrong_type_raises_error(self, manager):
         """Test get_dataframe raises error for non-DataFrame."""
-        manager.cache('not_df', {'key': 'value'})
+        manager.set('not_df', {'key': 'value'})
         
         with pytest.raises(DataError):
             manager.get_dataframe('not_df')
@@ -140,12 +140,12 @@ class TestDataManager:
         """Test checking if data exists."""
         assert not manager.exists('test')
         
-        manager.cache('test', 'value')
+        manager.set('test', 'value')
         assert manager.exists('test')
 
     def test_delete(self, manager):
         """Test deleting cached data."""
-        manager.cache('test', 'value')
+        manager.set('test', 'value')
         assert manager.exists('test')
         
         assert manager.delete('test') is True
@@ -156,8 +156,8 @@ class TestDataManager:
 
     def test_clear(self, manager):
         """Test clearing all cache."""
-        manager.cache('test1', 'value1')
-        manager.cache('test2', 'value2')
+        manager.set('test1', 'value1')
+        manager.set('test2', 'value2')
         
         assert manager.get_count() == 2
         
@@ -166,8 +166,8 @@ class TestDataManager:
 
     def test_list_keys(self, manager):
         """Test listing cache keys."""
-        manager.cache('key1', 'value1')
-        manager.cache('key2', 'value2')
+        manager.set('key1', 'value1')
+        manager.set('key2', 'value2')
         
         keys = manager.list_keys()
         assert 'key1' in keys
@@ -176,8 +176,8 @@ class TestDataManager:
 
     def test_get_summary(self, manager):
         """Test data manager summary."""
-        manager.cache('key1', 'string_value')
-        manager.cache('key2', {'dict': 'value'})
+        manager.set('key1', 'string_value')
+        manager.set('key2', {'dict': 'value'})
         
         summary = manager.get_summary()
         
