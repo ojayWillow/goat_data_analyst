@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import AgentError
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class ActionRecommender:
@@ -32,6 +33,7 @@ class ActionRecommender:
         self.name = "ActionRecommender"
         self.logger = get_logger("ActionRecommender")
         self.structured_logger = get_structured_logger("ActionRecommender")
+        self.error_intelligence = ErrorIntelligence()
         self.logger.info("ActionRecommender worker initialized")
 
     def recommend_for_anomalies(self, problem: Dict[str, Any]) -> Dict[str, Any]:
@@ -308,44 +310,64 @@ class ActionRecommender:
         Returns:
             List of recommendation dicts, sorted by priority (highest first)
         """
-        self.logger.info(f"Generating recommendations for {len(problems)} problems")
+        try:
+            self.logger.info(f"Generating recommendations for {len(problems)} problems")
 
-        recommendations = []
+            recommendations = []
 
-        for problem in problems:
-            problem_type = problem.get('type')
+            for problem in problems:
+                problem_type = problem.get('type')
 
-            if problem_type == 'anomalies':
-                rec = self.recommend_for_anomalies(problem)
-            elif problem_type == 'missing_data':
-                rec = self.recommend_for_missing_data(problem)
-            elif problem_type == 'low_prediction_confidence':
-                rec = self.recommend_for_prediction(problem)
-            elif problem_type == 'skewed_distribution':
-                rec = self.recommend_for_distribution(problem)
-            else:
-                rec = None
+                if problem_type == 'anomalies':
+                    rec = self.recommend_for_anomalies(problem)
+                elif problem_type == 'missing_data':
+                    rec = self.recommend_for_missing_data(problem)
+                elif problem_type == 'low_prediction_confidence':
+                    rec = self.recommend_for_prediction(problem)
+                elif problem_type == 'skewed_distribution':
+                    rec = self.recommend_for_distribution(problem)
+                else:
+                    rec = None
 
-            if rec:
-                rec['problem_type'] = problem_type
-                recommendations.append(rec)
+                if rec:
+                    rec['problem_type'] = problem_type
+                    recommendations.append(rec)
 
-        # Sort by priority (highest first)
-        recommendations.sort(key=lambda x: x['priority'], reverse=True)
+            # Sort by priority (highest first)
+            recommendations.sort(key=lambda x: x['priority'], reverse=True)
 
-        self.logger.info(f"Generated {len(recommendations)} recommendations")
-        self.structured_logger.info("Recommendations generated", {
-            'total': len(recommendations),
-            'by_priority': {
-                5: sum(1 for r in recommendations if r['priority'] == 5),
-                4: sum(1 for r in recommendations if r['priority'] == 4),
-                3: sum(1 for r in recommendations if r['priority'] == 3),
-                2: sum(1 for r in recommendations if r['priority'] == 2),
-                1: sum(1 for r in recommendations if r['priority'] == 1)
-            }
-        })
+            self.logger.info(f"Generated {len(recommendations)} recommendations")
+            self.structured_logger.info("Recommendations generated", {
+                'total': len(recommendations),
+                'by_priority': {
+                    5: sum(1 for r in recommendations if r['priority'] == 5),
+                    4: sum(1 for r in recommendations if r['priority'] == 4),
+                    3: sum(1 for r in recommendations if r['priority'] == 3),
+                    2: sum(1 for r in recommendations if r['priority'] == 2),
+                    1: sum(1 for r in recommendations if r['priority'] == 1)
+                }
+            })
+            
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="narrative_generator",
+                worker_name="ActionRecommender",
+                operation="recommend_for_all_problems",
+                context={"total_recommendations": len(recommendations)}
+            )
 
-        return recommendations
+            return recommendations
+            
+        except Exception as e:
+            self.logger.error(f"Error in recommend_for_all_problems: {e}")
+            self.error_intelligence.track_error(
+                agent_name="narrative_generator",
+                worker_name="ActionRecommender",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"operation": "recommend_for_all_problems"}
+            )
+            raise
 
     # === HELPER METHODS ===
 
