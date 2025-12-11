@@ -166,10 +166,15 @@ class ProjectManager:
             dep_consistency_score = self.dependency_consistency.get("consistency_score", 0)
             self.logger.info(f"   Dependency consistency: {dep_consistency_score:.1f}/100")
 
-            # 12. Generate health report
+            # 12. Generate health report (with ALL results for honest scoring)
             self.logger.info("[HEALTH] Generating honest health report...")
+            all_results = self.get_intermediate_report()
             self.report = self.reporter.generate_report(
-                self.structure, self.patterns, self.changes, self.code_analysis
+                self.structure,
+                self.patterns,
+                self.changes,
+                self.code_analysis,
+                all_results  # Pass ALL results for honest composite score
             )
             self.logger.info(f"   Health: {self.report['health_score']}/100 {self.report['status']}")
 
@@ -178,6 +183,22 @@ class ProjectManager:
         except Exception as e:
             self.logger.error(f"ProjectManager execution failed: {e}")
             raise
+
+    def get_intermediate_report(self) -> Dict[str, Any]:
+        """Get intermediate report with all health metrics (before final synthesis)."""
+        return {
+            "structure": self.structure,
+            "patterns": self.patterns,
+            "code_analysis": self.code_analysis,
+            "architecture": self.architecture,
+            "dependencies": self.dependencies,
+            "error_intelligence": self.error_intelligence,
+            "error_handling": self.error_handling,
+            "integrations": self.integrations,
+            "contracts": self.contracts,
+            "dependency_consistency": self.dependency_consistency,
+            "health": {"summary": {}},  # Placeholder for initial health summary
+        }
 
     def get_report(self) -> Dict[str, Any]:
         """Get complete project analysis report."""
@@ -217,7 +238,7 @@ class ProjectManager:
         return summary
 
     def print_report(self) -> None:
-        """Print formatted report to console."""
+        """Print formatted HONEST health report to console."""
         if not self.report:
             print("No report generated. Call execute() first.")
             return
@@ -226,8 +247,10 @@ class ProjectManager:
         print(f"PROJECT HEALTH REPORT - {self.report['status']}")
         print("="*70)
         
-        # Health Score
-        print(f"\n[HEALTH] Score: {self.report['health_score']}/100")
+        # Health Score (now HONEST)
+        print(f"\n[HONEST HEALTH] Score: {self.report['health_score']}/100")
+        print(f"   Based on composite of: EI, Error Handling, Integration,")
+        print(f"   Contracts, Dependencies, Code Quality, & Testing")
         
         # Summary
         print(f"\n[SUMMARY]")
@@ -277,10 +300,6 @@ class ProjectManager:
         # Architecture
         if self.architecture:
             print(f"\n[ARCH] Architecture Score: {self.architecture.get('overall_score', 0):.1f}/100")
-            if self.architecture.get("issues"):
-                print(f"   Issues: {len(self.architecture['issues'])}")
-                for issue in self.architecture["issues"][:3]:
-                    print(f"   - {issue}")
         
         # Code Quality
         if self.code_analysis:
@@ -294,11 +313,11 @@ class ProjectManager:
             print(f"   Type Hints: {avg_type_hints:.0f}%")
             print(f"   Docstrings: {avg_docstrings:.0f}%")
         
-        # Recommendations
+        # DYNAMIC Recommendations (based on actual gaps)
         if self.report["recommendations"]:
-            print(f"\n[RECOMMENDATIONS]")
+            print(f"\n[DYNAMIC RECOMMENDATIONS]")
             for rec in self.report["recommendations"]:
-                print(f"   - {rec}")
+                print(f"   {rec}")
         
         print("\n" + "="*70 + "\n")
 
