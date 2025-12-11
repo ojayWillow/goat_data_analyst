@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from agents.aggregator.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,7 @@ class WindowFunction(BaseWorker):
     def __init__(self):
         """Initialize WindowFunction."""
         super().__init__("WindowFunction")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(
         self,
@@ -29,12 +31,39 @@ class WindowFunction(BaseWorker):
         Args:
             df: DataFrame to process
             window_size: Size of rolling window
-            operations: List of operations ('mean', 'sum', 'std', 'min', 'max')
-            **kwargs: Additional arguments
+            operations: List of operations
             
         Returns:
             WorkerResult with windowed data
         """
+        try:
+            result = self._calculate_window(df, window_size, operations, **kwargs)
+            
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="WindowFunction",
+                error_type="SUCCESS",
+                error_message="Window functions successful",
+                context={"operation": "window_functions"}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="WindowFunction",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={
+                    "operation": "window_functions",
+                    "window_size": window_size,
+                }
+            )
+            raise
+    
+    def _calculate_window(self, df, window_size, operations, **kwargs) -> WorkerResult:
+        """Perform window function calculation."""
         result = self._create_result(task_type="window_functions")
         
         if df is None:
@@ -46,7 +75,6 @@ class WindowFunction(BaseWorker):
             operations = ['mean']
         
         try:
-            # Select numeric columns
             numeric_df = df.select_dtypes(include=[np.number])
             
             if numeric_df.empty:

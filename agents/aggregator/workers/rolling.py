@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -18,6 +19,7 @@ class RollingWorker(BaseWorker):
     
     def __init__(self):
         super().__init__("RollingWorker")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Perform rolling aggregation.
@@ -26,14 +28,39 @@ class RollingWorker(BaseWorker):
             df: DataFrame to analyze
             column: Column to aggregate
             window: Rolling window size
-            aggfunc: Aggregation function ('mean', 'sum', 'min', 'max')
+            aggfunc: Aggregation function
             
         Returns:
             WorkerResult with rolling aggregation
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._perform_rolling(**kwargs)
+            
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="RollingWorker",
+                error_type="SUCCESS",
+                error_message="Rolling aggregation successful",
+                context={"operation": "rolling_aggregation"}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="RollingWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={
+                    "operation": "rolling_aggregation",
+                    "column": kwargs.get('column'),
+                    "window": kwargs.get('window'),
+                }
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
+    def _perform_rolling(self, **kwargs) -> WorkerResult:
         """Perform rolling window operation."""
         df = kwargs.get('df')
         column = kwargs.get('column')
@@ -45,7 +72,6 @@ class RollingWorker(BaseWorker):
             quality_score=1.0
         )
         
-        # Validate data
         if df is None or df.empty:
             self._add_error(
                 result,
@@ -61,7 +87,6 @@ class RollingWorker(BaseWorker):
         try:
             self.logger.info(f"Rolling {aggfunc} on '{column}' with window={window}")
             
-            # Validate required parameters
             if not column or not window:
                 self._add_error(
                     result,
@@ -74,7 +99,6 @@ class RollingWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
-            # Validate column exists
             if column not in df.columns:
                 self._add_error(
                     result,
@@ -87,7 +111,6 @@ class RollingWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
-            # Validate window size
             if not isinstance(window, int) or window < 1:
                 self._add_error(
                     result,
@@ -100,14 +123,12 @@ class RollingWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
-            # Validate column is numeric
             if not pd.api.types.is_numeric_dtype(df[column]):
                 self._add_warning(
                     result,
                     f"Column '{column}' is not numeric, conversion may occur"
                 )
             
-            # Apply rolling aggregation
             rolling_result = df[column].rolling(window=window).agg(aggfunc)
             
             result_df = pd.DataFrame({

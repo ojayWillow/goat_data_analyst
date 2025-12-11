@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -18,6 +19,7 @@ class PivotWorker(BaseWorker):
     
     def __init__(self):
         super().__init__("PivotWorker")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Create pivot table.
@@ -32,9 +34,34 @@ class PivotWorker(BaseWorker):
         Returns:
             WorkerResult with pivot table
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._create_pivot(**kwargs)
+            
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="PivotWorker",
+                error_type="SUCCESS",
+                error_message="Pivot table created successfully",
+                context={"operation": "pivot_table"}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="PivotWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={
+                    "operation": "pivot_table",
+                    "index": kwargs.get('index'),
+                    "columns": kwargs.get('columns'),
+                }
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
+    def _create_pivot(self, **kwargs) -> WorkerResult:
         """Perform pivot table operation."""
         df = kwargs.get('df')
         index = kwargs.get('index')
@@ -47,7 +74,6 @@ class PivotWorker(BaseWorker):
             quality_score=1.0
         )
         
-        # Validate data
         if df is None or df.empty:
             self._add_error(
                 result,
@@ -63,7 +89,6 @@ class PivotWorker(BaseWorker):
         try:
             self.logger.info(f"Creating pivot table: index={index}, columns={columns}, values={values}")
             
-            # Validate required parameters
             if not index or not columns or not values:
                 self._add_error(
                     result,
@@ -76,7 +101,6 @@ class PivotWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
-            # Validate columns exist
             required_cols = [index, columns, values]
             missing_cols = [col for col in required_cols if col not in df.columns]
             if missing_cols:
@@ -91,7 +115,6 @@ class PivotWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
-            # Create pivot table
             pivot = pd.pivot_table(
                 df,
                 index=index,
