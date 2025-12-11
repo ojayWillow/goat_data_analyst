@@ -16,6 +16,7 @@
   ],
   "tests": [
     "test_action_recommender",
+    "test_aggregator",
     "test_anomaly_detector",
     "test_anomaly_detector_day1",
     "test_config_hardening",
@@ -25,7 +26,11 @@
     "test_data_loader_week2_edge_cases",
     "test_data_loader_week2_performance",
     "test_data_loader_week2_performance_fixed",
+    "test_end_to_end",
+    "test_error_intelligence",
+    "test_error_intelligence_aggregator",
     "test_error_recovery",
+    "test_explorer",
     "test_explorer_advanced_analysis",
     "test_explorer_summary",
     "test_explorer_week1",
@@ -35,6 +40,7 @@
     "test_integration_day5",
     "test_integration_week1",
     "test_integration_week1_day5",
+    "test_orchestrator_integration",
     "test_orchestrator_narrative_integration",
     "test_orchestrator_refactored",
     "test_performance",
@@ -42,11 +48,14 @@
     "test_predictor_day2",
     "test_problem_identifier",
     "test_project_manager",
+    "test_recommender",
     "test_recommender_day3",
+    "test_reporter",
     "test_reporter_day4",
     "test_report_generator",
     "test_story_builder",
     "test_structured_logger",
+    "test_visualizer",
     "test_visualizer_day5"
   ],
   "core_systems": [
@@ -57,5 +66,5 @@
     "structured_logger",
     "validators"
   ],
-  "timestamp": "2025-12-11T14:29:18.208070"
+  "timestamp": "2025-12-11T14:33:00.000000"
 }
