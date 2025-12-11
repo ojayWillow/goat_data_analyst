@@ -68,6 +68,7 @@ class Predictor:
     
     # ===== DATA MANAGEMENT =====
     
+    @retry_on_error(max_attempts=2, backoff=1)
     def set_data(self, df: pd.DataFrame) -> None:
         """Store DataFrame for all workers to use.
         
@@ -84,6 +85,7 @@ class Predictor:
             "dtypes": dict(df.dtypes.astype(str).value_counts())
         })
     
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_data(self) -> Optional[pd.DataFrame]:
         """Retrieve the stored DataFrame.
         
@@ -337,6 +339,7 @@ class Predictor:
     
     # ===== SUMMARY & REPORTING =====
     
+    @retry_on_error(max_attempts=2, backoff=1)
     def summary_report(self) -> Dict[str, Any]:
         """Generate summary of all predictions.
         
