@@ -5,6 +5,7 @@ import pandas as pd
 
 from agents.data_loader.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -15,6 +16,7 @@ class FormatDetection(BaseWorker):
     def __init__(self):
         """Initialize FormatDetection."""
         super().__init__("FormatDetection")
+        self.error_intelligence = ErrorIntelligence()
         self.supported_formats = {'.csv', '.json', '.xlsx', '.xls', '.parquet', '.pkl'}
     
     def execute(self, file_path: str = None, **kwargs) -> WorkerResult:
@@ -27,6 +29,30 @@ class FormatDetection(BaseWorker):
         Returns:
             WorkerResult with detected format
         """
+        try:
+            result = self._run_format_detection(file_path=file_path, **kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="data_loader",
+                worker_name="FormatDetection",
+                operation="format_detection",
+                context={"file_path": file_path}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="data_loader",
+                worker_name="FormatDetection",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"file_path": file_path}
+            )
+            raise
+    
+    def _run_format_detection(self, file_path: str = None, **kwargs) -> WorkerResult:
+        """Perform format detection."""
         result = self._create_result(task_type="format_detection")
         
         if not file_path:
