@@ -82,6 +82,7 @@ class AnomalyDetector:
 
     # === DATA MANAGEMENT ===
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def set_data(self, df: pd.DataFrame) -> None:
         """Store the DataFrame for anomaly detection.
         
@@ -98,6 +99,7 @@ class AnomalyDetector:
             "numeric_cols": len(df.select_dtypes(include=['number']).columns)
         })
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_data(self) -> Optional[pd.DataFrame]:
         """Retrieve the stored DataFrame.
         
@@ -318,6 +320,7 @@ class AnomalyDetector:
 
     # === REPORTING ===
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def summary_report(self) -> Dict[str, Any]:
         """Get summary of all anomaly detections.
         
@@ -352,6 +355,7 @@ class AnomalyDetector:
 
         return report
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_summary(self) -> str:
         """Get human-readable info about the agent state.
         
