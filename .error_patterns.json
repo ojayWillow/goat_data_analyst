@@ -1,0 +1,14 @@
+{
+  "aggregator": {
+    "total_runs": 3,
+    "successes": 3,
+    "failures": 0,
+    "workers": {
+      "StatisticsWorker": {
+        "successes": 3,
+        "failures": 0,
+        "errors": []
+      }
+    }
+  }
+}

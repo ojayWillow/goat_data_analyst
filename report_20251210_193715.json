@@ -1,0 +1,18 @@
+{
+  "report_type": "executive_summary",
+  "generated_at": "2025-12-10T19:37:15.099187+00:00",
+  "dataset_info": {
+    "rows": 50,
+    "columns": 3,
+    "numeric_columns": 2,
+    "categorical_columns": 1,
+    "total_cells": 150
+  },
+  "data_quality": {
+    "quality_rating": "Excellent",
+    "null_percentage": 0.0,
+    "duplicate_count": 0,
+    "duplicate_percentage": 0.0
+  },
+  "summary_statement": "Dataset contains 50 rows and 3 columns with Excellent data quality."
+}

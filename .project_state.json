@@ -1,21 +1,61 @@
 {
   "agents": [
+    "aggregator",
     "anomaly_detector",
     "data_loader",
+    "error_intelligence",
     "explorer",
+    "narrative_generator",
     "orchestrator",
     "predictor",
+    "project_manager",
     "recommender",
     "reporter",
-    "visualizer",
-    "aggregator",
-    "project_manager"
+    "report_generator",
+    "visualizer"
   ],
   "tests": [
+    "test_action_recommender",
+    "test_anomaly_detector",
+    "test_anomaly_detector_day1",
+    "test_config_hardening",
     "test_data_loader",
+    "test_data_loader_week1",
+    "test_data_loader_week2",
+    "test_data_loader_week2_edge_cases",
+    "test_data_loader_week2_performance",
+    "test_data_loader_week2_performance_fixed",
+    "test_error_recovery",
+    "test_explorer_advanced_analysis",
     "test_explorer_summary",
+    "test_explorer_week1",
     "test_explorer_workers",
-    "test_project_manager"
+    "test_insight_extractor",
+    "test_integration",
+    "test_integration_day5",
+    "test_integration_week1",
+    "test_integration_week1_day5",
+    "test_orchestrator_narrative_integration",
+    "test_orchestrator_refactored",
+    "test_performance",
+    "test_predictor",
+    "test_predictor_day2",
+    "test_problem_identifier",
+    "test_project_manager",
+    "test_recommender_day3",
+    "test_reporter_day4",
+    "test_report_generator",
+    "test_story_builder",
+    "test_structured_logger",
+    "test_visualizer_day5"
   ],
-  "timestamp": "2025-12-09T11:24:13.644136"
+  "core_systems": [
+    "config",
+    "error_recovery",
+    "exceptions",
+    "logger",
+    "structured_logger",
+    "validators"
+  ],
+  "timestamp": "2025-12-11T14:17:51.101254"
 }
