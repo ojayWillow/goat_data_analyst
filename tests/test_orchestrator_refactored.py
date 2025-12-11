@@ -18,7 +18,8 @@ from agents.orchestrator import (
     TaskRouter,
     WorkflowExecutor
 )
-from core.exceptions import OrchestratorError, AgentError, DataError
+from core.exceptions import OrchestratorError, AgentError, DataLoadError
+from core.error_recovery import RecoveryError
 
 
 class TestAgentRegistry:
@@ -46,7 +47,7 @@ class TestAgentRegistry:
         
         registry.register("test_agent", mock_agent)
         
-        with pytest.raises(AgentError):
+        with pytest.raises(RecoveryError):
             registry.register("test_agent", mock_agent)
 
     def test_get_nonexistent_agent_returns_none(self, registry):
@@ -133,7 +134,7 @@ class TestDataManager:
         """Test get_dataframe raises error for non-DataFrame."""
         manager.set('not_df', {'key': 'value'})
         
-        with pytest.raises(DataError):
+        with pytest.raises(DataLoadError):
             manager.get_dataframe('not_df')
 
     def test_exists(self, manager):
@@ -202,14 +203,14 @@ class TestTaskRouter:
         """Test routing unknown task type fails."""
         task = {'type': 'unknown_task', 'parameters': {}}
         
-        with pytest.raises(OrchestratorError):
+        with pytest.raises(RecoveryError):
             setup['router'].route(task)
 
     def test_route_missing_agent_fails(self, setup):
         """Test routing to missing agent fails."""
         task = {'type': 'load_data', 'parameters': {'file_path': 'test.csv'}}
         
-        with pytest.raises(OrchestratorError):
+        with pytest.raises(RecoveryError):
             setup['router'].route(task)
 
     def test_route_load_data_missing_file_path_fails(self, setup):
@@ -219,7 +220,7 @@ class TestTaskRouter:
         
         task = {'type': 'load_data', 'parameters': {}}
         
-        with pytest.raises(OrchestratorError):
+        with pytest.raises(RecoveryError):
             setup['router'].route(task)
 
 
@@ -299,7 +300,7 @@ class TestWorkflowExecutor:
             {'type': 'task3', 'parameters': {}}
         ]
         
-        with pytest.raises(OrchestratorError):
+        with pytest.raises(RecoveryError):
             executor.execute(workflow_tasks)
 
     def test_list_workflows(self, executor):
