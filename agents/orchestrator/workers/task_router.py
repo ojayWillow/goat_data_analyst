@@ -12,6 +12,7 @@ from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import OrchestratorError
 from core.error_recovery import retry_on_error
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class TaskRouter:
@@ -31,6 +32,7 @@ class TaskRouter:
         self.name = "TaskRouter"
         self.logger = get_logger("TaskRouter")
         self.structured_logger = get_structured_logger("TaskRouter")
+        self.error_intelligence = ErrorIntelligence()
         self.agent_registry = agent_registry
         self.data_manager = data_manager
         self.logger.info("TaskRouter initialized")
@@ -60,41 +62,58 @@ class TaskRouter:
         try:
             # Data Loading
             if task_type == 'load_data':
-                return self._route_load_data(params)
+                result = self._route_load_data(params)
             
             # Exploration
             elif task_type == 'explore_data':
-                return self._route_explore_data(params)
+                result = self._route_explore_data(params)
             
             # Aggregation
             elif task_type == 'aggregate_data':
-                return self._route_aggregate_data(params)
+                result = self._route_aggregate_data(params)
             
             # Anomaly Detection
             elif task_type == 'detect_anomalies':
-                return self._route_detect_anomalies(params)
+                result = self._route_detect_anomalies(params)
             
             # Prediction
             elif task_type == 'predict':
-                return self._route_predict(params)
+                result = self._route_predict(params)
             
             # Recommendation
             elif task_type == 'get_recommendations':
-                return self._route_recommendations(params)
+                result = self._route_recommendations(params)
             
             # Visualization
             elif task_type == 'visualize_data':
-                return self._route_visualize_data(params)
+                result = self._route_visualize_data(params)
             
             # Reporting
             elif task_type == 'generate_report':
-                return self._route_generate_report(params)
+                result = self._route_generate_report(params)
             
             else:
                 raise OrchestratorError(f"Unknown task type: {task_type}")
+            
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="orchestrator",
+                worker_name="TaskRouter",
+                operation="route_task",
+                context={"task_type": task_type}
+            )
+            
+            return result
         
         except Exception as e:
             self.logger.error(f"Task routing failed: {e}")
+            self.error_intelligence.track_error(
+                agent_name="orchestrator",
+                worker_name="TaskRouter",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"task_type": task_type}
+            )
             raise OrchestratorError(f"Failed to route task '{task_type}': {e}")
 
     def _route_load_data(self, params: Dict[str, Any]) -> Any:
@@ -116,7 +135,7 @@ class TaskRouter:
         
         # Cache the loaded data
         if result.get('status') == 'success':
-            self.data_manager.cache('loaded_data', result['data'])
+            self.data_manager.set('loaded_data', result['data'])
         
         return result
 
