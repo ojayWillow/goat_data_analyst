@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.neighbors import LocalOutlierFactor
 from agents.anomaly_detector.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -15,6 +16,7 @@ class LOF(BaseWorker):
     def __init__(self):
         """Initialize LOF."""
         super().__init__("LOF")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(
         self,
@@ -34,6 +36,30 @@ class LOF(BaseWorker):
         Returns:
             WorkerResult with anomaly scores
         """
+        try:
+            result = self._run_lof(df, n_neighbors, contamination, **kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="anomaly_detector",
+                worker_name="LOF",
+                operation="lof_detection",
+                context={"n_neighbors": n_neighbors, "contamination": contamination}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="anomaly_detector",
+                worker_name="LOF",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"n_neighbors": n_neighbors, "contamination": contamination}
+            )
+            raise
+    
+    def _run_lof(self, df, n_neighbors, contamination, **kwargs) -> WorkerResult:
+        """Perform LOF anomaly detection."""
         result = self._create_result(task_type="lof_detection")
         
         if df is None:
