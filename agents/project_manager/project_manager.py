@@ -3,12 +3,13 @@
 Auto-discovers agents, learns patterns, validates architecture,
 monitors health, analyzes code, and generates actionable insights.
 
-V3 Enhancements (Honest Health Reporting):
+V3 Enhancements (Honest Health Reporting + Retry Coverage):
 - ErrorIntelligenceChecker: Detect which agents have EI
 - ErrorHandlingAuditor: Audit error patterns
 - IntegrationTester: Test agent integration
 - ContractValidator: Validate API contracts
 - DependencyConsistencyChecker: Check import consistency
+- RetryErrorRecoveryChecker: Audit @retry_on_error coverage (NEW)
 
 Result: Honest health scores that show ACTUAL gaps A-Z
 """
@@ -32,6 +33,7 @@ from .workers import (
     IntegrationTester,
     ContractValidator,
     DependencyConsistencyChecker,
+    RetryErrorRecoveryChecker,
 )
 
 
@@ -55,13 +57,14 @@ class ProjectManager:
     - IntegrationTester: Tests agent integrations
     - ContractValidator: Validates API contracts
     - DependencyConsistencyChecker: Checks import consistency
+    - RetryErrorRecoveryChecker: Audits @retry_on_error coverage (NEW)
     """
 
     def __init__(self):
         self.logger = get_logger("ProjectManager")
         self.project_root = Path(__file__).parent.parent.parent
 
-        # Initialize workers (8 original + 5 new)
+        # Initialize workers (8 original + 5 new + 1 retry)
         self.scanner = StructureScanner(self.logger)
         self.learner = PatternLearner(self.logger)
         self.validator = PatternValidator(self.logger)
@@ -77,6 +80,9 @@ class ProjectManager:
         self.integration_tester = IntegrationTester(self.logger)
         self.contract_validator = ContractValidator(self.logger)
         self.dep_consistency = DependencyConsistencyChecker(self.logger)
+        
+        # New worker for retry coverage
+        self.retry_checker = RetryErrorRecoveryChecker(self.logger)
 
         # Storage
         self.structure = {}
@@ -91,6 +97,7 @@ class ProjectManager:
         self.integrations = {}
         self.contracts = {}
         self.dependency_consistency = {}
+        self.retry_error_recovery = {}
 
     def execute(self) -> Dict[str, Any]:
         """Execute complete project analysis."""
@@ -166,7 +173,13 @@ class ProjectManager:
             dep_consistency_score = self.dependency_consistency.get("consistency_score", 0)
             self.logger.info(f"   Dependency consistency: {dep_consistency_score:.1f}/100")
 
-            # 12. Generate health report (with ALL results for honest scoring)
+            # 12. Check Retry Error Recovery Coverage (NEW)
+            self.logger.info("[RETRY] Checking @retry_on_error coverage...")
+            self.retry_error_recovery = self.retry_checker.audit_agents(self.structure)
+            retry_coverage = self.retry_error_recovery.get("coverage_percentage", 0)
+            self.logger.info(f"   Retry error recovery coverage: {retry_coverage}%")
+
+            # 13. Generate health report (with ALL results for honest scoring)
             self.logger.info("[HEALTH] Generating honest health report...")
             all_results = self.get_intermediate_report()
             self.report = self.reporter.generate_report(
@@ -197,6 +210,7 @@ class ProjectManager:
             "integrations": self.integrations,
             "contracts": self.contracts,
             "dependency_consistency": self.dependency_consistency,
+            "retry_error_recovery": self.retry_error_recovery,
             "health": {"summary": {}},  # Placeholder for initial health summary
         }
 
@@ -214,6 +228,7 @@ class ProjectManager:
             "integrations": self.integrations,
             "contracts": self.contracts,
             "dependency_consistency": self.dependency_consistency,
+            "retry_error_recovery": self.retry_error_recovery,
             "health": self.report,
             "timestamp": datetime.now().isoformat(),
         }
@@ -256,6 +271,26 @@ class ProjectManager:
         print(f"\n[SUMMARY]")
         for key, value in self.report["summary"].items():
             print(f"   {key}: {value}")
+        
+        # Retry Error Recovery Coverage (NEW)
+        if self.retry_error_recovery:
+            print(f"\n[RETRY ERROR RECOVERY]")
+            retry_coverage = self.retry_error_recovery.get("coverage_percentage", 0)
+            print(f"   Coverage: {retry_coverage}% ({self.retry_error_recovery.get('with_retry_error_recovery', 0)}/{self.retry_error_recovery.get('total_agents', 0)} agents)")
+            print(f"   Status: {self.retry_error_recovery.get('status')}")
+            
+            # Show agents with retry
+            if self.retry_error_recovery.get("agents_with_retry"):
+                print(f"   ✅ With @retry_on_error:")
+                for agent_name, info in self.retry_error_recovery["agents_with_retry"].items():
+                    print(f"      • {agent_name} ({info.get('decorated_count', 0)}/{info.get('public_methods_count', 0)} methods)")
+            
+            # Show agents without retry
+            if self.retry_error_recovery.get("agents_without_retry"):
+                print(f"   ❌ Missing @retry_on_error:")
+                for agent_name, info in self.retry_error_recovery["agents_without_retry"].items():
+                    methods = info.get("public_methods", [])
+                    print(f"      • {agent_name} ({len(methods)} methods need retry)")
         
         # Error Intelligence Coverage
         if self.error_intelligence:
