@@ -59,7 +59,7 @@ class TestNarrativeIntegrator:
             'executive_summary': 'Test summary',
             'problem_statement': 'Test problem',
             'action_plan': 'Test action',
-            'full_narrative': 'This is a test narrative that is long enough to validate.'
+            'full_narrative': 'This is a comprehensive test narrative that is sufficiently long to validate the length requirements. It contains important information about data analysis results and recommendations.'
         }
         
         validation = integrator.validate_narrative(narrative)
@@ -243,7 +243,7 @@ class TestNarrativeValidation:
             'executive_summary': 'This is a test summary',
             'problem_statement': 'This is a test problem statement',
             'action_plan': 'This is a test action plan with multiple items',
-            'full_narrative': 'This is a complete narrative that is long enough to pass the length check.'
+            'full_narrative': 'This is a complete and comprehensive narrative that is long enough to pass validation checks. It includes detailed analysis results and strategic recommendations for improvement.'
         }
         
         validation = integrator.validate_narrative(narrative)
