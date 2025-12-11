@@ -6,6 +6,7 @@ from sklearn.svm import OneClassSVM
 from sklearn.preprocessing import StandardScaler
 from agents.anomaly_detector.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,7 @@ class OneClassSVM(BaseWorker):
     def __init__(self):
         """Initialize OneClassSVM."""
         super().__init__("OneClassSVM")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(
         self,
@@ -35,6 +37,30 @@ class OneClassSVM(BaseWorker):
         Returns:
             WorkerResult with anomaly predictions
         """
+        try:
+            result = self._run_ocsvm(df, nu, kernel, **kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="anomaly_detector",
+                worker_name="OneClassSVM",
+                operation="ocsvm_detection",
+                context={"nu": nu, "kernel": kernel}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="anomaly_detector",
+                worker_name="OneClassSVM",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"nu": nu, "kernel": kernel}
+            )
+            raise
+    
+    def _run_ocsvm(self, df, nu, kernel, **kwargs) -> WorkerResult:
+        """Perform One-Class SVM detection."""
         result = self._create_result(task_type="ocsvm_detection")
         
         if df is None:
