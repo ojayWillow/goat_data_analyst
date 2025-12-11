@@ -1,13 +1,9 @@
-"""ProjectManager Agent - Self-aware project coordinator.
+"""ProjectManager Agent - Enterprise-grade project coordinator.
 
-Features:
-- Auto-discovers project structure
-- Learns patterns from existing code
-- Validates new agents automatically
-- Tracks changes and health
-- Zero maintenance - grows with project
+Auto-discovers agents, learns patterns, validates architecture,
+monitors health, and generates actionable insights.
 """
 
 from .project_manager import ProjectManager
 
-__all__ = ['ProjectManager']
+__all__ = ["ProjectManager"]
