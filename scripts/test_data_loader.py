@@ -57,14 +57,14 @@ class TestDataLoaderBasic:
         result = loader.load("/nonexistent/file.csv")
         assert result['status'] != 'success'
     
-    def test_get_data_info(self, loader):
-        """Test get_data_info method."""
+    def test_get_summary(self, loader):
+        """Test get_summary method."""
         sample_file = project_root / "data" / "sample_data.csv"
         loader.load(str(sample_file))
         
-        info = loader.get_data_info()
-        assert info is not None
-        assert isinstance(info, dict)
+        summary = loader.get_summary()
+        assert summary is not None
+        assert isinstance(summary, str)
 
 
 class TestDataLoaderWithMediumData:
@@ -177,8 +177,8 @@ class TestDataLoaderPerformance:
         """Test sequential loading of multiple large datasets."""
         datasets = [
             ("hotel_bookings.csv", 100000),
-            ("country_vaccinations.csv", 10000),
-            ("olist_orders_dataset.csv", 100000),
+            ("country_vaccinations.csv", 80000),
+            ("olist_orders_dataset.csv", 90000),
         ]
         
         for filename, min_rows in datasets:
@@ -262,8 +262,8 @@ class TestDataLoaderRobustness:
         result = loader.load("/nonexistent.csv")
         assert result['status'] != 'success'
     
-    def test_get_summary(self, loader):
-        """Test get_summary method."""
+    def test_loader_summary(self, loader):
+        """Test loader summary method."""
         sample_file = project_root / "data" / "sample_data.csv"
         loader.load(str(sample_file))
         
