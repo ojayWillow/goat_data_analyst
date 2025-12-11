@@ -2,6 +2,7 @@
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, List, Optional
