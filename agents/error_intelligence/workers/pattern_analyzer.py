@@ -12,14 +12,18 @@ class PatternAnalyzer:
 
     def __init__(self):
         """Initialize pattern analyzer."""
-        # Import here to avoid circular dependency
-        try:
-            from agents.error_intelligence.main import ErrorIntelligence
-            self.error_intelligence = ErrorIntelligence()
-        except ImportError:
-            self.error_intelligence = None
-        
+        self.error_intelligence = None  # Lazy load to avoid circular dependency
         logger.info("PatternAnalyzer worker initialized")
+
+    def _get_error_intelligence(self):
+        """Lazy load ErrorIntelligence to avoid circular dependency."""
+        if self.error_intelligence is None:
+            try:
+                from agents.error_intelligence.main import ErrorIntelligence
+                self.error_intelligence = ErrorIntelligence()
+            except ImportError:
+                pass
+        return self.error_intelligence
 
     def analyze(self, error_patterns: Dict[str, Any]) -> Dict[str, int]:
         """Analyze error patterns from tracked errors.
@@ -57,29 +61,10 @@ class PatternAnalyzer:
             result = dict(patterns.most_common())
             logger.info(f"Identified {len(result)} error patterns")
             
-            # Track success
-            if self.error_intelligence:
-                self.error_intelligence.track_success(
-                    agent_name="error_intelligence",
-                    worker_name="PatternAnalyzer",
-                    operation="analyze_patterns",
-                    context={"patterns_found": len(result)}
-                )
-            
             return result
         
         except Exception as e:
             logger.error(f"PatternAnalyzer.analyze failed: {e}")
-            
-            # Track error
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="PatternAnalyzer",
-                    error_type="analysis_error",
-                    error_message=str(e),
-                )
-            
             return {}
 
     def get_top_patterns(self, error_patterns: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
@@ -107,15 +92,6 @@ class PatternAnalyzer:
         
         except Exception as e:
             logger.error(f"PatternAnalyzer.get_top_patterns failed: {e}")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="PatternAnalyzer",
-                    error_type="get_top_patterns_error",
-                    error_message=str(e),
-                )
-            
             return []
 
     def find_patterns_by_worker(self, error_patterns: Dict[str, Any], agent: str, worker: str) -> List[Dict[str, Any]]:
@@ -149,25 +125,8 @@ class PatternAnalyzer:
                 for err_type, count in error_types.most_common()
             ]
             
-            if self.error_intelligence:
-                self.error_intelligence.track_success(
-                    agent_name="error_intelligence",
-                    worker_name="PatternAnalyzer",
-                    operation="find_patterns_by_worker",
-                    context={"agent": agent, "worker": worker, "patterns_found": len(result)}
-                )
-            
             return result
         
         except Exception as e:
             logger.error(f"PatternAnalyzer.find_patterns_by_worker failed: {e}")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="PatternAnalyzer",
-                    error_type="find_patterns_error",
-                    error_message=str(e),
-                )
-            
             return []
