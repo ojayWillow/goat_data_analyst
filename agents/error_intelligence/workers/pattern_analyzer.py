@@ -12,6 +12,13 @@ class PatternAnalyzer:
 
     def __init__(self):
         """Initialize pattern analyzer."""
+        # Import here to avoid circular dependency
+        try:
+            from agents.error_intelligence.main import ErrorIntelligence
+            self.error_intelligence = ErrorIntelligence()
+        except ImportError:
+            self.error_intelligence = None
+        
         logger.info("PatternAnalyzer worker initialized")
 
     def analyze(self, error_patterns: Dict[str, Any]) -> Dict[str, int]:
@@ -23,32 +30,57 @@ class PatternAnalyzer:
         Returns:
             Dictionary of patterns with frequencies
         """
-        patterns = Counter()
-        
-        for agent_name, agent_data in error_patterns.items():
-            if not isinstance(agent_data, dict) or 'workers' not in agent_data:
-                continue
-                
-            for worker_name, worker_data in agent_data['workers'].items():
-                if not isinstance(worker_data, dict) or 'errors' not in worker_data:
+        try:
+            patterns = Counter()
+            
+            for agent_name, agent_data in error_patterns.items():
+                if not isinstance(agent_data, dict) or 'workers' not in agent_data:
                     continue
                     
-                for error in worker_data['errors']:
-                    error_type = error.get('error_type', 'Unknown')
-                    data_type = error.get('data_type', 'Unknown')
-                    
-                    # Create pattern key
-                    pattern = f"{agent_name}.{worker_name}:{error_type}"
-                    patterns[pattern] += 1
-                    
-                    # Track by data type
-                    if data_type:
-                        pattern_by_type = f"{agent_name}.{worker_name}:{error_type}[{data_type}]"
-                        patterns[pattern_by_type] += 1
+                for worker_name, worker_data in agent_data['workers'].items():
+                    if not isinstance(worker_data, dict) or 'errors' not in worker_data:
+                        continue
+                        
+                    for error in worker_data['errors']:
+                        error_type = error.get('error_type', 'Unknown')
+                        data_type = error.get('data_type', 'Unknown')
+                        
+                        # Create pattern key
+                        pattern = f"{agent_name}.{worker_name}:{error_type}"
+                        patterns[pattern] += 1
+                        
+                        # Track by data type
+                        if data_type:
+                            pattern_by_type = f"{agent_name}.{worker_name}:{error_type}[{data_type}]"
+                            patterns[pattern_by_type] += 1
+            
+            result = dict(patterns.most_common())
+            logger.info(f"Identified {len(result)} error patterns")
+            
+            # Track success
+            if self.error_intelligence:
+                self.error_intelligence.track_success(
+                    agent_name="error_intelligence",
+                    worker_name="PatternAnalyzer",
+                    operation="analyze_patterns",
+                    context={"patterns_found": len(result)}
+                )
+            
+            return result
         
-        result = dict(patterns.most_common())
-        logger.info(f"Identified {len(result)} error patterns")
-        return result
+        except Exception as e:
+            logger.error(f"PatternAnalyzer.analyze failed: {e}")
+            
+            # Track error
+            if self.error_intelligence:
+                self.error_intelligence.track_error(
+                    agent_name="error_intelligence",
+                    worker_name="PatternAnalyzer",
+                    error_type="analysis_error",
+                    error_message=str(e),
+                )
+            
+            return {}
 
     def get_top_patterns(self, error_patterns: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
         """Get top error patterns.
@@ -60,17 +92,31 @@ class PatternAnalyzer:
         Returns:
             List of top patterns with details
         """
-        patterns = self.analyze(error_patterns)
+        try:
+            patterns = self.analyze(error_patterns)
+            
+            result = []
+            for pattern, frequency in list(patterns.items())[:limit]:
+                result.append({
+                    'pattern': pattern,
+                    'frequency': frequency,
+                    'severity': 'HIGH' if frequency > 5 else 'MEDIUM' if frequency > 2 else 'LOW',
+                })
+            
+            return result
         
-        result = []
-        for pattern, frequency in list(patterns.items())[:limit]:
-            result.append({
-                'pattern': pattern,
-                'frequency': frequency,
-                'severity': 'HIGH' if frequency > 5 else 'MEDIUM' if frequency > 2 else 'LOW',
-            })
-        
-        return result
+        except Exception as e:
+            logger.error(f"PatternAnalyzer.get_top_patterns failed: {e}")
+            
+            if self.error_intelligence:
+                self.error_intelligence.track_error(
+                    agent_name="error_intelligence",
+                    worker_name="PatternAnalyzer",
+                    error_type="get_top_patterns_error",
+                    error_message=str(e),
+                )
+            
+            return []
 
     def find_patterns_by_worker(self, error_patterns: Dict[str, Any], agent: str, worker: str) -> List[Dict[str, Any]]:
         """Find all patterns for specific worker.
@@ -83,21 +129,45 @@ class PatternAnalyzer:
         Returns:
             List of patterns for that worker
         """
-        if agent not in error_patterns:
+        try:
+            if agent not in error_patterns:
+                return []
+            
+            agent_data = error_patterns[agent]
+            if 'workers' not in agent_data or worker not in agent_data['workers']:
+                return []
+            
+            worker_data = agent_data['workers'][worker]
+            error_types = Counter()
+            
+            for error in worker_data.get('errors', []):
+                error_type = error.get('error_type', 'Unknown')
+                error_types[error_type] += 1
+            
+            result = [
+                {'error_type': err_type, 'frequency': count}
+                for err_type, count in error_types.most_common()
+            ]
+            
+            if self.error_intelligence:
+                self.error_intelligence.track_success(
+                    agent_name="error_intelligence",
+                    worker_name="PatternAnalyzer",
+                    operation="find_patterns_by_worker",
+                    context={"agent": agent, "worker": worker, "patterns_found": len(result)}
+                )
+            
+            return result
+        
+        except Exception as e:
+            logger.error(f"PatternAnalyzer.find_patterns_by_worker failed: {e}")
+            
+            if self.error_intelligence:
+                self.error_intelligence.track_error(
+                    agent_name="error_intelligence",
+                    worker_name="PatternAnalyzer",
+                    error_type="find_patterns_error",
+                    error_message=str(e),
+                )
+            
             return []
-        
-        agent_data = error_patterns[agent]
-        if 'workers' not in agent_data or worker not in agent_data['workers']:
-            return []
-        
-        worker_data = agent_data['workers'][worker]
-        error_types = Counter()
-        
-        for error in worker_data.get('errors', []):
-            error_type = error.get('error_type', 'Unknown')
-            error_types[error_type] += 1
-        
-        return [
-            {'error_type': err_type, 'frequency': count}
-            for err_type, count in error_types.most_common()
-        ]
