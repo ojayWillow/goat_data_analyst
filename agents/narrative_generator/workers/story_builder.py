@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import AgentError
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class StoryBuilder:
@@ -33,6 +34,7 @@ class StoryBuilder:
         self.name = "StoryBuilder"
         self.logger = get_logger("StoryBuilder")
         self.structured_logger = get_structured_logger("StoryBuilder")
+        self.error_intelligence = ErrorIntelligence()
         self.logger.info("StoryBuilder worker initialized")
 
     def build_problem_summary(self, recommendations: List[Dict[str, Any]]) -> str:
@@ -229,9 +231,9 @@ class StoryBuilder:
             - improvement_outlook: What gets better
             - full_narrative: Complete story formatted for reading
         """
-        self.logger.info("Building complete narrative")
-
         try:
+            self.logger.info("Building complete narrative")
+
             # Build all sections
             problem_summary = self.build_problem_summary(recommendations)
             pain_points = self.build_pain_points(recommendations)
@@ -276,11 +278,26 @@ class StoryBuilder:
                 'high': narrative['high_count'],
                 'medium': narrative['medium_count']
             })
+            
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="narrative_generator",
+                worker_name="StoryBuilder",
+                operation="build_complete_narrative",
+                context={"total_recommendations": len(recommendations)}
+            )
 
             return narrative
 
         except Exception as e:
             self.logger.error(f"Error building complete narrative: {e}")
+            self.error_intelligence.track_error(
+                agent_name="narrative_generator",
+                worker_name="StoryBuilder",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"operation": "build_complete_narrative"}
+            )
             return self._default_narrative(recommendations)
 
     def build_narrative_for_export(self, narrative: Dict[str, Any]) -> str:
