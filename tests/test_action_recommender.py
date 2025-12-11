@@ -43,7 +43,7 @@ class TestActionRecommender:
         assert rec['priority'] == 5  # Highest
         assert rec['effort'] == 'medium'
         assert 'Immediately investigate' in rec['action']
-        assert rec['count'] == 50 or '50' in rec['detail']
+        assert '50' in rec['detail']  # Check detail contains the count
 
     def test_recommend_high_anomalies(self, recommender):
         """Test recommendation for high anomaly problem."""
