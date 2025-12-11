@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -18,6 +19,7 @@ class ValidatorWorker(BaseWorker):
     def __init__(self):
         """Initialize ValidatorWorker."""
         super().__init__("ValidatorWorker")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Execute validation and metadata extraction.
@@ -30,10 +32,30 @@ class ValidatorWorker(BaseWorker):
         Returns:
             WorkerResult with metadata
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._run_validation(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="data_loader",
+                worker_name="ValidatorWorker",
+                operation="validation",
+                context={"file_path": kwargs.get('file_path'), "file_format": kwargs.get('file_format')}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="data_loader",
+                worker_name="ValidatorWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"file_path": kwargs.get('file_path'), "file_format": kwargs.get('file_format')}
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
-        """Actual implementation of validation."""
+    def _run_validation(self, **kwargs) -> WorkerResult:
+        """Perform validation."""
         df = kwargs.get('df')
         file_path = kwargs.get('file_path')
         file_format = kwargs.get('file_format', 'unknown')
