@@ -45,14 +45,18 @@ class FixRecommender:
 
     def __init__(self):
         """Initialize fix recommender."""
-        # Import here to avoid circular dependency
-        try:
-            from agents.error_intelligence.main import ErrorIntelligence
-            self.error_intelligence = ErrorIntelligence()
-        except ImportError:
-            self.error_intelligence = None
-        
+        self.error_intelligence = None  # Lazy load to avoid circular dependency
         logger.info("FixRecommender worker initialized")
+
+    def _get_error_intelligence(self):
+        """Lazy load ErrorIntelligence to avoid circular dependency."""
+        if self.error_intelligence is None:
+            try:
+                from agents.error_intelligence.main import ErrorIntelligence
+                self.error_intelligence = ErrorIntelligence()
+            except ImportError:
+                pass
+        return self.error_intelligence
 
     def recommend(self, patterns: Dict[str, int]) -> List[Dict[str, Any]]:
         """Recommend fixes for identified patterns.
@@ -97,29 +101,10 @@ class FixRecommender:
             )
             
             logger.info(f"Generated {len(recommendations)} fix recommendations")
-            
-            # Track success
-            if self.error_intelligence:
-                self.error_intelligence.track_success(
-                    agent_name="error_intelligence",
-                    worker_name="FixRecommender",
-                    operation="recommend_fixes",
-                    context={"recommendations_generated": len(recommendations)}
-                )
-            
             return recommendations
         
         except Exception as e:
             logger.error(f"FixRecommender.recommend failed: {e}")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="FixRecommender",
-                    error_type="recommend_error",
-                    error_message=str(e),
-                )
-            
             return []
 
     def get_top_recommendations(self, patterns: Dict[str, int], limit: int = 5) -> List[Dict[str, Any]]:
@@ -138,15 +123,6 @@ class FixRecommender:
         
         except Exception as e:
             logger.error(f"FixRecommender.get_top_recommendations failed: {e}")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="FixRecommender",
-                    error_type="get_top_recommendations_error",
-                    error_message=str(e),
-                )
-            
             return []
 
     def recommend_for_worker(self, agent: str, worker: str, errors: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -176,26 +152,8 @@ class FixRecommender:
                     fix['error_type'] = error_type
                     recommendations.append(fix)
             
-            # Track success
-            if self.error_intelligence:
-                self.error_intelligence.track_success(
-                    agent_name="error_intelligence",
-                    worker_name="FixRecommender",
-                    operation="recommend_for_worker",
-                    context={"agent": agent, "worker": worker, "recommendations": len(recommendations)}
-                )
-            
             return recommendations
         
         except Exception as e:
             logger.error(f"FixRecommender.recommend_for_worker failed: {e}")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="FixRecommender",
-                    error_type="recommend_for_worker_error",
-                    error_message=str(e),
-                )
-            
             return []
