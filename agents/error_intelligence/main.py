@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 
 from core.logger import get_logger
+from core.error_recovery import retry_on_error
 from core.exceptions import AgentError
 from agents.error_intelligence.workers.error_tracker import ErrorTracker
 from agents.error_intelligence.workers.pattern_analyzer import PatternAnalyzer
@@ -55,6 +56,7 @@ class ErrorIntelligence:
         except Exception as e:
             logger.error(f"Failed to save error patterns: {e}")
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def track_success(
         self,
         agent_name: str,
@@ -84,6 +86,7 @@ class ErrorIntelligence:
         
         logger.info(f"Success tracked: {agent_name}.{worker_name} - {operation}")
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def track_error(
         self,
         agent_name: str,
@@ -119,6 +122,7 @@ class ErrorIntelligence:
         
         logger.info(f"Error tracked: {agent_name}.{worker_name} - {error_type}")
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def analyze_patterns(self) -> Dict[str, Any]:
         """Analyze error patterns across system.
         
@@ -129,6 +133,7 @@ class ErrorIntelligence:
         logger.info(f"Identified {len(patterns)} error patterns")
         return patterns
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_worker_health(self) -> Dict[str, Dict[str, Any]]:
         """Get health scores for all workers.
         
@@ -139,6 +144,7 @@ class ErrorIntelligence:
         logger.info("Calculated worker health scores")
         return health
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_recommendations(self) -> List[Dict[str, Any]]:
         """Get fix recommendations based on error patterns.
         
@@ -150,6 +156,7 @@ class ErrorIntelligence:
         logger.info(f"Generated {len(recommendations)} fix recommendations")
         return recommendations
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def record_fix_attempt(
         self,
         agent_name: str,
@@ -176,6 +183,7 @@ class ErrorIntelligence:
         )
         logger.info(f"Fix recorded: {agent_name}.{worker_name} - {success}")
 
+    @retry_on_error(max_attempts=3, backoff=2)
     def execute(self) -> Dict[str, Any]:
         """Execute full error intelligence analysis.
         
@@ -208,6 +216,7 @@ class ErrorIntelligence:
             logger.error(f"Error intelligence analysis failed: {e}")
             raise AgentError(f"ErrorIntelligence execution failed: {e}") from e
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def print_report(self) -> None:
         """Print human-readable error intelligence report."""
         report = self.execute()
