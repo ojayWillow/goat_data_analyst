@@ -7,6 +7,7 @@ from agents.anomaly_detector.workers.ocsvm import OneClassSVM
 from agents.anomaly_detector.workers.isolation_forest import IsolationForest
 from agents.anomaly_detector.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -17,6 +18,7 @@ class Ensemble(BaseWorker):
     def __init__(self):
         """Initialize Ensemble."""
         super().__init__("Ensemble")
+        self.error_intelligence = ErrorIntelligence()
         self.lof = LOF()
         self.ocsvm = OneClassSVM()
         self.iso_forest = IsolationForest()
@@ -37,6 +39,30 @@ class Ensemble(BaseWorker):
         Returns:
             WorkerResult with ensemble anomaly predictions
         """
+        try:
+            result = self._run_ensemble(df, threshold, **kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="anomaly_detector",
+                worker_name="Ensemble",
+                operation="ensemble_detection",
+                context={"threshold": threshold}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="anomaly_detector",
+                worker_name="Ensemble",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"threshold": threshold}
+            )
+            raise
+    
+    def _run_ensemble(self, df, threshold, **kwargs) -> WorkerResult:
+        """Perform ensemble detection."""
         result = self._create_result(task_type="ensemble_detection")
         
         if df is None:
