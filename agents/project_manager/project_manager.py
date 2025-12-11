@@ -72,34 +72,34 @@ class ProjectManager:
         """Execute complete project analysis."""
         try:
             # 1. Discover
-            self.logger.info("🔍 Scanning project structure...")
+            self.logger.info("[SCAN] Scanning project structure...")
             self.structure = self.scanner.discover_structure()
             agents_found = len(self.structure.get("agents", {}))
             tests_found = len(self.structure.get("tests", {}))
             self.logger.info(f"   Found {agents_found} agents, {tests_found} tests")
 
             # 2. Learn patterns
-            self.logger.info("🧠 Learning patterns from code...")
+            self.logger.info("[LEARN] Learning patterns from code...")
             self.patterns = self.learner.learn_patterns(self.structure)
             self.logger.info(f"   Pattern confidence: {self.patterns.get('pattern_confidence')}")
 
             # 3. Analyze code
-            self.logger.info("🔬 Analyzing code structure...")
+            self.logger.info("[ANALYZE] Analyzing code structure...")
             self.code_analysis = self._analyze_all_agents()
             self.logger.info(f"   Analyzed {len(self.code_analysis)} agents")
 
             # 4. Validate architecture
-            self.logger.info("🏗️  Validating architecture...")
+            self.logger.info("[ARCH] Validating architecture...")
             self.architecture = self.arch_validator.validate_project_structure(self.structure)
             self.logger.info(f"   Architecture score: {self.architecture.get('overall_score'):.1f}/100")
 
             # 5. Map dependencies
-            self.logger.info("🗺️  Mapping dependencies...")
+            self.logger.info("[DEPS] Mapping dependencies...")
             self.dependencies = self.dep_mapper.map_dependencies(self.structure)
             self.logger.info(f"   Found {self.dependencies.get('total_external')} external deps")
 
             # 6. Track changes
-            self.logger.info("📝 Tracking changes...")
+            self.logger.info("[TRACK] Tracking changes...")
             current_state = self.tracker.get_current_state(self.structure)
             previous_state = self.tracker.load_previous_state()
             self.changes = self.tracker.get_changes(current_state, previous_state)
@@ -111,7 +111,7 @@ class ProjectManager:
                 self.logger.info(f"   New tests: {self.changes['new_tests']}")
 
             # 7. Generate health report
-            self.logger.info("📊 Generating health report...")
+            self.logger.info("[HEALTH] Generating health report...")
             self.report = self.reporter.generate_report(
                 self.structure, self.patterns, self.changes, self.code_analysis
             )
@@ -149,9 +149,9 @@ class ProjectManager:
 
         summary = f"Found {len(agents)} agents:\n"
         for agent_name, info in agents.items():
-            status = "✅" if info.get("has_test") else "⚠️ "
+            status = "OK" if info.get("has_test") else "NO-TEST"
             workers = f" [{info.get('worker_count', 0)} workers]" if info.get("has_workers") else ""
-            summary += f"  {status} {agent_name}{workers}\n"
+            summary += f"  [{status}] {agent_name}{workers}\n"
 
         return summary
 
@@ -166,46 +166,46 @@ class ProjectManager:
         print("="*70)
         
         # Health Score
-        print(f"\n📊 Health Score: {self.report['health_score']}/100")
+        print(f"\n[HEALTH] Score: {self.report['health_score']}/100")
         
         # Summary
-        print(f"\n📋 Summary:")
+        print(f"\n[SUMMARY]")
         for key, value in self.report["summary"].items():
             print(f"   {key}: {value}")
         
         # Architecture
         if self.architecture:
-            print(f"\n🏗️  Architecture Score: {self.architecture.get('overall_score', 0):.1f}/100")
+            print(f"\n[ARCH] Architecture Score: {self.architecture.get('overall_score', 0):.1f}/100")
             if self.architecture.get("issues"):
                 print(f"   Issues: {len(self.architecture['issues'])}")
                 for issue in self.architecture["issues"][:3]:
-                    print(f"   ⚠️  {issue}")
+                    print(f"   - {issue}")
         
         # Code Quality
         if self.code_analysis:
-            print(f"\n📝 Code Analysis:")
+            print(f"\n[CODE]")
             avg_type_hints = sum(
                 a.get("type_hints_coverage", 0) for a in self.code_analysis.values()
             ) / len(self.code_analysis) if self.code_analysis else 0
             avg_docstrings = sum(
                 a.get("docstring_coverage", 0) for a in self.code_analysis.values()
             ) / len(self.code_analysis) if self.code_analysis else 0
-            print(f"   Avg Type Hints: {avg_type_hints:.0f}%")
-            print(f"   Avg Docstrings: {avg_docstrings:.0f}%")
+            print(f"   Type Hints: {avg_type_hints:.0f}%")
+            print(f"   Docstrings: {avg_docstrings:.0f}%")
         
         # Changes
         if self.changes["new_agents"] or self.changes["new_tests"]:
-            print(f"\n📝 Changes:")
+            print(f"\n[CHANGES]")
             if self.changes["new_agents"]:
                 print(f"   New agents: {', '.join(self.changes['new_agents'])}")
             if self.changes["new_tests"]:
-                print(f"   New tests: {', '.join(self.changes['new_tests'])}")
+                print(f"   New tests: {len(self.changes['new_tests'])} added")
         
         # Recommendations
         if self.report["recommendations"]:
-            print(f"\n💡 Recommendations:")
+            print(f"\n[RECOMMENDATIONS]")
             for rec in self.report["recommendations"]:
-                print(f"   • {rec}")
+                print(f"   - {rec}")
         
         print("\n" + "="*70 + "\n")
 
