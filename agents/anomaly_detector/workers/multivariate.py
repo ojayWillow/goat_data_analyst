@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 try:
     from sklearn.preprocessing import StandardScaler
@@ -26,6 +27,7 @@ class MultivariateWorker(BaseWorker):
     def __init__(self):
         """Initialize MultivariateWorker."""
         super().__init__("MultivariateWorker")
+        self.error_intelligence = ErrorIntelligence()
         if not SKLEARN_AVAILABLE:
             logger.warning("scikit-learn not available - Multivariate detection disabled")
     
@@ -40,10 +42,30 @@ class MultivariateWorker(BaseWorker):
         Returns:
             WorkerResult with multivariate anomaly results
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._run_multivariate(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="anomaly_detector",
+                worker_name="MultivariateWorker",
+                operation="multivariate_detection",
+                context={"feature_cols": str(kwargs.get('feature_cols', []))}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="anomaly_detector",
+                worker_name="MultivariateWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"feature_cols": str(kwargs.get('feature_cols', []))}
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
-        """Actual implementation of multivariate detection."""
+    def _run_multivariate(self, **kwargs) -> WorkerResult:
+        """Perform multivariate detection."""
         df = kwargs.get('df')
         feature_cols = kwargs.get('feature_cols', [])
         percentile = kwargs.get('percentile', 95)
