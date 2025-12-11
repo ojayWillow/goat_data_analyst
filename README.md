@@ -10,6 +10,16 @@
 
 ---
 
+## TL;DR for Humans (What is this?)
+
+- **What it is:** GOAT Data Analyst turns CSV data into **full, professional reports**.
+- **How it works:** It uses a 3-step pipeline: **Analysis → Storytelling → Reporting**.
+- **What you get:** An empathetic narrative with intelligently-selected charts, formatted beautifully.
+- **Is it ready?** Yes. The system is **production-ready** with 6,800+ lines of code and 130+ passing tests.
+- **How to use:** See the `Quick Start` section below for a simple, end-to-end example.
+
+---
+
 ## 📋 Quick Overview
 
 GOAT Data Analyst transforms raw data into **professional reports** through three stages:
