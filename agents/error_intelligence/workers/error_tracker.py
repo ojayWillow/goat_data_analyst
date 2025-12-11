@@ -8,11 +8,28 @@ logger = get_logger(__name__)
 
 
 class ErrorTracker:
-    """Tracks both successes and errors from all agents and workers."""
+    """Tracks both successes and errors from all agents and workers.
+    
+    Implemented as a singleton to ensure all ErrorIntelligence instances
+    share the same error tracking state.
+    """
+    
+    _instance = None
+
+    def __new__(cls):
+        """Singleton pattern - always return same instance."""
+        if cls._instance is None:
+            cls._instance = super(ErrorTracker, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
 
     def __init__(self):
-        """Initialize error tracker."""
+        """Initialize error tracker (only on first creation)."""
+        if self._initialized:
+            return
+        
         self.errors = {}
+        self._initialized = True
         logger.info("ErrorTracker worker initialized")
 
     def track_success(
