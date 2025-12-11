@@ -87,6 +87,7 @@ class Orchestrator:
         except Exception as e:
             raise OrchestratorError(f"Agent registration failed: {e}")
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_agent(self, agent_name: str) -> Optional[Any]:
         """Get a registered agent.
         
@@ -98,6 +99,7 @@ class Orchestrator:
         """
         return self.agent_registry.get(agent_name)
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def list_agents(self) -> List[str]:
         """List all registered agents.
         
@@ -108,6 +110,7 @@ class Orchestrator:
 
     # ========== Data Management ==========
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def cache_data(self, key: str, data: Any) -> None:
         """Cache data for inter-agent sharing.
         
@@ -117,6 +120,7 @@ class Orchestrator:
         """
         self.data_manager.set(key, data)
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_cached_data(self, key: str) -> Optional[Any]:
         """Retrieve cached data.
         
@@ -128,6 +132,7 @@ class Orchestrator:
         """
         return self.data_manager.get(key)
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def clear_cache(self) -> None:
         """Clear all cached data."""
         self.data_manager.clear()
@@ -135,7 +140,7 @@ class Orchestrator:
 
     # ========== Task Management ==========
 
-    @retry_on_error(max_attempts=2, backoff=1)
+    @retry_on_error(max_attempts=3, backoff=2)
     @validate_output('dict')
     def execute_task(self, task_type: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a single task.
@@ -180,7 +185,7 @@ class Orchestrator:
 
     # ========== Workflow Management ==========
 
-    @retry_on_error(max_attempts=2, backoff=1)
+    @retry_on_error(max_attempts=3, backoff=2)
     @validate_output('dict')
     def execute_workflow(self, workflow_tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Execute a workflow (sequence of tasks).
@@ -207,7 +212,7 @@ class Orchestrator:
 
     # ========== Narrative Generation ==========
 
-    @retry_on_error(max_attempts=2, backoff=1)
+    @retry_on_error(max_attempts=3, backoff=2)
     @validate_output('dict')
     def generate_narrative(
         self,
@@ -235,7 +240,7 @@ class Orchestrator:
             self.logger.error(f"Narrative generation failed: {e}")
             raise OrchestratorError(f"Narrative generation failed: {e}")
 
-    @retry_on_error(max_attempts=2, backoff=1)
+    @retry_on_error(max_attempts=3, backoff=2)
     @validate_output('dict')
     def execute_workflow_with_narrative(
         self,
@@ -281,6 +286,7 @@ class Orchestrator:
 
     # ========== Status & Reporting ==========
 
+    @retry_on_error(max_attempts=2, backoff=1)
     @validate_output('dict')
     def get_status(self) -> Dict[str, Any]:
         """Get current orchestrator status.
@@ -297,6 +303,7 @@ class Orchestrator:
             'current_task': self.current_task['type'] if self.current_task else None
         }
 
+    @retry_on_error(max_attempts=2, backoff=1)
     @validate_output('dict')
     def get_detailed_status(self) -> Dict[str, Any]:
         """Get detailed status including all workflows and cache.
@@ -324,12 +331,14 @@ class Orchestrator:
 
     # ========== Utility Methods ==========
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def reset(self) -> None:
         """Reset orchestrator state (keep agents, clear cache and history)."""
         self.data_manager.clear()
         self.current_task = None
         self.logger.info("Orchestrator reset")
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def shutdown(self) -> None:
         """Shutdown orchestrator (cleanup resources)."""
         self.reset()
