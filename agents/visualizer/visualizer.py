@@ -84,6 +84,7 @@ class Visualizer:
 
     # === SECTION 1: DATA MANAGEMENT ===
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def set_data(self, df: pd.DataFrame) -> None:
         """Set data to visualize.
         
@@ -101,6 +102,7 @@ class Visualizer:
             "categorical_cols": len(df.select_dtypes(include=['object']).columns)
         })
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_data(self) -> Optional[pd.DataFrame]:
         """Get current data.
         
@@ -471,6 +473,7 @@ class Visualizer:
             chart_id = f"{result.chart_type}_{len(self.charts)}"
             self.charts[chart_id] = result.data
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_chart(self, chart_id: str) -> Optional[Any]:
         """Get a previously created chart.
         
@@ -482,6 +485,7 @@ class Visualizer:
         """
         return self.charts.get(chart_id)
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def list_charts(self) -> Dict[str, Any]:
         """List all created charts.
         
@@ -501,6 +505,7 @@ class Visualizer:
         
         return result
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_summary(self) -> str:
         """Get summary of Visualizer state.
         
