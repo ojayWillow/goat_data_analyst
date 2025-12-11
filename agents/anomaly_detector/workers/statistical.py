@@ -7,6 +7,7 @@ from typing import Any, Dict
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -23,6 +24,7 @@ class StatisticalWorker(BaseWorker):
     def __init__(self):
         """Initialize StatisticalWorker."""
         super().__init__("StatisticalWorker")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Execute statistical anomaly detection.
@@ -38,10 +40,30 @@ class StatisticalWorker(BaseWorker):
         Returns:
             WorkerResult with detection results
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._run_statistical(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="anomaly_detector",
+                worker_name="StatisticalWorker",
+                operation="statistical_detection",
+                context={"method": kwargs.get('method', 'iqr'), "column": kwargs.get('column')}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="anomaly_detector",
+                worker_name="StatisticalWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"method": kwargs.get('method', 'iqr'), "column": kwargs.get('column')}
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
-        """Actual implementation of statistical detection."""
+    def _run_statistical(self, **kwargs) -> WorkerResult:
+        """Perform statistical detection."""
         df = kwargs.get('df')
         column = kwargs.get('column')
         method = kwargs.get('method', 'iqr')
