@@ -8,8 +8,10 @@ import time
 from datetime import datetime
 
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
+error_intelligence = ErrorIntelligence()
 
 
 class ErrorType(Enum):
@@ -71,6 +73,7 @@ class Base(ABC):
         """
         self.name = name
         self.logger = get_logger(self.__class__.__name__)
+        self.error_intelligence = ErrorIntelligence()
     
     @abstractmethod
     def execute(self, **kwargs) -> WorkerResult:
@@ -97,10 +100,41 @@ class Base(ABC):
         try:
             result = self.execute(**kwargs)
             result.execution_time_ms = (time.time() - start_time) * 1000
+            
+            # Track success
+            if result.success:
+                self.error_intelligence.track_success(
+                    agent_name="predictor",
+                    worker_name=self.name,
+                    operation="execute",
+                    context={"task_type": result.task_type, "quality_score": result.quality_score}
+                )
+            else:
+                # Track failure if errors exist
+                if result.errors:
+                    error_msg = "; ".join([e.get("message", "") for e in result.errors])
+                    self.error_intelligence.track_error(
+                        agent_name="predictor",
+                        worker_name=self.name,
+                        error_type="execution_failure",
+                        error_message=error_msg,
+                        context={"task_type": result.task_type}
+                    )
+            
             return result
         except Exception as e:
             self.logger.error(f"Worker execution failed: {e}")
             duration_ms = (time.time() - start_time) * 1000
+            
+            # Track error
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name=self.name,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"operation": "safe_execute"}
+            )
+            
             return WorkerResult(
                 worker=self.name,
                 task_type="prediction",
