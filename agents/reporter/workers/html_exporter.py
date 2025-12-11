@@ -4,6 +4,7 @@ import pandas as pd
 from typing import Any, Dict, Optional
 from datetime import datetime, timezone
 from .base_worker import BaseWorker, WorkerResult, ErrorType
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class HTMLExporter(BaseWorker):
