@@ -5,6 +5,7 @@ Refactored with worker architecture:
 - DataManager: Handles caching and data flow
 - TaskRouter: Routes tasks to agents
 - WorkflowExecutor: Executes multi-task workflows
+- NarrativeIntegrator: Bridges to narrative generator
 
 Integrated with Week 1 foundation systems:
 - Configuration management
@@ -24,6 +25,7 @@ from agents.orchestrator.workers.agent_registry import AgentRegistry
 from agents.orchestrator.workers.data_manager import DataManager
 from agents.orchestrator.workers.task_router import TaskRouter
 from agents.orchestrator.workers.workflow_executor import WorkflowExecutor
+from agents.orchestrator.workers.narrative_integrator import NarrativeIntegrator
 
 
 class Orchestrator:
@@ -34,6 +36,7 @@ class Orchestrator:
     - Route tasks to agents (via TaskRouter)
     - Handle data flow between agents (via DataManager)
     - Execute workflows (via WorkflowExecutor)
+    - Generate narratives (via NarrativeIntegrator)
     - Aggregate and manage results
     
     Architecture:
@@ -54,14 +57,15 @@ class Orchestrator:
         self.data_manager = DataManager()
         self.task_router = TaskRouter(self.agent_registry, self.data_manager)
         self.workflow_executor = WorkflowExecutor(self.task_router)
+        self.narrative_integrator = NarrativeIntegrator()
         
         # Tracking
         self.current_task: Optional[Dict[str, Any]] = None
         
         self.logger.info("Orchestrator initialized with worker architecture")
         self.structured_logger.info("Orchestrator initialized", {
-            'version': '2.1-refactored',
-            'workers': ['AgentRegistry', 'DataManager', 'TaskRouter', 'WorkflowExecutor']
+            'version': '2.2-with-narrative',
+            'workers': ['AgentRegistry', 'DataManager', 'TaskRouter', 'WorkflowExecutor', 'NarrativeIntegrator']
         })
 
     # ========== Agent Management ==========
@@ -200,6 +204,80 @@ class Orchestrator:
         except Exception as e:
             self.logger.error(f"Workflow execution failed: {e}")
             raise OrchestratorError(f"Workflow execution failed: {e}")
+
+    # ========== Narrative Generation ==========
+
+    @retry_on_error(max_attempts=2, backoff=1)
+    @validate_output('dict')
+    def generate_narrative(
+        self,
+        agent_results: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate narrative from agent results.
+        
+        Converts raw agent outputs into an empathetic story
+        that tells users what the data means and what to do.
+        
+        Args:
+            agent_results: Dict with agent outputs
+        
+        Returns:
+            Narrative dict with story (validated)
+        
+        Raises:
+            OrchestratorError: If narrative generation fails
+        """
+        self.logger.info("Generating narrative from agent results")
+        
+        try:
+            return self.narrative_integrator.generate_narrative_from_results(agent_results)
+        except Exception as e:
+            self.logger.error(f"Narrative generation failed: {e}")
+            raise OrchestratorError(f"Narrative generation failed: {e}")
+
+    @retry_on_error(max_attempts=2, backoff=1)
+    @validate_output('dict')
+    def execute_workflow_with_narrative(
+        self,
+        workflow_tasks: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Execute workflow and generate narrative automatically.
+        
+        This is the complete pipeline:
+        1. Run all agents through workflow
+        2. Collect their results
+        3. Generate narrative story
+        4. Return combined result
+        
+        Args:
+            workflow_tasks: List of task configs
+        
+        Returns:
+            Complete result with workflow + narrative (validated)
+        
+        Raises:
+            OrchestratorError: If execution fails
+        """
+        self.logger.info("Executing workflow with automatic narrative generation")
+        self.structured_logger.info("Full pipeline started", {
+            'total_tasks': len(workflow_tasks)
+        })
+        
+        try:
+            # Execute workflow
+            workflow_result = self.execute_workflow(workflow_tasks)
+            
+            # Generate narrative from results
+            enriched_result = self.narrative_integrator.generate_narrative_from_workflow(
+                workflow_result
+            )
+            
+            self.logger.info("Full pipeline completed with narrative")
+            return enriched_result
+        
+        except Exception as e:
+            self.logger.error(f"Full pipeline execution failed: {e}")
+            raise OrchestratorError(f"Full pipeline failed: {e}")
 
     # ========== Status & Reporting ==========
 
