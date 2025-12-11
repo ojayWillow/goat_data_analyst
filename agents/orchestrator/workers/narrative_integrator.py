@@ -14,6 +14,7 @@ from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import OrchestratorError
 from core.error_recovery import retry_on_error
+from agents.error_intelligence.main import ErrorIntelligence
 from agents.narrative_generator.integration_tester import IntegrationTester
 
 
@@ -32,6 +33,7 @@ class NarrativeIntegrator:
         self.name = "NarrativeIntegrator"
         self.logger = get_logger("NarrativeIntegrator")
         self.structured_logger = get_structured_logger("NarrativeIntegrator")
+        self.error_intelligence = ErrorIntelligence()
         
         # Initialize narrative generator
         self.narrative_tester = IntegrationTester()
@@ -84,10 +86,25 @@ class NarrativeIntegrator:
                 'total_recommendations': narrative.get('total_recommendations', 0)
             })
             
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="orchestrator",
+                worker_name="NarrativeIntegrator",
+                operation="generate_narrative_from_results",
+                context={"result_keys": list(agent_results.keys())}
+            )
+            
             return narrative
         
         except Exception as e:
             self.logger.error(f"Narrative generation failed: {e}")
+            self.error_intelligence.track_error(
+                agent_name="orchestrator",
+                worker_name="NarrativeIntegrator",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"operation": "generate_narrative_from_results"}
+            )
             raise OrchestratorError(f"Failed to generate narrative: {e}")
 
     @retry_on_error(max_attempts=2, backoff=1)
@@ -127,10 +144,26 @@ class NarrativeIntegrator:
             }
             
             self.logger.info("Workflow enriched with narrative")
+            
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="orchestrator",
+                worker_name="NarrativeIntegrator",
+                operation="generate_narrative_from_workflow",
+                context={"workflow_id": workflow_result.get('workflow_id')}
+            )
+            
             return enriched_result
         
         except Exception as e:
             self.logger.error(f"Workflow narrative generation failed: {e}")
+            self.error_intelligence.track_error(
+                agent_name="orchestrator",
+                worker_name="NarrativeIntegrator",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"operation": "generate_narrative_from_workflow"}
+            )
             raise OrchestratorError(f"Failed to generate workflow narrative: {e}")
 
     def _extract_agent_results_from_workflow(
