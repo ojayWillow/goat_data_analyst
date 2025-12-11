@@ -5,6 +5,7 @@ import numpy as np
 from typing import Any, Dict
 from datetime import datetime, timezone
 from .base_worker import BaseWorker, WorkerResult, ErrorType
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class ExecutiveSummaryGenerator(BaseWorker):
