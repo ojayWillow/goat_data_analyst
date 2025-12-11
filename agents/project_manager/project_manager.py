@@ -3,12 +3,14 @@
 Auto-discovers agents, learns patterns, validates architecture,
 monitors health, analyzes code, and generates actionable insights.
 
-V2 Enhancements:
-- Worker-based architecture
-- Deep code analysis (AST)
-- Architecture validation
-- Dependency mapping
-- Advanced health reporting
+V3 Enhancements (Honest Health Reporting):
+- ErrorIntelligenceChecker: Detect which agents have EI
+- ErrorHandlingAuditor: Audit error patterns
+- IntegrationTester: Test agent integration
+- ContractValidator: Validate API contracts
+- DependencyConsistencyChecker: Check import consistency
+
+Result: Honest health scores that show ACTUAL gaps A-Z
 """
 
 from pathlib import Path
@@ -25,6 +27,11 @@ from .workers import (
     CodeAnalyzer,
     ArchitectureValidator,
     DependencyMapper,
+    ErrorIntelligenceChecker,
+    ErrorHandlingAuditor,
+    IntegrationTester,
+    ContractValidator,
+    DependencyConsistencyChecker,
 )
 
 
@@ -43,13 +50,18 @@ class ProjectManager:
     - CodeAnalyzer: Deep code inspection
     - ArchitectureValidator: Validates architecture
     - DependencyMapper: Maps dependencies
+    - ErrorIntelligenceChecker: Audits Error Intelligence coverage
+    - ErrorHandlingAuditor: Audits error handling patterns
+    - IntegrationTester: Tests agent integrations
+    - ContractValidator: Validates API contracts
+    - DependencyConsistencyChecker: Checks import consistency
     """
 
     def __init__(self):
         self.logger = get_logger("ProjectManager")
         self.project_root = Path(__file__).parent.parent.parent
 
-        # Initialize workers
+        # Initialize workers (8 original + 5 new)
         self.scanner = StructureScanner(self.logger)
         self.learner = PatternLearner(self.logger)
         self.validator = PatternValidator(self.logger)
@@ -58,6 +70,13 @@ class ProjectManager:
         self.analyzer = CodeAnalyzer(self.logger)
         self.arch_validator = ArchitectureValidator(self.logger)
         self.dep_mapper = DependencyMapper(self.logger)
+        
+        # New workers for honest health reporting
+        self.ei_checker = ErrorIntelligenceChecker(self.logger)
+        self.error_auditor = ErrorHandlingAuditor(self.logger)
+        self.integration_tester = IntegrationTester(self.logger)
+        self.contract_validator = ContractValidator(self.logger)
+        self.dep_consistency = DependencyConsistencyChecker(self.logger)
 
         # Storage
         self.structure = {}
@@ -67,6 +86,11 @@ class ProjectManager:
         self.code_analysis = {}
         self.architecture = {}
         self.dependencies = {}
+        self.error_intelligence = {}
+        self.error_handling = {}
+        self.integrations = {}
+        self.contracts = {}
+        self.dependency_consistency = {}
 
     def execute(self) -> Dict[str, Any]:
         """Execute complete project analysis."""
@@ -110,8 +134,40 @@ class ProjectManager:
             if self.changes.get("new_tests"):
                 self.logger.info(f"   New tests: {self.changes['new_tests']}")
 
-            # 7. Generate health report
-            self.logger.info("[HEALTH] Generating health report...")
+            # ===== NEW ANALYSIS =====
+            
+            # 7. Check Error Intelligence Coverage
+            self.logger.info("[EI] Checking Error Intelligence coverage...")
+            self.error_intelligence = self.ei_checker.audit_agents(self.structure)
+            ei_coverage = self.error_intelligence.get("coverage_percentage", 0)
+            self.logger.info(f"   Error Intelligence coverage: {ei_coverage}%")
+
+            # 8. Audit Error Handling
+            self.logger.info("[ERROR] Auditing error handling patterns...")
+            self.error_handling = self.error_auditor.audit_agents(self.structure)
+            error_score = self.error_handling.get("average_score", 0)
+            self.logger.info(f"   Error handling score: {error_score:.1f}/100")
+
+            # 9. Test Integrations
+            self.logger.info("[INTEGRATION] Testing agent integrations...")
+            self.integrations = self.integration_tester.test_integrations(self.structure)
+            integration_health = self.integrations.get("health_score", 0)
+            self.logger.info(f"   Integration health: {integration_health:.1f}%")
+
+            # 10. Validate Contracts
+            self.logger.info("[CONTRACT] Validating API contracts...")
+            self.contracts = self.contract_validator.validate_contracts(self.structure)
+            contract_compliance = self.contracts.get("contract_compliance", 0)
+            self.logger.info(f"   Contract compliance: {contract_compliance:.1f}%")
+
+            # 11. Check Dependency Consistency
+            self.logger.info("[CONSISTENCY] Checking dependency consistency...")
+            self.dependency_consistency = self.dep_consistency.check_consistency(self.structure)
+            dep_consistency_score = self.dependency_consistency.get("consistency_score", 0)
+            self.logger.info(f"   Dependency consistency: {dep_consistency_score:.1f}/100")
+
+            # 12. Generate health report
+            self.logger.info("[HEALTH] Generating honest health report...")
             self.report = self.reporter.generate_report(
                 self.structure, self.patterns, self.changes, self.code_analysis
             )
@@ -132,6 +188,11 @@ class ProjectManager:
             "architecture": self.architecture,
             "dependencies": self.dependencies,
             "changes": self.changes,
+            "error_intelligence": self.error_intelligence,
+            "error_handling": self.error_handling,
+            "integrations": self.integrations,
+            "contracts": self.contracts,
+            "dependency_consistency": self.dependency_consistency,
             "health": self.report,
             "timestamp": datetime.now().isoformat(),
         }
@@ -173,6 +234,46 @@ class ProjectManager:
         for key, value in self.report["summary"].items():
             print(f"   {key}: {value}")
         
+        # Error Intelligence Coverage
+        if self.error_intelligence:
+            print(f"\n[ERROR INTELLIGENCE]")
+            ei_cov = self.error_intelligence.get("coverage_percentage", 0)
+            print(f"   Coverage: {ei_cov}% ({self.error_intelligence.get('with_error_intelligence', 0)}/{self.error_intelligence.get('total_agents', 0)} agents)")
+            print(f"   Status: {self.error_intelligence.get('status')}")
+        
+        # Error Handling
+        if self.error_handling:
+            print(f"\n[ERROR HANDLING]")
+            avg_score = self.error_handling.get("average_score", 0)
+            print(f"   Average Score: {avg_score:.1f}/100")
+            print(f"   Strong: {self.error_handling.get('strong_error_handling', 0)} agents")
+            print(f"   Weak: {self.error_handling.get('weak_error_handling', 0)} agents")
+            print(f"   Critical Gaps: {self.error_handling.get('critical_gaps', 0)} agents")
+        
+        # Integration Health
+        if self.integrations:
+            print(f"\n[INTEGRATIONS]")
+            int_health = self.integrations.get("health_score", 0)
+            print(f"   Health: {int_health:.1f}%")
+            print(f"   Working: {self.integrations.get('working_integrations', 0)} points")
+            print(f"   Broken: {self.integrations.get('broken_integrations', 0)} points")
+        
+        # Contracts
+        if self.contracts:
+            print(f"\n[CONTRACTS]")
+            compliance = self.contracts.get("contract_compliance", 0)
+            print(f"   Compliance: {compliance:.1f}%")
+            print(f"   Valid: {self.contracts.get('agents_with_valid_contracts', 0)} agents")
+            print(f"   Issues: {self.contracts.get('contract_issues', 0)}")
+        
+        # Dependency Consistency
+        if self.dependency_consistency:
+            print(f"\n[DEPENDENCY CONSISTENCY]")
+            dep_score = self.dependency_consistency.get("consistency_score", 0)
+            print(f"   Score: {dep_score:.1f}/100")
+            print(f"   Missing Imports: {len(self.dependency_consistency.get('missing_standard_imports', []))}")
+            print(f"   Inconsistencies: {len(self.dependency_consistency.get('inconsistent_imports', []))}")
+        
         # Architecture
         if self.architecture:
             print(f"\n[ARCH] Architecture Score: {self.architecture.get('overall_score', 0):.1f}/100")
@@ -192,14 +293,6 @@ class ProjectManager:
             ) / len(self.code_analysis) if self.code_analysis else 0
             print(f"   Type Hints: {avg_type_hints:.0f}%")
             print(f"   Docstrings: {avg_docstrings:.0f}%")
-        
-        # Changes
-        if self.changes["new_agents"] or self.changes["new_tests"]:
-            print(f"\n[CHANGES]")
-            if self.changes["new_agents"]:
-                print(f"   New agents: {', '.join(self.changes['new_agents'])}")
-            if self.changes["new_tests"]:
-                print(f"   New tests: {len(self.changes['new_tests'])} added")
         
         # Recommendations
         if self.report["recommendations"]:
