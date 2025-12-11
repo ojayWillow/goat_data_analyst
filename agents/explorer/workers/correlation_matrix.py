@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 from agents.explorer.workers.base_worker import BaseWorker, WorkerResult, ErrorType
+from agents.error_intelligence.main import ErrorIntelligence
 from core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -14,6 +15,7 @@ class CorrelationMatrix(BaseWorker):
     def __init__(self):
         """Initialize CorrelationMatrix."""
         super().__init__("CorrelationMatrix")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, df: pd.DataFrame = None, method: str = 'pearson', **kwargs) -> WorkerResult:
         """Compute correlation matrix.
@@ -29,7 +31,7 @@ class CorrelationMatrix(BaseWorker):
         result = self._create_result(task_type="correlation_matrix")
         
         if df is None:
-            self._add_error(result, ErrorType.VALIDATION_ERROR, "df required")
+            self._add_error(result, ErrorType.MISSING_DATA, "df required")
             result.success = False
             return result
         
@@ -37,7 +39,7 @@ class CorrelationMatrix(BaseWorker):
             numeric_df = df.select_dtypes(include=[np.number])
             
             if numeric_df.empty:
-                self._add_error(result, ErrorType.LOAD_ERROR, "No numeric columns")
+                self._add_error(result, ErrorType.COMPUTATION_ERROR, "No numeric columns")
                 result.success = False
                 return result
             
@@ -49,10 +51,26 @@ class CorrelationMatrix(BaseWorker):
                 "columns": numeric_df.columns.tolist()
             }
             
+            self.error_intelligence.track_success(
+                agent_name="explorer",
+                worker_name="CorrelationMatrix",
+                operation="execute",
+                context={"method": method}
+            )
+            
             logger.info(f"Correlation matrix computed: {method}")
             return result
         
         except Exception as e:
-            self._add_error(result, ErrorType.LOAD_ERROR, f"Correlation matrix failed: {e}")
+            self._add_error(result, ErrorType.COMPUTATION_ERROR, f"Correlation matrix failed: {e}")
             result.success = False
+            
+            self.error_intelligence.track_error(
+                agent_name="explorer",
+                worker_name="CorrelationMatrix",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={}
+            )
+            
             return result
