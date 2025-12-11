@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 from agents.anomaly_detector.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -15,6 +16,7 @@ class IsolationForest(BaseWorker):
     def __init__(self):
         """Initialize IsolationForest."""
         super().__init__("IsolationForest")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(
         self,
@@ -34,6 +36,30 @@ class IsolationForest(BaseWorker):
         Returns:
             WorkerResult with anomaly predictions
         """
+        try:
+            result = self._run_isolation_forest(df, contamination, n_estimators, **kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="anomaly_detector",
+                worker_name="IsolationForest",
+                operation="isolation_forest_detection",
+                context={"contamination": contamination, "n_estimators": n_estimators}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="anomaly_detector",
+                worker_name="IsolationForest",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"contamination": contamination, "n_estimators": n_estimators}
+            )
+            raise
+    
+    def _run_isolation_forest(self, df, contamination, n_estimators, **kwargs) -> WorkerResult:
+        """Perform Isolation Forest detection."""
         result = self._create_result(task_type="isolation_forest_detection")
         
         if df is None:
