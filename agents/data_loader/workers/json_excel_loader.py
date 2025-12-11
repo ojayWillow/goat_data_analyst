@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,7 @@ class JSONExcelLoaderWorker(BaseWorker):
     def __init__(self):
         """Initialize JSONExcelLoaderWorker."""
         super().__init__("JSONExcelLoaderWorker")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Execute JSON/Excel loading.
@@ -28,10 +30,30 @@ class JSONExcelLoaderWorker(BaseWorker):
         Returns:
             WorkerResult with loaded data
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._run_json_excel_load(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="data_loader",
+                worker_name="JSONExcelLoaderWorker",
+                operation="json_excel_loading",
+                context={"file_path": kwargs.get('file_path'), "file_format": kwargs.get('file_format')}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="data_loader",
+                worker_name="JSONExcelLoaderWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"file_path": kwargs.get('file_path'), "file_format": kwargs.get('file_format')}
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
-        """Actual implementation of JSON/Excel loading."""
+    def _run_json_excel_load(self, **kwargs) -> WorkerResult:
+        """Perform JSON/Excel loading."""
         file_path = kwargs.get('file_path')
         file_format = kwargs.get('file_format', '').lower()
         
