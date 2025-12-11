@@ -1,13 +1,21 @@
 {
-  "aggregator": {
-    "total_runs": 3,
-    "successes": 3,
-    "failures": 0,
+  "TestAgent": {
+    "total_runs": 2,
+    "successes": 1,
+    "failures": 1,
     "workers": {
-      "StatisticsWorker": {
-        "successes": 3,
-        "failures": 0,
-        "errors": []
+      "TestWorker": {
+        "successes": 1,
+        "failures": 1,
+        "errors": [
+          {
+            "timestamp": "2025-12-11T20:57:18.070171",
+            "error_type": "TestError",
+            "error_message": "This is a test error",
+            "data_type": null,
+            "context": {}
+          }
+        ]
       }
     }
   }

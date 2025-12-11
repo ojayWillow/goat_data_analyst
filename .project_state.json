@@ -38,6 +38,7 @@
     "test_orchestrator_narrative_integration",
     "test_orchestrator_refactored",
     "test_performance",
+    "test_phase_1_phase_2",
     "test_predictor",
     "test_predictor_day2",
     "test_problem_identifier",
@@ -53,6 +54,8 @@
     "test_error_intelligence",
     "test_error_intelligence_aggregator",
     "test_explorer",
+    "test_narrative_generator",
+    "test_orchestrator",
     "test_orchestrator_integration",
     "test_recommender",
     "test_reporter",
@@ -66,5 +69,5 @@
     "structured_logger",
     "validators"
   ],
-  "timestamp": "2025-12-11T14:50:24.907278"
+  "timestamp": "2025-12-11T20:59:50.371535"
 }
