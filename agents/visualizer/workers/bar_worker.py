@@ -11,6 +11,7 @@ except ImportError:
 
 from .base_worker import BaseChartWorker, WorkerResult, ErrorType
 from .config import get_theme, get_palette
+from agents.error_intelligence.main import ErrorIntelligence
 from core.logger import get_logger
 
 logger = get_logger(__name__)
