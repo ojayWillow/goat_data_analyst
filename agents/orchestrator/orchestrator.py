@@ -153,7 +153,7 @@ class Orchestrator:
         task = {
             'id': f"task_{datetime.now().timestamp()}",
             'type': task_type,
-            'parameters': parameters,
+            'parameters': parameters if parameters else {},
             'status': 'created',
             'created_at': datetime.now(timezone.utc).isoformat()
         }
@@ -163,7 +163,7 @@ class Orchestrator:
         self.logger.info(f"Executing task: {task_type}")
         self.structured_logger.info("Task execution started", {
             'task_type': task_type,
-            'param_count': len(parameters)
+            'param_count': len(parameters) if parameters else 0
         })
         
         try:
