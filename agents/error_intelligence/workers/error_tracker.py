@@ -30,6 +30,15 @@ class ErrorTracker:
         
         self.errors = {}
         self._initialized = True
+        
+        # Import here to avoid circular dependency
+        try:
+            from agents.error_intelligence.main import ErrorIntelligence
+            self.error_intelligence = ErrorIntelligence()
+        except ImportError:
+            # If ErrorIntelligence not available yet, skip
+            self.error_intelligence = None
+        
         logger.info("ErrorTracker worker initialized")
 
     def track_success(
@@ -47,27 +56,41 @@ class ErrorTracker:
             operation: Operation that succeeded
             context: Additional context
         """
-        if agent_name not in self.errors:
-            self.errors[agent_name] = {
-                'total_runs': 0,
-                'successes': 0,
-                'failures': 0,
-                'workers': {},
-            }
+        try:
+            if agent_name not in self.errors:
+                self.errors[agent_name] = {
+                    'total_runs': 0,
+                    'successes': 0,
+                    'failures': 0,
+                    'workers': {},
+                }
+            
+            if worker_name not in self.errors[agent_name]['workers']:
+                self.errors[agent_name]['workers'][worker_name] = {
+                    'successes': 0,
+                    'failures': 0,
+                    'errors': [],
+                }
+            
+            # Increment success counters
+            self.errors[agent_name]['total_runs'] += 1
+            self.errors[agent_name]['successes'] += 1
+            self.errors[agent_name]['workers'][worker_name]['successes'] += 1
+            
+            logger.debug(f"Tracked success: {agent_name}.{worker_name} - {operation}")
+            
+            # Track success in error intelligence
+            if self.error_intelligence:
+                self.error_intelligence.track_success(
+                    agent_name=agent_name,
+                    worker_name=worker_name,
+                    operation=operation,
+                    context=context,
+                )
         
-        if worker_name not in self.errors[agent_name]['workers']:
-            self.errors[agent_name]['workers'][worker_name] = {
-                'successes': 0,
-                'failures': 0,
-                'errors': [],
-            }
-        
-        # Increment success counters
-        self.errors[agent_name]['total_runs'] += 1
-        self.errors[agent_name]['successes'] += 1
-        self.errors[agent_name]['workers'][worker_name]['successes'] += 1
-        
-        logger.debug(f"Tracked success: {agent_name}.{worker_name} - {operation}")
+        except Exception as e:
+            logger.error(f"ErrorTracker.track_success failed: {e}")
+            # Don't raise - we don't want tracking to break the system
 
     def track_error(
         self,
@@ -88,38 +111,54 @@ class ErrorTracker:
             data_type: Data type that caused error
             context: Additional context
         """
-        if agent_name not in self.errors:
-            self.errors[agent_name] = {
-                'total_runs': 0,
-                'successes': 0,
-                'failures': 0,
-                'workers': {},
+        try:
+            if agent_name not in self.errors:
+                self.errors[agent_name] = {
+                    'total_runs': 0,
+                    'successes': 0,
+                    'failures': 0,
+                    'workers': {},
+                }
+            
+            if worker_name not in self.errors[agent_name]['workers']:
+                self.errors[agent_name]['workers'][worker_name] = {
+                    'successes': 0,
+                    'failures': 0,
+                    'errors': [],
+                }
+            
+            # Increment failure counters
+            self.errors[agent_name]['total_runs'] += 1
+            self.errors[agent_name]['failures'] += 1
+            self.errors[agent_name]['workers'][worker_name]['failures'] += 1
+            
+            # Store error details
+            error_record = {
+                'timestamp': datetime.now().isoformat(),
+                'error_type': error_type,
+                'error_message': error_message,
+                'data_type': data_type,
+                'context': context or {},
             }
+            
+            self.errors[agent_name]['workers'][worker_name]['errors'].append(error_record)
+            
+            logger.debug(f"Tracked error: {agent_name}.{worker_name} - {error_type}")
+            
+            # Track error in error intelligence
+            if self.error_intelligence:
+                self.error_intelligence.track_error(
+                    agent_name=agent_name,
+                    worker_name=worker_name,
+                    error_type=error_type,
+                    error_message=error_message,
+                    data_type=data_type,
+                    context=context,
+                )
         
-        if worker_name not in self.errors[agent_name]['workers']:
-            self.errors[agent_name]['workers'][worker_name] = {
-                'successes': 0,
-                'failures': 0,
-                'errors': [],
-            }
-        
-        # Increment failure counters
-        self.errors[agent_name]['total_runs'] += 1
-        self.errors[agent_name]['failures'] += 1
-        self.errors[agent_name]['workers'][worker_name]['failures'] += 1
-        
-        # Store error details
-        error_record = {
-            'timestamp': datetime.now().isoformat(),
-            'error_type': error_type,
-            'error_message': error_message,
-            'data_type': data_type,
-            'context': context or {},
-        }
-        
-        self.errors[agent_name]['workers'][worker_name]['errors'].append(error_record)
-        
-        logger.debug(f"Tracked error: {agent_name}.{worker_name} - {error_type}")
+        except Exception as e:
+            logger.error(f"ErrorTracker.track_error failed: {e}")
+            # Don't raise - we don't want tracking to break the system
 
     def record_run(self, agent_name: str) -> None:
         """Record a run attempt for an agent.
@@ -127,15 +166,19 @@ class ErrorTracker:
         Args:
             agent_name: Name of agent that ran
         """
-        if agent_name not in self.errors:
-            self.errors[agent_name] = {
-                'total_runs': 0,
-                'successes': 0,
-                'failures': 0,
-                'workers': {},
-            }
+        try:
+            if agent_name not in self.errors:
+                self.errors[agent_name] = {
+                    'total_runs': 0,
+                    'successes': 0,
+                    'failures': 0,
+                    'workers': {},
+                }
+            
+            self.errors[agent_name]['total_runs'] += 1
         
-        self.errors[agent_name]['total_runs'] += 1
+        except Exception as e:
+            logger.error(f"ErrorTracker.record_run failed: {e}")
 
     def get_patterns(self) -> Dict[str, Any]:
         """Get current error patterns.
@@ -154,26 +197,34 @@ class ErrorTracker:
         Returns:
             Agent statistics
         """
-        if agent_name not in self.errors:
+        try:
+            if agent_name not in self.errors:
+                return {}
+            
+            stats = self.errors[agent_name].copy()
+            total = stats.get('total_runs', 1)
+            successes = stats.get('successes', 0)
+            failures = stats.get('failures', 0)
+            
+            stats['success_rate'] = (
+                (successes / total * 100)
+                if total > 0 else 0
+            )
+            stats['failure_rate'] = (
+                (failures / total * 100)
+                if total > 0 else 0
+            )
+            
+            return stats
+        
+        except Exception as e:
+            logger.error(f"ErrorTracker.get_agent_stats failed: {e}")
             return {}
-        
-        stats = self.errors[agent_name].copy()
-        total = stats.get('total_runs', 1)
-        successes = stats.get('successes', 0)
-        failures = stats.get('failures', 0)
-        
-        stats['success_rate'] = (
-            (successes / total * 100)
-            if total > 0 else 0
-        )
-        stats['failure_rate'] = (
-            (failures / total * 100)
-            if total > 0 else 0
-        )
-        
-        return stats
 
     def clear(self) -> None:
         """Clear all tracked errors."""
-        self.errors = {}
-        logger.info("Error tracker cleared")
+        try:
+            self.errors = {}
+            logger.info("Error tracker cleared")
+        except Exception as e:
+            logger.error(f"ErrorTracker.clear failed: {e}")
