@@ -1,0 +1,133 @@
+"""FixRecommender Worker - Recommends fixes for identified error patterns."""
+
+from typing import Dict, Any, List
+from core.logger import get_logger
+
+logger = get_logger(__name__)
+
+# Fix recommendation mappings
+FIX_RECOMMENDATIONS = {
+    'DateFormatError': {
+        'description': 'Add date format converter/normalizer',
+        'priority': 'HIGH',
+        'action': 'Add date validation and conversion before worker execution',
+    },
+    'NullValueError': {
+        'description': 'Add null/empty value checking',
+        'priority': 'HIGH',
+        'action': 'Add null checks and filtering before processing',
+    },
+    'DataTypeError': {
+        'description': 'Add type validation',
+        'priority': 'HIGH',
+        'action': 'Validate data types before processing',
+    },
+    'IndexError': {
+        'description': 'Add bounds checking',
+        'priority': 'MEDIUM',
+        'action': 'Add length validation and safe indexing',
+    },
+    'ValueError': {
+        'description': 'Add value validation',
+        'priority': 'MEDIUM',
+        'action': 'Validate input values and ranges',
+    },
+    'KeyError': {
+        'description': 'Add key existence checking',
+        'priority': 'MEDIUM',
+        'action': 'Check for key existence before access',
+    },
+}
+
+
+class FixRecommender:
+    """Recommends fixes based on error patterns."""
+
+    def __init__(self):
+        """Initialize fix recommender."""
+        logger.info("FixRecommender worker initialized")
+
+    def recommend(self, patterns: Dict[str, int]) -> List[Dict[str, Any]]:
+        """Recommend fixes for identified patterns.
+        
+        Args:
+            patterns: Dictionary of error patterns with frequencies
+            
+        Returns:
+            List of recommended fixes
+        """
+        recommendations = []
+        
+        for pattern, frequency in patterns.items():
+            # Extract error type from pattern
+            parts = pattern.split(':')
+            if len(parts) < 2:
+                continue
+            
+            error_type = parts[1].split('[')[0]  # Remove data type if present
+            
+            # Look up recommendation
+            if error_type in FIX_RECOMMENDATIONS:
+                fix = FIX_RECOMMENDATIONS[error_type].copy()
+                fix['pattern'] = pattern
+                fix['frequency'] = frequency
+                recommendations.append(fix)
+            else:
+                # Generic recommendation
+                recommendations.append({
+                    'pattern': pattern,
+                    'frequency': frequency,
+                    'description': f'Investigate and handle {error_type}',
+                    'priority': 'MEDIUM' if frequency > 2 else 'LOW',
+                    'action': f'Add error handling for {error_type}',
+                })
+        
+        # Sort by priority and frequency
+        priority_order = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3}
+        recommendations.sort(
+            key=lambda x: (priority_order.get(x.get('priority', 'LOW'), 4), -x['frequency'])
+        )
+        
+        logger.info(f"Generated {len(recommendations)} fix recommendations")
+        return recommendations
+
+    def get_top_recommendations(self, patterns: Dict[str, int], limit: int = 5) -> List[Dict[str, Any]]:
+        """Get top recommended fixes.
+        
+        Args:
+            patterns: Dictionary of error patterns
+            limit: Maximum recommendations to return
+            
+        Returns:
+            Top recommendations
+        """
+        all_recs = self.recommend(patterns)
+        return all_recs[:limit]
+
+    def recommend_for_worker(self, agent: str, worker: str, errors: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Get recommendations for specific worker.
+        
+        Args:
+            agent: Agent name
+            worker: Worker name
+            errors: List of errors for worker
+            
+        Returns:
+            Recommendations for that worker
+        """
+        recommendations = []
+        error_types = set()
+        
+        # Collect all error types
+        for error in errors:
+            error_type = error.get('error_type', 'Unknown')
+            error_types.add(error_type)
+        
+        # Get recommendations for each error type
+        for error_type in error_types:
+            if error_type in FIX_RECOMMENDATIONS:
+                fix = FIX_RECOMMENDATIONS[error_type].copy()
+                fix['error_type'] = error_type
+                recommendations.append(fix)
+        
+        return recommendations
