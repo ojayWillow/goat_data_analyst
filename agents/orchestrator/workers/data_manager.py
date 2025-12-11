@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
-from core.exceptions import DataError
+from core.exceptions import DataLoadError
 
 
 class DataManager:
@@ -46,7 +46,7 @@ class DataManager:
             })
         except Exception as e:
             self.logger.error(f"Error caching data: {e}")
-            raise DataError(f"Failed to cache data with key '{key}': {e}")
+            raise DataLoadError(f"Failed to cache data with key '{key}': {e}")
 
     def get(self, key: str) -> Optional[Any]:
         """Retrieve cached data by key.
@@ -81,14 +81,14 @@ class DataManager:
             DataFrame or None
         
         Raises:
-            DataError: If cached data is not a DataFrame
+            DataLoadError: If cached data is not a DataFrame
         """
         data = self.get(key)
         if data is None:
             return None
         
         if not isinstance(data, pd.DataFrame):
-            raise DataError(f"Cached data at '{key}' is not a DataFrame")
+            raise DataLoadError(f"Cached data at '{key}' is not a DataFrame")
         
         return data
 
@@ -173,7 +173,7 @@ class DataManager:
             DataFrame
         
         Raises:
-            DataError: If no data available
+            DataLoadError: If no data available
         """
         # Priority 1: Data provided directly
         if 'data' in params and isinstance(params['data'], pd.DataFrame):
@@ -205,4 +205,4 @@ class DataManager:
             except Exception as e:
                 self.logger.error(f"Error loading data from file: {e}")
         
-        raise DataError("No data available for task execution")
+        raise DataLoadError("No data available for task execution")
