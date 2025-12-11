@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -18,6 +19,7 @@ class NumericAnalyzer(BaseWorker):
     
     def __init__(self):
         super().__init__("NumericAnalyzer")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Analyze numeric columns.
@@ -28,9 +30,29 @@ class NumericAnalyzer(BaseWorker):
         Returns:
             WorkerResult with numeric statistics
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._run_numeric_analysis(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="explorer",
+                worker_name="NumericAnalyzer",
+                operation="numeric_analysis",
+                context={}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="explorer",
+                worker_name="NumericAnalyzer",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={}
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
+    def _run_numeric_analysis(self, **kwargs) -> WorkerResult:
         """Perform numeric analysis."""
         df = kwargs.get('df')
         
