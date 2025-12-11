@@ -8,6 +8,11 @@ from .health_reporter import HealthReporter
 from .code_analyzer import CodeAnalyzer
 from .architecture_validator import ArchitectureValidator
 from .dependency_mapper import DependencyMapper
+from .error_intelligence_checker import ErrorIntelligenceChecker
+from .error_handling_auditor import ErrorHandlingAuditor
+from .integration_tester import IntegrationTester
+from .contract_validator import ContractValidator
+from .dependency_consistency_checker import DependencyConsistencyChecker
 
 __all__ = [
     "StructureScanner",
@@ -18,4 +23,9 @@ __all__ = [
     "CodeAnalyzer",
     "ArchitectureValidator",
     "DependencyMapper",
+    "ErrorIntelligenceChecker",
+    "ErrorHandlingAuditor",
+    "IntegrationTester",
+    "ContractValidator",
+    "DependencyConsistencyChecker",
 ]
