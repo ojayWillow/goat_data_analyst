@@ -4,6 +4,7 @@ import pandas as pd
 import time
 import numpy as np
 from agents.explorer.workers.base_worker import BaseWorker, WorkerResult, ErrorType
+from agents.error_intelligence.main import ErrorIntelligence
 from core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -15,6 +16,7 @@ class PerformanceTest(BaseWorker):
     def __init__(self):
         """Initialize PerformanceTest."""
         super().__init__("PerformanceTest")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, df: pd.DataFrame = None, operations: list = None, **kwargs) -> WorkerResult:
         """Benchmark performance of data operations.
@@ -30,7 +32,7 @@ class PerformanceTest(BaseWorker):
         result = self._create_result(task_type="performance_test")
         
         if df is None:
-            self._add_error(result, ErrorType.VALIDATION_ERROR, "df required")
+            self._add_error(result, ErrorType.MISSING_DATA, "df required")
             result.success = False
             return result
         
@@ -53,10 +55,26 @@ class PerformanceTest(BaseWorker):
                 "total_time": sum(benchmarks.values())
             }
             
+            self.error_intelligence.track_success(
+                agent_name="explorer",
+                worker_name="PerformanceTest",
+                operation="execute",
+                context={"rows": len(df), "columns": len(df.columns), "total_time": sum(benchmarks.values())}
+            )
+            
             logger.info(f"Performance test completed")
             return result
         
         except Exception as e:
-            self._add_error(result, ErrorType.LOAD_ERROR, f"Performance test failed: {e}")
+            self._add_error(result, ErrorType.COMPUTATION_ERROR, f"Performance test failed: {e}")
             result.success = False
+            
+            self.error_intelligence.track_error(
+                agent_name="explorer",
+                worker_name="PerformanceTest",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={}
+            )
+            
             return result
