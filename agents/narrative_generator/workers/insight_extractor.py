@@ -13,6 +13,7 @@ from typing import Any, Dict, Optional, List
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import AgentError
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class InsightExtractor:
@@ -32,6 +33,7 @@ class InsightExtractor:
         self.name = "InsightExtractor"
         self.logger = get_logger("InsightExtractor")
         self.structured_logger = get_structured_logger("InsightExtractor")
+        self.error_intelligence = ErrorIntelligence()
         self.logger.info("InsightExtractor worker initialized")
 
     def extract_anomalies(self, anomaly_results: Dict[str, Any]) -> Dict[str, Any]:
@@ -298,30 +300,50 @@ class InsightExtractor:
         Returns:
             Dictionary with all insights organized by type
         """
-        self.logger.info("Starting comprehensive insight extraction")
+        try:
+            self.logger.info("Starting comprehensive insight extraction")
 
-        all_insights = {
-            'anomalies': self.extract_anomalies(agent_results.get('anomalies', {})),
-            'predictions': self.extract_predictions(agent_results.get('predictions', {})),
-            'recommendations': self.extract_recommendations(agent_results.get('recommendations', {})),
-            'statistics': self.extract_statistics(agent_results.get('report', {}))
-        }
+            all_insights = {
+                'anomalies': self.extract_anomalies(agent_results.get('anomalies', {})),
+                'predictions': self.extract_predictions(agent_results.get('predictions', {})),
+                'recommendations': self.extract_recommendations(agent_results.get('recommendations', {})),
+                'statistics': self.extract_statistics(agent_results.get('report', {}))
+            }
 
-        # Calculate overall importance
-        total_importance = sum(
-            v.get('importance', 0) for v in all_insights.values()
-            if isinstance(v, dict)
-        )
-        avg_importance = total_importance / len(all_insights) if all_insights else 0
-        all_insights['overall_importance'] = round(avg_importance, 2)
+            # Calculate overall importance
+            total_importance = sum(
+                v.get('importance', 0) for v in all_insights.values()
+                if isinstance(v, dict)
+            )
+            avg_importance = total_importance / len(all_insights) if all_insights else 0
+            all_insights['overall_importance'] = round(avg_importance, 2)
 
-        self.logger.info(f"Insight extraction complete. Overall importance: {avg_importance:.2f}")
-        self.structured_logger.info("Insight extraction complete", {
-            'insight_types': len(all_insights),
-            'overall_importance': round(avg_importance, 2)
-        })
+            self.logger.info(f"Insight extraction complete. Overall importance: {avg_importance:.2f}")
+            self.structured_logger.info("Insight extraction complete", {
+                'insight_types': len(all_insights),
+                'overall_importance': round(avg_importance, 2)
+            })
+            
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="narrative_generator",
+                worker_name="InsightExtractor",
+                operation="extract_all",
+                context={"insight_types": len(all_insights), "overall_importance": round(avg_importance, 2)}
+            )
 
-        return all_insights
+            return all_insights
+            
+        except Exception as e:
+            self.logger.error(f"Error in extract_all: {e}")
+            self.error_intelligence.track_error(
+                agent_name="narrative_generator",
+                worker_name="InsightExtractor",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"operation": "extract_all"}
+            )
+            raise
 
     # === HELPER METHODS ===
 
