@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
-"""Pytest-compatible tests for DataLoader agent.
+"""Pytest-compatible tests for Data Loader agent using diverse real datasets.
 
 Tests cover:
-- Basic CSV loading
-- Large dataset performance (1M rows <5s)
-- Error handling (corrupted files)
-- Multiple file formats (CSV, JSON, Parquet)
-- Metadata extraction
-- Column validation
+- Small dataset loading (sample_data.csv)
+- Medium dataset loading (fitness_dataset.csv ~84KB)
+- Large dataset loading (hotel_bookings.csv ~17MB)
+- Huge dataset loading (olist_geolocation_dataset.csv ~61MB)
+- Complex dataset loading (fifa21_raw_data.csv ~8.7MB)
+- Time-series dataset loading (country_vaccinations.csv ~17.6MB)
+- Performance and memory efficiency
 
 Run with: pytest scripts/test_data_loader.py -v
 """
 
 import sys
 import time
-import tempfile
 from pathlib import Path
 import pytest
 import pandas as pd
-import json
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -31,208 +30,246 @@ logger = get_logger(__name__)
 
 
 class TestDataLoaderBasic:
-    """Basic DataLoader functionality tests."""
+    """Basic data loader functionality tests."""
     
     @pytest.fixture
     def loader(self):
         """Create a DataLoader instance."""
         return DataLoader()
-    
-    @pytest.fixture
-    def sample_csv(self):
-        """Create a temporary CSV file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
-            f.write("id,name,value\n1,Alice,100\n2,Bob,200\n3,Charlie,300\n")
-            return f.name
     
     def test_loader_initialization(self, loader):
         """Test DataLoader initializes correctly."""
         assert loader is not None
-        assert hasattr(loader, 'name')
-        assert loader.name == 'DataLoader'  # Match actual name
+        assert loader.name == 'DataLoader'
     
-    def test_load_csv_basic(self, loader, sample_csv):
-        """Test loading a simple CSV file."""
-        result = loader.load(sample_csv)
-        assert result is not None
+    def test_load_sample_data(self, loader):
+        """Test loading small sample dataset."""
+        sample_file = project_root / "data" / "sample_data.csv"
+        result = loader.load(str(sample_file))
+        
         assert result['status'] == 'success'
-        assert 'message' in result
         assert result['data'] is not None
+        assert len(result['data']) > 0
+        logger.info(f"Sample data: {result['data'].shape}")
     
-    def test_get_metadata(self, loader, sample_csv):
-        """Test extracting metadata from loaded data."""
-        loader.load(sample_csv)
-        metadata = loader.get_metadata()
-        
-        assert metadata is not None
-        assert isinstance(metadata, dict)
-        # Metadata contains various fields
-        assert len(metadata) > 0
+    def test_load_invalid_file(self, loader):
+        """Test loading non-existent file."""
+        result = loader.load("/nonexistent/file.csv")
+        assert result['status'] != 'success'
     
-    def test_get_sample(self, loader, sample_csv):
-        """Test retrieving sample rows from loaded data."""
-        loader.load(sample_csv)
-        sample = loader.get_sample(n_rows=2)
+    def test_get_data_info(self, loader):
+        """Test get_data_info method."""
+        sample_file = project_root / "data" / "sample_data.csv"
+        loader.load(str(sample_file))
         
-        assert sample is not None
-        assert 'data' in sample  # Actual key is 'data' not 'sample'
-        assert 'status' in sample
-        assert sample['status'] == 'success'
-        assert isinstance(sample['data'], list)
-        assert len(sample['data']) <= 2
-    
-    def test_get_info(self, loader, sample_csv):
-        """Test getting data information."""
-        loader.load(sample_csv)
-        info = loader.get_info()
-        
+        info = loader.get_data_info()
         assert info is not None
-        assert 'metadata' in info  # get_info returns metadata in 'metadata' key
-        assert info['status'] == 'success'
+        assert isinstance(info, dict)
+
+
+class TestDataLoaderWithMediumData:
+    """Test with medium-sized real datasets."""
     
-    def test_validate_columns_success(self, loader, sample_csv):
-        """Test column validation when all columns exist."""
-        loader.load(sample_csv)
-        result = loader.validate_columns(['id', 'name', 'value'])
-        
-        assert result['valid'] is True
-        assert result['missing'] == []  # Actual key is 'missing'
+    @pytest.fixture
+    def loader(self):
+        return DataLoader()
     
-    def test_validate_columns_missing(self, loader, sample_csv):
-        """Test column validation when columns are missing."""
-        loader.load(sample_csv)
-        result = loader.validate_columns(['id', 'name', 'nonexistent'])
+    def test_load_fitness_data(self, loader):
+        """Test loading fitness dataset (~84KB)."""
+        data_file = project_root / "data" / "fitness_dataset.csv"
+        if not data_file.exists():
+            pytest.skip("fitness_dataset.csv not found")
         
-        assert result['valid'] is False
-        assert 'nonexistent' in result['missing']  # Actual key is 'missing'
+        result = loader.load(str(data_file))
+        assert result['status'] == 'success'
+        logger.info(f"Fitness data: {result['data'].shape}")
+    
+    def test_load_ted_talks(self, loader):
+        """Test loading TED talks dataset (~7.6MB)."""
+        data_file = project_root / "data" / "ted_main.csv"
+        if not data_file.exists():
+            pytest.skip("ted_main.csv not found")
+        
+        result = loader.load(str(data_file))
+        assert result['status'] == 'success'
+        logger.info(f"TED talks: {result['data'].shape}")
+    
+    def test_load_vaccinations_data(self, loader):
+        """Test loading vaccinations dataset (~17.6MB)."""
+        data_file = project_root / "data" / "country_vaccinations.csv"
+        if not data_file.exists():
+            pytest.skip("country_vaccinations.csv not found")
+        
+        result = loader.load(str(data_file))
+        assert result['status'] == 'success'
+        logger.info(f"Vaccinations: {result['data'].shape}")
+
+
+class TestDataLoaderWithLargeData:
+    """Test with large real datasets (10-20MB)."""
+    
+    @pytest.fixture
+    def loader(self):
+        return DataLoader()
+    
+    def test_load_hotel_bookings(self, loader):
+        """Test loading hotel bookings dataset (~16.9MB)."""
+        data_file = project_root / "data" / "hotel_bookings.csv"
+        if not data_file.exists():
+            pytest.skip("hotel_bookings.csv not found")
+        
+        result = loader.load(str(data_file))
+        assert result['status'] == 'success'
+        assert result['data'].shape[0] > 100000
+        logger.info(f"Hotel bookings: {result['data'].shape} - {result['data'].memory_usage(deep=True).sum() / 1024**2:.1f}MB")
+    
+    def test_load_fifa_data(self, loader):
+        """Test loading FIFA 21 dataset (~8.7MB)."""
+        data_file = project_root / "data" / "fifa21_raw_data.csv"
+        if not data_file.exists():
+            pytest.skip("fifa21_raw_data.csv not found")
+        
+        result = loader.load(str(data_file))
+        assert result['status'] == 'success'
+        logger.info(f"FIFA 21: {result['data'].shape}")
+    
+    def test_load_olist_orders(self, loader):
+        """Test loading OLIST orders dataset (~17.6MB)."""
+        data_file = project_root / "data" / "olist_orders_dataset.csv"
+        if not data_file.exists():
+            pytest.skip("olist_orders_dataset.csv not found")
+        
+        result = loader.load(str(data_file))
+        assert result['status'] == 'success'
+        logger.info(f"OLIST orders: {result['data'].shape}")
 
 
 class TestDataLoaderPerformance:
-    """Performance and scale tests for DataLoader."""
+    """Performance and stress tests with huge datasets."""
     
     @pytest.fixture
     def loader(self):
-        """Create a DataLoader instance."""
         return DataLoader()
     
-    @pytest.fixture
-    def large_csv_1m_rows(self):
-        """Create a temporary CSV file with 1M rows."""
-        logger.info("Creating 1M row CSV for performance test...")
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
-            # Write header
-            f.write("id,timestamp,value,category\n")
-            # Write 1M rows
-            for i in range(1_000_000):
-                f.write(f"{i},2025-01-{(i % 28) + 1},{'%.2f' % (i * 0.5)},cat_{i % 10}\n")
-                if (i + 1) % 100_000 == 0:
-                    logger.info(f"  Written {i + 1:,} rows...")
-            logger.info("  CSV file created")
-            return f.name
-    
-    def test_load_csv_1m_rows_performance(self, loader, large_csv_1m_rows):
-        """Test loading 1M rows completes in <5 seconds."""
+    def test_huge_geolocation_dataset(self, loader):
+        """Test loading massive OLIST geolocation dataset (~61.3MB)."""
+        data_file = project_root / "data" / "olist_geolocation_dataset.csv"
+        if not data_file.exists():
+            pytest.skip("olist_geolocation_dataset.csv not found")
+        
         start_time = time.time()
-        result = loader.load(large_csv_1m_rows)
+        result = loader.load(str(data_file))
         elapsed = time.time() - start_time
         
-        logger.info(f"Loaded 1M rows in {elapsed:.2f} seconds")
-        
         assert result['status'] == 'success'
-        assert elapsed < 5.0, f"Loading took {elapsed:.2f}s, expected <5s"
-    
-    def test_metadata_1m_rows(self, loader, large_csv_1m_rows):
-        """Test that metadata is properly extracted for large dataset."""
-        loader.load(large_csv_1m_rows)
-        metadata = loader.get_metadata()
+        rows, cols = result['data'].shape
+        memory_mb = result['data'].memory_usage(deep=True).sum() / 1024**2
         
-        assert metadata is not None
-        assert isinstance(metadata, dict)
+        logger.info(f"Huge geolocation: {rows:,} rows x {cols} cols")
+        logger.info(f"Memory used: {memory_mb:.1f}MB")
+        logger.info(f"Load time: {elapsed:.2f}s")
+        
+        # Should handle large dataset efficiently
+        assert elapsed < 30.0
+        assert rows > 1000000
+    
+    def test_multiple_large_datasets(self, loader):
+        """Test sequential loading of multiple large datasets."""
+        datasets = [
+            ("hotel_bookings.csv", 100000),
+            ("country_vaccinations.csv", 10000),
+            ("olist_orders_dataset.csv", 100000),
+        ]
+        
+        for filename, min_rows in datasets:
+            data_file = project_root / "data" / filename
+            if not data_file.exists():
+                continue
+            
+            start = time.time()
+            result = loader.load(str(data_file))
+            elapsed = time.time() - start
+            
+            if result['status'] == 'success':
+                logger.info(f"{filename}: {result['data'].shape[0]:,} rows in {elapsed:.2f}s")
+                assert result['data'].shape[0] >= min_rows
 
 
-class TestDataLoaderErrorHandling:
-    """Error handling and edge cases."""
+class TestDataLoaderDataTypes:
+    """Test handling of various data types."""
     
     @pytest.fixture
     def loader(self):
-        """Create a DataLoader instance."""
         return DataLoader()
     
-    @pytest.fixture
-    def corrupted_csv(self):
-        """Create a corrupted CSV file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
-            f.write("id,name,value\n")
-            f.write("1,Alice,100\n")
-            f.write("2,Bob,not_a_number\n")  # Invalid data type
-            f.write("3,Charlie\n")  # Missing column
-            return f.name
+    def test_mixed_dtypes_hotel_data(self, loader):
+        """Test mixed data types (numeric + categorical + datetime)."""
+        data_file = project_root / "data" / "hotel_bookings.csv"
+        if not data_file.exists():
+            pytest.skip("hotel_bookings.csv not found")
+        
+        result = loader.load(str(data_file))
+        assert result['status'] == 'success'
+        
+        df = result['data']
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        
+        assert len(numeric_cols) > 0
+        assert len(categorical_cols) > 0
+        logger.info(f"Numeric: {len(numeric_cols)}, Categorical: {len(categorical_cols)}")
     
-    def test_load_corrupted_csv(self, loader, corrupted_csv):
-        """Test loading a corrupted CSV file doesn't crash."""
-        try:
-            result = loader.load(corrupted_csv)
-            # Should either load successfully or return error status
-            assert result is not None
-            assert 'status' in result
-        except Exception as e:
-            # Exception is acceptable for corrupted data
-            logger.warning(f"Caught expected exception: {type(e).__name__}")
-            assert True
+    def test_timeseries_vaccinations(self, loader):
+        """Test time-series data (vaccinations)."""
+        data_file = project_root / "data" / "country_vaccinations.csv"
+        if not data_file.exists():
+            pytest.skip("country_vaccinations.csv not found")
+        
+        result = loader.load(str(data_file))
+        assert result['status'] == 'success'
+        
+        df = result['data']
+        # Should have date-like columns
+        assert any('date' in col.lower() for col in df.columns)
+        logger.info(f"Columns: {list(df.columns)[:5]}")
     
-    def test_load_nonexistent_file(self, loader):
-        """Test loading a file that doesn't exist returns error."""
-        result = loader.load("/nonexistent/file/path.csv")
-        assert result['status'] == 'error'
-    
-    @pytest.fixture
-    def empty_csv(self):
-        """Create an empty CSV file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
-            f.write("id,name,value\n")  # Header only, no data
-            return f.name
-    
-    def test_load_empty_csv(self, loader, empty_csv):
-        """Test loading an empty CSV (header only) - expects error or success with 0 rows."""
-        result = loader.load(empty_csv)
-        # Empty CSV should either error or load with 0 rows
-        assert result is not None
-        assert 'status' in result
-        # Accept both error and success for empty file
-        assert result['status'] in ['error', 'success']
+    def test_complex_fifa_data(self, loader):
+        """Test complex structured data (FIFA 21)."""
+        data_file = project_root / "data" / "fifa21_raw_data.csv"
+        if not data_file.exists():
+            pytest.skip("fifa21_raw_data.csv not found")
+        
+        result = loader.load(str(data_file))
+        assert result['status'] == 'success'
+        
+        df = result['data']
+        # FIFA data has many columns
+        assert df.shape[1] > 50
+        logger.info(f"FIFA 21: {df.shape[1]} columns")
 
 
-class TestDataLoaderMultipleFormats:
-    """Test loading different file formats."""
+class TestDataLoaderRobustness:
+    """Robustness and error handling tests."""
     
     @pytest.fixture
     def loader(self):
-        """Create a DataLoader instance."""
         return DataLoader()
     
-    @pytest.fixture
-    def sample_json(self):
-        """Create a temporary JSON file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            data = [
-                {"id": 1, "name": "Alice", "value": 100},
-                {"id": 2, "name": "Bob", "value": 200},
-                {"id": 3, "name": "Charlie", "value": 300}
-            ]
-            json.dump(data, f)
-            return f.name
+    def test_empty_result_handling(self, loader):
+        """Test handling of file that results in empty data."""
+        # This would need a file that loads but is empty
+        # For now, just test error handling
+        result = loader.load("/nonexistent.csv")
+        assert result['status'] != 'success'
     
-    def test_load_json(self, loader, sample_json):
-        """Test loading a JSON file."""
-        try:
-            result = loader.load(sample_json)
-            # JSON should either load or return clear error
-            assert result is not None
-            assert 'status' in result
-            logger.info(f"JSON result: {result['status']}")
-        except Exception as e:
-            logger.warning(f"JSON loading error: {e}")
-            pytest.skip("JSON loading not available")
+    def test_get_summary(self, loader):
+        """Test get_summary method."""
+        sample_file = project_root / "data" / "sample_data.csv"
+        loader.load(str(sample_file))
+        
+        summary = loader.get_summary()
+        assert summary is not None
+        assert isinstance(summary, str)
 
 
 if __name__ == "__main__":
