@@ -29,17 +29,19 @@ class ErrorTracker:
             return
         
         self.errors = {}
+        self.error_intelligence = None  # Lazy load to avoid circular dependency
         self._initialized = True
-        
-        # Import here to avoid circular dependency
-        try:
-            from agents.error_intelligence.main import ErrorIntelligence
-            self.error_intelligence = ErrorIntelligence()
-        except ImportError:
-            # If ErrorIntelligence not available yet, skip
-            self.error_intelligence = None
-        
         logger.info("ErrorTracker worker initialized")
+
+    def _get_error_intelligence(self):
+        """Lazy load ErrorIntelligence to avoid circular dependency."""
+        if self.error_intelligence is None:
+            try:
+                from agents.error_intelligence.main import ErrorIntelligence
+                self.error_intelligence = ErrorIntelligence()
+            except ImportError:
+                pass
+        return self.error_intelligence
 
     def track_success(
         self,
@@ -78,15 +80,6 @@ class ErrorTracker:
             self.errors[agent_name]['workers'][worker_name]['successes'] += 1
             
             logger.debug(f"Tracked success: {agent_name}.{worker_name} - {operation}")
-            
-            # Track success in error intelligence
-            if self.error_intelligence:
-                self.error_intelligence.track_success(
-                    agent_name=agent_name,
-                    worker_name=worker_name,
-                    operation=operation,
-                    context=context,
-                )
         
         except Exception as e:
             logger.error(f"ErrorTracker.track_success failed: {e}")
@@ -144,17 +137,6 @@ class ErrorTracker:
             self.errors[agent_name]['workers'][worker_name]['errors'].append(error_record)
             
             logger.debug(f"Tracked error: {agent_name}.{worker_name} - {error_type}")
-            
-            # Track error in error intelligence
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name=agent_name,
-                    worker_name=worker_name,
-                    error_type=error_type,
-                    error_message=error_message,
-                    data_type=data_type,
-                    context=context,
-                )
         
         except Exception as e:
             logger.error(f"ErrorTracker.track_error failed: {e}")
