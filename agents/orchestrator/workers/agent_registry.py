@@ -12,6 +12,7 @@ from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import AgentError
 from core.error_recovery import retry_on_error
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class AgentRegistry:
@@ -26,6 +27,7 @@ class AgentRegistry:
         self.name = "AgentRegistry"
         self.logger = get_logger("AgentRegistry")
         self.structured_logger = get_structured_logger("AgentRegistry")
+        self.error_intelligence = ErrorIntelligence()
         self.agents: Dict[str, Any] = {}
         self.logger.info("AgentRegistry initialized")
 
@@ -53,9 +55,24 @@ class AgentRegistry:
                 'agent_name': agent_name,
                 'total_agents': len(self.agents)
             })
+            
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="orchestrator",
+                worker_name="AgentRegistry",
+                operation="register_agent",
+                context={"agent_name": agent_name, "total_agents": len(self.agents)}
+            )
 
         except Exception as e:
             self.logger.error(f"Agent registration failed: {e}")
+            self.error_intelligence.track_error(
+                agent_name="orchestrator",
+                worker_name="AgentRegistry",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"agent_name": agent_name}
+            )
             raise AgentError(f"Failed to register agent '{agent_name}': {e}")
 
     def get(self, agent_name: str) -> Optional[Any]:
