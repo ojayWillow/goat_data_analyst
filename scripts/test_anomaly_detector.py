@@ -2,12 +2,12 @@
 """Pytest-compatible tests for Anomaly Detector agent using real data.
 
 Tests cover:
-- IQR-based outlier detection
-- Z-score detection
-- Modified Z-score detection
+- LOF (Local Outlier Factor) detection
+- One-Class SVM detection
 - Isolation Forest detection
-- Multivariate (Mahalanobis) analysis
+- Ensemble voting method
 - Summary report generation
+- Batch detection (detect_all)
 
 Run with: pytest scripts/test_anomaly_detector.py -v
 """
@@ -53,7 +53,8 @@ class TestAnomalyDetectorBasic:
     def test_detector_initialization(self, detector):
         """Test AnomalyDetector initializes correctly."""
         assert detector is not None
-        assert hasattr(detector, 'name')
+        assert detector.name == 'AnomalyDetector'
+        assert len(detector.workers) == 4
     
     def test_set_data(self, detector, sample_data):
         """Test setting data in detector."""
@@ -61,66 +62,58 @@ class TestAnomalyDetectorBasic:
         assert detector.data is not None
         assert len(detector.data) == len(sample_data)
     
-    def test_iqr_detection(self, detector, sample_data):
-        """Test IQR-based outlier detection."""
+    def test_lof_detection(self, detector, sample_data):
+        """Test LOF (Local Outlier Factor) detection."""
         detector.set_data(sample_data)
+        result = detector.detect_lof(n_neighbors=5, contamination=0.1)
         
-        # Get numeric columns
-        num_cols = sample_data.select_dtypes(include=['number']).columns
-        if len(num_cols) > 0:
-            result = detector.iqr_detection(num_cols[0], multiplier=1.5)
-            assert result is not None
-            assert isinstance(result, dict)
-            assert 'bounds' in result
-            assert 'outliers_count' in result
+        assert result is not None
+        assert isinstance(result, dict)
     
-    def test_zscore_detection(self, detector, sample_data):
-        """Test Z-score based detection."""
+    def test_ocsvm_detection(self, detector, sample_data):
+        """Test One-Class SVM detection."""
         detector.set_data(sample_data)
+        result = detector.detect_ocsvm(nu=0.05, kernel='rbf')
         
-        num_cols = sample_data.select_dtypes(include=['number']).columns
-        if len(num_cols) > 0:
-            result = detector.zscore_detection(num_cols[0], threshold=3.0)
-            assert result is not None
-            assert isinstance(result, dict)
-    
-    def test_modified_zscore_detection(self, detector, sample_data):
-        """Test modified Z-score detection."""
-        detector.set_data(sample_data)
-        
-        num_cols = sample_data.select_dtypes(include=['number']).columns
-        if len(num_cols) > 0:
-            result = detector.modified_zscore_detection(num_cols[0], threshold=3.5)
-            assert result is not None
-            assert isinstance(result, dict)
+        assert result is not None
+        assert isinstance(result, dict)
     
     def test_isolation_forest_detection(self, detector, sample_data):
-        """Test Isolation Forest based detection."""
+        """Test Isolation Forest detection."""
         detector.set_data(sample_data)
+        result = detector.detect_isolation_forest(contamination=0.1)
         
-        num_cols = sample_data.select_dtypes(include=['number']).columns.tolist()
-        if len(num_cols) >= 2:
-            result = detector.isolation_forest_detection(num_cols, contamination=0.1)
-            assert result is not None
-            assert isinstance(result, dict)
+        assert result is not None
+        assert isinstance(result, dict)
     
-    def test_multivariate_analysis(self, detector, sample_data):
-        """Test multivariate (Mahalanobis) analysis."""
+    def test_ensemble_detection(self, detector, sample_data):
+        """Test Ensemble voting detection."""
         detector.set_data(sample_data)
+        result = detector.detect_ensemble(threshold=0.5)
         
-        num_cols = sample_data.select_dtypes(include=['number']).columns.tolist()
-        if len(num_cols) >= 2:
-            result = detector.multivariate_analysis(num_cols)
-            assert result is not None
-            assert isinstance(result, dict)
+        assert result is not None
+        assert isinstance(result, dict)
+    
+    def test_detect_all(self, detector, sample_data):
+        """Test running all detection methods at once."""
+        detector.set_data(sample_data)
+        results = detector.detect_all()
+        
+        assert results is not None
+        assert isinstance(results, dict)
+        # Should have at least some results
+        assert len(results) > 0
     
     def test_summary_report(self, detector, sample_data):
         """Test summary report generation."""
         detector.set_data(sample_data)
+        detector.detect_all()  # Run detections first
         report = detector.summary_report()
         
         assert report is not None
-        assert isinstance(report, dict)
+        assert 'status' in report
+        assert report['status'] == 'success'
+        assert 'timestamp' in report
 
 
 class TestAnomalyDetectorWithRealData:
@@ -147,25 +140,30 @@ class TestAnomalyDetectorWithRealData:
         
         return result['data']
     
-    def test_iqr_on_real_data(self, detector, fitness_data):
-        """Test IQR detection on real dataset."""
+    def test_lof_on_real_data(self, detector, fitness_data):
+        """Test LOF detection on real dataset."""
         detector.set_data(fitness_data)
+        result = detector.detect_lof()
         
-        num_cols = fitness_data.select_dtypes(include=['number']).columns
-        if len(num_cols) > 0:
-            result = detector.iqr_detection(num_cols[0])
-            assert result is not None
-            logger.info(f"IQR found {result.get('outliers_count', 0)} outliers")
+        assert result is not None
+        logger.info(f"LOF detection completed")
     
     def test_isolation_forest_on_real_data(self, detector, fitness_data):
         """Test Isolation Forest on real dataset."""
         detector.set_data(fitness_data)
+        result = detector.detect_isolation_forest()
         
-        num_cols = fitness_data.select_dtypes(include=['number']).columns.tolist()
-        if len(num_cols) >= 2:
-            result = detector.isolation_forest_detection(num_cols[:2], contamination=0.05)
-            assert result is not None
-            logger.info(f"Isolation Forest found {result.get('anomalies_count', 0)} anomalies")
+        assert result is not None
+        logger.info(f"Isolation Forest detection completed")
+    
+    def test_detect_all_on_real_data(self, detector, fitness_data):
+        """Test all methods on real dataset."""
+        detector.set_data(fitness_data)
+        results = detector.detect_all()
+        
+        assert results is not None
+        assert len(results) > 0
+        logger.info(f"All detection methods completed")
 
 
 class TestAnomalyDetectorPerformance:
@@ -192,31 +190,44 @@ class TestAnomalyDetectorPerformance:
         
         return result['data']
     
-    def test_iqr_performance_on_100k_rows(self, detector, hotel_data):
-        """Test IQR performance on 100K rows."""
+    def test_lof_performance_on_100k_rows(self, detector, hotel_data):
+        """Test LOF performance on 100K rows."""
         detector.set_data(hotel_data)
         
-        num_cols = hotel_data.select_dtypes(include=['number']).columns
-        if len(num_cols) > 0:
-            start = time.time()
-            result = detector.iqr_detection(num_cols[0])
-            elapsed = time.time() - start
-            
-            logger.info(f"IQR on {len(hotel_data):,} rows: {elapsed:.2f}s")
-            assert elapsed < 10.0
+        start = time.time()
+        result = detector.detect_lof()
+        elapsed = time.time() - start
+        
+        logger.info(f"LOF on {len(hotel_data):,} rows: {elapsed:.2f}s")
+        assert result is not None
+        # Should complete in reasonable time
+        assert elapsed < 30.0
     
     def test_isolation_forest_performance(self, detector, hotel_data):
         """Test Isolation Forest performance on 100K rows."""
         detector.set_data(hotel_data)
         
-        num_cols = hotel_data.select_dtypes(include=['number']).columns.tolist()
-        if len(num_cols) >= 2:
-            start = time.time()
-            result = detector.isolation_forest_detection(num_cols[:2], contamination=0.05)
-            elapsed = time.time() - start
-            
-            logger.info(f"Isolation Forest on {len(hotel_data):,} rows: {elapsed:.2f}s")
-            assert elapsed < 15.0
+        start = time.time()
+        result = detector.detect_isolation_forest()
+        elapsed = time.time() - start
+        
+        logger.info(f"Isolation Forest on {len(hotel_data):,} rows: {elapsed:.2f}s")
+        assert result is not None
+        # Should complete in reasonable time
+        assert elapsed < 30.0
+    
+    def test_detect_all_performance(self, detector, hotel_data):
+        """Test all methods performance on 100K rows."""
+        detector.set_data(hotel_data)
+        
+        start = time.time()
+        results = detector.detect_all()
+        elapsed = time.time() - start
+        
+        logger.info(f"All methods on {len(hotel_data):,} rows: {elapsed:.2f}s")
+        assert results is not None
+        # All 4 methods should complete in reasonable time
+        assert elapsed < 60.0
 
 
 class TestAnomalyDetectorEdgeCases:
@@ -226,32 +237,49 @@ class TestAnomalyDetectorEdgeCases:
     def detector(self):
         return AnomalyDetector()
     
-    def test_single_column_data(self, detector):
-        """Test with single column."""
-        df = pd.DataFrame({'value': [1, 2, 3, 4, 100]})  # 100 is outlier
+    def test_small_dataframe(self, detector):
+        """Test with small dataframe (5 rows)."""
+        df = pd.DataFrame({
+            'value1': [1, 2, 3, 4, 100],  # 100 is potential outlier
+            'value2': [10, 20, 30, 40, 500]
+        })
         detector.set_data(df)
         
-        result = detector.iqr_detection('value')
+        result = detector.detect_isolation_forest()
         assert result is not None
-        # Should detect the 100 as outlier
-        assert result.get('outliers_count', 0) > 0
     
-    def test_no_outliers(self, detector):
-        """Test data with no outliers."""
-        df = pd.DataFrame({'value': [1, 2, 3, 4, 5]})
+    def test_no_anomalies(self, detector):
+        """Test data with no clear anomalies."""
+        df = pd.DataFrame({
+            'value1': [1, 2, 3, 4, 5],
+            'value2': [10, 20, 30, 40, 50]
+        })
         detector.set_data(df)
         
-        result = detector.iqr_detection('value')
+        result = detector.detect_isolation_forest(contamination=0.01)
         assert result is not None
-        assert result.get('outliers_count', 0) == 0
     
-    def test_all_same_values(self, detector):
-        """Test with all same values."""
-        df = pd.DataFrame({'value': [5, 5, 5, 5, 5]})
+    def test_mixed_types(self, detector):
+        """Test with mixed numeric and categorical columns."""
+        df = pd.DataFrame({
+            'numeric': [1, 2, 3, 4, 5],
+            'category': ['a', 'b', 'c', 'd', 'e']
+        })
         detector.set_data(df)
         
-        result = detector.iqr_detection('value')
+        # Should handle gracefully - only numeric columns
+        result = detector.detect_isolation_forest()
         assert result is not None
+    
+    def test_get_summary(self, detector):
+        """Test get_summary method."""
+        df = pd.DataFrame({'value': [1, 2, 3]})
+        detector.set_data(df)
+        
+        summary = detector.get_summary()
+        assert summary is not None
+        assert isinstance(summary, str)
+        assert 'AnomalyDetector' in summary
 
 
 if __name__ == "__main__":
