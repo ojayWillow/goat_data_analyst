@@ -12,6 +12,7 @@ import traceback
 import time
 
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -118,6 +119,7 @@ class BaseWorker(ABC):
     def __init__(self, worker_name: str):
         self.worker_name = worker_name
         self.logger = get_logger(f"reporter.workers.{worker_name}")
+        self.error_intelligence = ErrorIntelligence()
         self.logger.info(f"Worker initialized: {worker_name}")
     
     @abstractmethod
@@ -190,10 +192,41 @@ class BaseWorker(ABC):
         try:
             result = self.execute(**kwargs)
             result.execution_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Track success
+            if result.success:
+                self.error_intelligence.track_success(
+                    agent_name="reporter",
+                    worker_name=self.worker_name,
+                    operation="execute",
+                    context={"task_type": result.task_type, "quality_score": result.quality_score}
+                )
+            else:
+                # Track failure if errors exist
+                if result.errors:
+                    error_msg = "; ".join([e.message for e in result.errors])
+                    self.error_intelligence.track_error(
+                        agent_name="reporter",
+                        worker_name=self.worker_name,
+                        error_type="execution_failure",
+                        error_message=error_msg,
+                        context={"task_type": result.task_type}
+                    )
+            
             return result
         
         except Exception as e:
             self.logger.error(f"Worker execution failed: {e}")
+            duration_ms = int((time.time() - start_time) * 1000)
+            
+            # Track error
+            self.error_intelligence.track_error(
+                agent_name="reporter",
+                worker_name=self.worker_name,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"operation": "safe_execute"}
+            )
             
             result = self._create_result(success=False, quality_score=0)
             self._add_error(
@@ -203,5 +236,5 @@ class BaseWorker(ABC):
                 severity="critical",
                 details={"traceback": traceback.format_exc()},
             )
-            result.execution_time_ms = int((time.time() - start_time) * 1000)
+            result.execution_time_ms = duration_ms
             return result
