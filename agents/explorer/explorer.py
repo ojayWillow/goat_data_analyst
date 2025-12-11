@@ -101,6 +101,7 @@ class Explorer:
             "total_workers": len(self.all_workers)
         })
     
+    @retry_on_error(max_attempts=2, backoff=1)
     def set_data(self, df: pd.DataFrame) -> None:
         """Set data to explore.
         
@@ -119,6 +120,7 @@ class Explorer:
             "dtypes": dict(df.dtypes.astype(str).value_counts())
         })
     
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_data(self) -> Optional[pd.DataFrame]:
         """Get current data.
         
@@ -127,6 +129,7 @@ class Explorer:
         """
         return self.data
     
+    @retry_on_error(max_attempts=2, backoff=1)
     def analyze(self) -> Dict[str, Any]:
         """Analyze data (alias for get_summary_report).
         
