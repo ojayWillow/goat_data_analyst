@@ -242,7 +242,7 @@ class InsightExtractor:
         
         Args:
             report_results: Results from Reporter agent
-                          Expected keys: statistics, metrics, etc.
+                          Expected keys: statistics, metrics, completeness, etc.
         
         Returns:
             Dictionary with key statistics and importance score
@@ -254,7 +254,7 @@ class InsightExtractor:
             if not report_results or not isinstance(report_results, dict):
                 return self._no_statistics_insights()
 
-            # Extract key statistics
+            # Extract key statistics from nested statistics dict
             statistics = report_results.get('statistics', {})
             if not isinstance(statistics, dict):
                 statistics = {}
@@ -265,14 +265,21 @@ class InsightExtractor:
                 if key in statistics:
                     key_stats[key] = statistics[key]
 
+            # Get completeness from top level of report_results, not nested
+            completeness = report_results.get('completeness', 100)
+            if isinstance(completeness, (int, float)):
+                completeness = min(max(completeness, 0), 100)  # Clamp 0-100
+            else:
+                completeness = 100
+
             insight = {
                 'key_statistics': key_stats,
-                'completeness': statistics.get('completeness', 100),
-                'data_quality': statistics.get('data_quality', 'unknown'),
+                'completeness': completeness,
+                'data_quality': report_results.get('data_quality', 'unknown'),
                 'importance': 0.5  # Statistics are context
             }
 
-            self.logger.info(f"Statistics extracted: {len(key_stats)} key metrics")
+            self.logger.info(f"Statistics extracted: {len(key_stats)} key metrics, completeness: {completeness}")
             self.structured_logger.info("Statistics extracted", insight)
 
             return insight
