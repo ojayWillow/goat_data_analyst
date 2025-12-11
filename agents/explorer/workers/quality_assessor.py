@@ -8,6 +8,7 @@ from typing import Any, Dict
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -17,6 +18,7 @@ class QualityAssessor(BaseWorker):
     
     def __init__(self):
         super().__init__("QualityAssessor")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Assess data quality.
@@ -27,9 +29,29 @@ class QualityAssessor(BaseWorker):
         Returns:
             WorkerResult with quality metrics
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._run_quality_assessment(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="explorer",
+                worker_name="QualityAssessor",
+                operation="quality_assessment",
+                context={}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="explorer",
+                worker_name="QualityAssessor",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={}
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
+    def _run_quality_assessment(self, **kwargs) -> WorkerResult:
         """Perform data quality assessment."""
         df = kwargs.get('df')
         
