@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,7 @@ class ParquetLoaderWorker(BaseWorker):
     def __init__(self):
         """Initialize ParquetLoaderWorker."""
         super().__init__("ParquetLoaderWorker")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Execute Parquet loading.
@@ -27,10 +29,30 @@ class ParquetLoaderWorker(BaseWorker):
         Returns:
             WorkerResult with loaded data
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._run_parquet_load(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="data_loader",
+                worker_name="ParquetLoaderWorker",
+                operation="parquet_loading",
+                context={"file_path": kwargs.get('file_path')}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="data_loader",
+                worker_name="ParquetLoaderWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"file_path": kwargs.get('file_path')}
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
-        """Actual implementation of Parquet loading."""
+    def _run_parquet_load(self, **kwargs) -> WorkerResult:
+        """Perform Parquet loading."""
         file_path = kwargs.get('file_path')
         
         result = self._create_result(task_type="parquet_loading")
