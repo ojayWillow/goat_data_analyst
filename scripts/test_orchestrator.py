@@ -26,6 +26,7 @@ sys.path.insert(0, str(project_root))
 
 from agents.orchestrator.orchestrator import Orchestrator
 from core.exceptions import OrchestratorError
+from core.error_recovery import RecoveryError
 from core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -447,9 +448,9 @@ class TestOrchestratorEdgeCases:
         try:
             result = orchestrator.execute_task("test_task", None)
             # Should handle gracefully
-            assert True
-        except (TypeError, AttributeError):
-            # This is acceptable
+            assert result is not None
+        except (TypeError, RecoveryError, AttributeError):
+            # This is acceptable - None parameters is invalid
             pass
         logger.info("✓ None parameters test passed")
     
