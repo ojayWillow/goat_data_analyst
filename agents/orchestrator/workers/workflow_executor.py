@@ -14,6 +14,7 @@ from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import OrchestratorError
 from core.error_recovery import retry_on_error
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class WorkflowExecutor:
@@ -32,6 +33,7 @@ class WorkflowExecutor:
         self.name = "WorkflowExecutor"
         self.logger = get_logger("WorkflowExecutor")
         self.structured_logger = get_structured_logger("WorkflowExecutor")
+        self.error_intelligence = ErrorIntelligence()
         self.task_router = task_router
         self.workflow_history = []
         self.logger.info("WorkflowExecutor initialized")
@@ -110,6 +112,14 @@ class WorkflowExecutor:
                 'successful_tasks': len([t for t in workflow['tasks'] if t['status'] == 'completed'])
             })
             
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="orchestrator",
+                worker_name="WorkflowExecutor",
+                operation="execute_workflow",
+                context={"workflow_id": workflow_id, "task_count": len(workflow_tasks)}
+            )
+            
             self.workflow_history.append(workflow)
             return workflow
         
@@ -120,6 +130,15 @@ class WorkflowExecutor:
             
             self.logger.error(f"Workflow failed: {e}")
             self.workflow_history.append(workflow)
+            
+            # Track error
+            self.error_intelligence.track_error(
+                agent_name="orchestrator",
+                worker_name="WorkflowExecutor",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"workflow_id": workflow_id}
+            )
             
             raise OrchestratorError(f"Workflow execution failed: {e}")
 
