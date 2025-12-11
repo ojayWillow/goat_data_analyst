@@ -5,6 +5,7 @@ Enhances original with:
 - Tracks file sizes and metrics
 - Identifies documentation coverage
 - Detects circular dependencies
+- Scans both /tests and /scripts for test files
 """
 
 import json
@@ -61,22 +62,39 @@ class StructureScanner:
         return agents
 
     def discover_tests(self) -> Dict[str, Dict[str, Any]]:
-        """Discover all test files with metadata."""
+        """Discover all test files with metadata.
+        
+        Scans both /tests and /scripts directories for test_*.py files.
+        """
         tests = {}
+        
+        # Scan /tests directory
         tests_dir = self.project_root / "tests"
-
-        if not tests_dir.exists():
-            return tests
-
-        for test_file in tests_dir.glob("test_*.py"):
-            test_name = test_file.stem
-            tests[test_name] = {
-                "path": str(test_file),
-                "exists": True,
-                "discoverable": True,
-                "file_size_bytes": test_file.stat().st_size,
-                "last_modified": datetime.fromtimestamp(test_file.stat().st_mtime).isoformat(),
-            }
+        if tests_dir.exists():
+            for test_file in tests_dir.glob("test_*.py"):
+                test_name = test_file.stem
+                tests[test_name] = {
+                    "path": str(test_file),
+                    "exists": True,
+                    "discoverable": True,
+                    "file_size_bytes": test_file.stat().st_size,
+                    "last_modified": datetime.fromtimestamp(test_file.stat().st_mtime).isoformat(),
+                }
+        
+        # Scan /scripts directory for test_*.py files
+        scripts_dir = self.project_root / "scripts"
+        if scripts_dir.exists():
+            for test_file in scripts_dir.glob("test_*.py"):
+                test_name = test_file.stem
+                # Avoid duplicates if test exists in both directories
+                if test_name not in tests:
+                    tests[test_name] = {
+                        "path": str(test_file),
+                        "exists": True,
+                        "discoverable": True,
+                        "file_size_bytes": test_file.stat().st_size,
+                        "last_modified": datetime.fromtimestamp(test_file.stat().st_mtime).isoformat(),
+                    }
 
         return tests
 
@@ -137,9 +155,17 @@ class StructureScanner:
         }
 
     def _has_test(self, agent_name: str) -> bool:
-        """Check if agent has corresponding test file."""
+        """Check if agent has corresponding test file.
+        
+        Checks both /tests and /scripts directories.
+        """
         tests_dir = self.project_root / "tests"
-        return (tests_dir / f"test_{agent_name}.py").exists()
+        scripts_dir = self.project_root / "scripts"
+        
+        return (
+            (tests_dir / f"test_{agent_name}.py").exists() or
+            (scripts_dir / f"test_{agent_name}.py").exists()
+        )
 
     def _has_workers_folder(self, agent_path: Path) -> bool:
         """Check if agent has workers subdirectory."""
