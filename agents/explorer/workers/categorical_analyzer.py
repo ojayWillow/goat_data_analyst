@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -17,6 +18,7 @@ class CategoricalAnalyzer(BaseWorker):
     
     def __init__(self):
         super().__init__("CategoricalAnalyzer")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Analyze categorical columns.
@@ -27,9 +29,29 @@ class CategoricalAnalyzer(BaseWorker):
         Returns:
             WorkerResult with categorical statistics
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._run_categorical_analysis(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="explorer",
+                worker_name="CategoricalAnalyzer",
+                operation="categorical_analysis",
+                context={}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="explorer",
+                worker_name="CategoricalAnalyzer",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={}
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
+    def _run_categorical_analysis(self, **kwargs) -> WorkerResult:
         """Perform categorical analysis."""
         df = kwargs.get('df')
         
