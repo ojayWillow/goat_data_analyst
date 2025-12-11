@@ -14,6 +14,7 @@ Integrated with Week 1 foundation:
 - Error recovery (@retry_on_error)
 - Structured logging
 - Input validation
+- Error Intelligence tracking
 """
 
 from typing import Dict, List, Optional, Tuple, Any
@@ -27,6 +28,7 @@ from core.error_recovery import retry_on_error
 from core.structured_logger import get_structured_logger
 from core.validators import validate_input, validate_output
 from core.exceptions import AgentError
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_structured_logger(__name__)
 
@@ -36,6 +38,7 @@ class AdvancedAnalysis:
     
     def __init__(self):
         """Initialize advanced analysis module."""
+        self.error_intelligence = ErrorIntelligence()
         logger.info("AdvancedAnalysis module initialized")
     
     # ===== ONE-WAY ANOVA =====
@@ -104,6 +107,13 @@ class AdvancedAnalysis:
                 is_significant = p_value < 0.05
                 interpretation = 'Significant (p < 0.05)' if is_significant else 'Not significant (p >= 0.05)'
                 
+                self.error_intelligence.track_success(
+                    agent_name="explorer",
+                    worker_name="AdvancedAnalysis",
+                    operation="one_way_anova",
+                    context={"groups": len(groups), "p_value": float(p_value), "significant": is_significant}
+                )
+                
                 logger.info(
                     'One-way ANOVA complete',
                     extra={'f_stat': f_stat, 'p_value': p_value, 'significant': is_significant}
@@ -125,6 +135,13 @@ class AdvancedAnalysis:
                 }
             
             except Exception as e:
+                self.error_intelligence.track_error(
+                    agent_name="explorer",
+                    worker_name="AdvancedAnalysis",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    context={"operation": "one_way_anova"}
+                )
                 logger.error('One-way ANOVA failed', extra={'error': str(e)})
                 raise AgentError(f"One-way ANOVA failed: {e}")
     
@@ -180,6 +197,13 @@ class AdvancedAnalysis:
                     g_data = data[data[group_col] == g][value_col].dropna()
                     group_variances[str(g)] = float(g_data.var())
                 
+                self.error_intelligence.track_success(
+                    agent_name="explorer",
+                    worker_name="AdvancedAnalysis",
+                    operation="levenes_test",
+                    context={"groups": len(groups), "p_value": float(p_value), "equal_variance": equal_variance}
+                )
+                
                 logger.info(
                     'Levene\'s test complete',
                     extra={'statistic': statistic, 'p_value': p_value, 'equal_variance': equal_variance}
@@ -199,6 +223,13 @@ class AdvancedAnalysis:
                 }
             
             except Exception as e:
+                self.error_intelligence.track_error(
+                    agent_name="explorer",
+                    worker_name="AdvancedAnalysis",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    context={"operation": "levenes_test"}
+                )
                 logger.error('Levene\'s test failed', extra={'error': str(e)})
                 raise AgentError(f"Levene's test failed: {e}")
     
@@ -264,6 +295,13 @@ class AdvancedAnalysis:
                 else:
                     effect_size = 'Large'
                 
+                self.error_intelligence.track_success(
+                    agent_name="explorer",
+                    worker_name="AdvancedAnalysis",
+                    operation="cohens_d",
+                    context={"d": float(d), "effect_size": effect_size}
+                )
+                
                 logger.info(
                     'Cohen\'s d calculated',
                     extra={'d': d, 'effect_size': effect_size}
@@ -290,6 +328,13 @@ class AdvancedAnalysis:
                 }
             
             except Exception as e:
+                self.error_intelligence.track_error(
+                    agent_name="explorer",
+                    worker_name="AdvancedAnalysis",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    context={"operation": "cohens_d"}
+                )
                 logger.error('Cohen\'s d calculation failed', extra={'error': str(e)})
                 raise AgentError(f"Cohen's d calculation failed: {e}")
     
@@ -359,6 +404,13 @@ class AdvancedAnalysis:
                 else:
                     effect_size = 'Large'
                 
+                self.error_intelligence.track_success(
+                    agent_name="explorer",
+                    worker_name="AdvancedAnalysis",
+                    operation="eta_squared",
+                    context={"eta_sq": float(eta_sq), "effect_size": effect_size}
+                )
+                
                 logger.info(
                     'Eta-squared calculated',
                     extra={'eta_sq': eta_sq, 'effect_size': effect_size}
@@ -382,6 +434,13 @@ class AdvancedAnalysis:
                 }
             
             except Exception as e:
+                self.error_intelligence.track_error(
+                    agent_name="explorer",
+                    worker_name="AdvancedAnalysis",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    context={"operation": "eta_squared"}
+                )
                 logger.error('Eta-squared calculation failed', extra={'error': str(e)})
                 raise AgentError(f"Eta-squared calculation failed: {e}")
     
@@ -447,6 +506,13 @@ class AdvancedAnalysis:
                 
                 is_significant = p_value < 0.05
                 
+                self.error_intelligence.track_success(
+                    agent_name="explorer",
+                    worker_name="AdvancedAnalysis",
+                    operation="welch_anova",
+                    context={"groups": len(groups), "p_value": float(p_value), "significant": is_significant}
+                )
+                
                 logger.info(
                     'Welch\'s ANOVA complete',
                     extra={'f_stat': f_stat, 'p_value': p_value}
@@ -465,5 +531,12 @@ class AdvancedAnalysis:
                 }
             
             except Exception as e:
+                self.error_intelligence.track_error(
+                    agent_name="explorer",
+                    worker_name="AdvancedAnalysis",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    context={"operation": "welch_anova"}
+                )
                 logger.error('Welch\'s ANOVA failed', extra={'error': str(e)})
                 raise AgentError(f"Welch's ANOVA failed: {e}")
