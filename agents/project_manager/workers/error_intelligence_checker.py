@@ -1,10 +1,12 @@
 """ErrorIntelligenceChecker Worker - Audit Error Intelligence coverage across agents.
 
 Checks:
-- Which agents have Error Intelligence integration
+- Which agents have Error Intelligence integration (in workers)
 - Which agents are missing Error Intelligence
 - Error Intelligence initialization patterns
 - Error tracking coverage
+
+Key: Checks WORKERS not just main agent file
 """
 
 import ast
@@ -60,7 +62,11 @@ class ErrorIntelligenceChecker:
         }
 
     def _check_agent_ei(self, agent_path: Path, agent_name: str) -> Dict[str, Any]:
-        """Check if agent has Error Intelligence integration."""
+        """Check if agent has Error Intelligence integration.
+        
+        Checks BOTH main agent file AND worker files for EI imports.
+        """
+        # Check main agent file
         main_file = agent_path / f"{agent_name}.py"
         if not main_file.exists():
             py_files = [f for f in agent_path.glob("*.py") if not f.name.startswith("_")]
@@ -72,75 +78,106 @@ class ErrorIntelligenceChecker:
                     "reason": "No main file found",
                     "ei_imports": [],
                     "ei_usage": [],
+                    "ei_in_workers": False,
                 }
             main_file = py_files[0]
 
+        # Check main file
+        main_ei_imports = self._find_ei_imports_in_file(main_file)
+        main_ei_usage = self._find_ei_usage_in_file(main_file)
+        
+        # Check worker files (if they exist)
+        worker_ei_imports = []
+        worker_ei_usage = []
+        ei_in_workers = False
+        
+        workers_dir = agent_path / "workers"
+        if workers_dir.exists():
+            for worker_file in workers_dir.glob("*.py"):
+                if worker_file.name.startswith("_"):
+                    continue
+                
+                file_imports = self._find_ei_imports_in_file(worker_file)
+                file_usage = self._find_ei_usage_in_file(worker_file)
+                
+                if file_imports or file_usage:
+                    ei_in_workers = True
+                    worker_ei_imports.extend(file_imports)
+                    worker_ei_usage.extend(file_usage)
+        
+        # Combine findings
+        all_ei_imports = main_ei_imports + worker_ei_imports
+        all_ei_usage = main_ei_usage + worker_ei_usage
+        
+        has_ei = len(all_ei_imports) > 0 and len(all_ei_usage) > 0
+        has_partial = len(all_ei_imports) > 0 and len(all_ei_usage) == 0
+        
+        return {
+            "agent": agent_name,
+            "has_ei": has_ei,
+            "has_partial": has_partial,
+            "main_file": str(main_file),
+            "has_workers": workers_dir.exists(),
+            "ei_in_workers": ei_in_workers,
+            "ei_imports": all_ei_imports,
+            "ei_usage": all_ei_usage,
+            "usage_count": len(all_ei_usage),
+            "reason": self._get_reason(has_ei, has_partial, all_ei_imports, all_ei_usage, ei_in_workers),
+        }
+
+    def _find_ei_imports_in_file(self, file_path: Path) -> List[str]:
+        """Find ErrorIntelligence imports in a single file."""
+        imports = []
         try:
-            with open(main_file, "r") as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 source = f.read()
             tree = ast.parse(source)
             
-            ei_imports = self._find_ei_imports(tree)
-            ei_usage = self._find_ei_usage(tree)
-            
-            has_ei = len(ei_imports) > 0 and len(ei_usage) > 0
-            has_partial = len(ei_imports) > 0 and len(ei_usage) == 0
-            
-            return {
-                "agent": agent_name,
-                "has_ei": has_ei,
-                "has_partial": has_partial,
-                "file": str(main_file),
-                "ei_imports": ei_imports,
-                "ei_usage": ei_usage,
-                "usage_count": len(ei_usage),
-                "reason": self._get_reason(has_ei, has_partial, ei_imports, ei_usage),
-            }
-        except Exception as e:
-            self.logger.error(f"Failed to check {agent_name}: {e}")
-            return {
-                "agent": agent_name,
-                "has_ei": False,
-                "has_partial": False,
-                "reason": f"Analysis failed: {str(e)}",
-                "ei_imports": [],
-                "ei_usage": [],
-            }
-
-    def _find_ei_imports(self, tree: ast.AST) -> List[str]:
-        """Find ErrorIntelligence imports in AST."""
-        imports = []
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom):
-                if node.module and "error_intelligence" in node.module:
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom):
+                    if node.module and "error_intelligence" in node.module:
+                        for alias in node.names:
+                            if self.ei_class in alias.name:
+                                imports.append(f"from {node.module} import {alias.name}")
+                elif isinstance(node, ast.Import):
                     for alias in node.names:
-                        if self.ei_class in alias.name:
-                            imports.append(f"from {node.module} import {alias.name}")
-            elif isinstance(node, ast.Import):
-                for alias in node.names:
-                    if "error_intelligence" in alias.name:
-                        imports.append(f"import {alias.name}")
+                        if "error_intelligence" in alias.name:
+                            imports.append(f"import {alias.name}")
+        except Exception as e:
+            self.logger.debug(f"Error parsing {file_path}: {e}")
+        
         return imports
 
-    def _find_ei_usage(self, tree: ast.AST) -> List[str]:
-        """Find ErrorIntelligence usage in AST."""
+    def _find_ei_usage_in_file(self, file_path: Path) -> List[str]:
+        """Find ErrorIntelligence usage in a single file."""
         usage = []
-        for node in ast.walk(tree):
-            # Check for instantiation: ErrorIntelligence()
-            if isinstance(node, ast.Call):
-                if isinstance(node.func, ast.Name):
-                    if self.ei_class in node.func.id:
-                        usage.append(f"Instantiation: {node.func.id}()")
-            # Check for attribute access: self.error_intelligence.track_error()
-            if isinstance(node, ast.Attribute):
-                if "error_intelligence" in node.attr:
-                    usage.append(f"Usage: error_intelligence.{node.attr}")
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                source = f.read()
+            tree = ast.parse(source)
+            
+            for node in ast.walk(tree):
+                # Check for instantiation: ErrorIntelligence()
+                if isinstance(node, ast.Call):
+                    if isinstance(node.func, ast.Name):
+                        if self.ei_class in node.func.id:
+                            usage.append(f"Instantiation: {node.func.id}()")
+                # Check for attribute access: self.error_intelligence.track_error()
+                if isinstance(node, ast.Attribute):
+                    if "error_intelligence" in node.attr:
+                        usage.append(f"Usage: error_intelligence.{node.attr}")
+        except Exception as e:
+            self.logger.debug(f"Error parsing {file_path}: {e}")
+        
         return list(set(usage))
 
-    def _get_reason(self, has_ei: bool, has_partial: bool, imports: List[str], usage: List[str]) -> str:
+    def _get_reason(self, has_ei: bool, has_partial: bool, imports: List[str], usage: List[str], ei_in_workers: bool) -> str:
         """Get human-readable reason for status."""
         if has_ei:
-            return "✅ Error Intelligence fully integrated"
+            if ei_in_workers:
+                return "✅ Error Intelligence integrated in workers"
+            else:
+                return "✅ Error Intelligence fully integrated"
         elif has_partial:
             return f"⚠️  Imported but not used ({len(imports)} imports, {len(usage)} usage)"
         elif imports:
