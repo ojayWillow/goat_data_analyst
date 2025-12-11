@@ -90,6 +90,7 @@ class Reporter:
             ]
         })
     
+    @retry_on_error(max_attempts=2, backoff=1)
     def set_data(self, df: pd.DataFrame) -> None:
         """Set data for report generation.
         
@@ -106,6 +107,7 @@ class Reporter:
             "dtypes": dict(df.dtypes.astype(str).value_counts())
         })
     
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_data(self) -> Optional[pd.DataFrame]:
         """Get current data.
         
@@ -405,6 +407,7 @@ class Reporter:
             })
             raise AgentError(f"Export failed: {e}")
     
+    @retry_on_error(max_attempts=2, backoff=1)
     def list_reports(self) -> Dict[str, Any]:
         """List all generated reports.
         
