@@ -11,14 +11,18 @@ class WorkerHealth:
 
     def __init__(self):
         """Initialize worker health calculator."""
-        # Import here to avoid circular dependency
-        try:
-            from agents.error_intelligence.main import ErrorIntelligence
-            self.error_intelligence = ErrorIntelligence()
-        except ImportError:
-            self.error_intelligence = None
-        
+        self.error_intelligence = None  # Lazy load to avoid circular dependency
         logger.info("WorkerHealth worker initialized")
+
+    def _get_error_intelligence(self):
+        """Lazy load ErrorIntelligence to avoid circular dependency."""
+        if self.error_intelligence is None:
+            try:
+                from agents.error_intelligence.main import ErrorIntelligence
+                self.error_intelligence = ErrorIntelligence()
+            except ImportError:
+                pass
+        return self.error_intelligence
 
     def calculate(self, error_patterns: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
         """Calculate health scores for all workers.
@@ -46,30 +50,10 @@ class WorkerHealth:
                         health_scores[agent_name]['workers'][worker_name] = self._calculate_worker_health(worker_data)
             
             logger.info(f"Calculated health scores for {len(health_scores)} agents")
-            
-            # Track success
-            if self.error_intelligence:
-                self.error_intelligence.track_success(
-                    agent_name="error_intelligence",
-                    worker_name="WorkerHealth",
-                    operation="calculate_health",
-                    context={"agents_scored": len(health_scores)}
-                )
-            
             return health_scores
         
         except Exception as e:
             logger.error(f"WorkerHealth.calculate failed: {e}")
-            
-            # Track error
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="WorkerHealth",
-                    error_type="calculate_error",
-                    error_message=str(e),
-                )
-            
             return {}
 
     def _calculate_agent_health(self, agent_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -174,27 +158,8 @@ class WorkerHealth:
             
             # Sort by failures (highest first)
             result = sorted(worker_list, key=lambda x: x['failures'], reverse=True)
-            
-            # Track success
-            if self.error_intelligence:
-                self.error_intelligence.track_success(
-                    agent_name="error_intelligence",
-                    worker_name="WorkerHealth",
-                    operation="rank_workers",
-                    context={"workers_ranked": len(result)}
-                )
-            
             return result
         
         except Exception as e:
             logger.error(f"WorkerHealth.rank_workers failed: {e}")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="WorkerHealth",
-                    error_type="rank_workers_error",
-                    error_message=str(e),
-                )
-            
             return []
