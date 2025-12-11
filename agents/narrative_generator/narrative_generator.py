@@ -45,6 +45,7 @@ class NarrativeGenerator:
             "workers": "to_be_added"
         })
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def set_results(self, results: Dict[str, Any]) -> None:
         """Store raw agent results for processing.
         
@@ -64,6 +65,7 @@ class NarrativeGenerator:
             "timestamp": datetime.now().isoformat()
         })
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_summary(self) -> str:
         """Get human-readable info about the agent state.
         
