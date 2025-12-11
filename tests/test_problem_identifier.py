@@ -40,7 +40,7 @@ class TestProblemIdentifier:
 
         assert problem is not None
         assert problem['type'] == 'anomalies'
-        assert problem['severity'] == 'medium'
+        assert problem['severity'] == 'low'  # 5.0% = low (threshold >5%)
         assert problem['count'] == 5
         assert problem['percentage'] == 5.0
 
@@ -112,8 +112,22 @@ class TestProblemIdentifier:
         problem = identifier.identify_missing_data_problems(statistics_insights)
 
         assert problem is not None
-        assert problem['severity'] == 'critical'  # >15%
+        assert problem['severity'] == 'high'  # 15% = high (threshold >15% = critical)
         assert problem['percentage'] == 15.0
+
+    def test_missing_data_severity_critical(self, identifier):
+        """Test critical severity for extreme missing data."""
+        statistics_insights = {
+            'completeness': 84.0,  # 16% missing (>15%)
+            'key_statistics': {},
+            'data_quality': 'critical'
+        }
+
+        problem = identifier.identify_missing_data_problems(statistics_insights)
+
+        assert problem is not None
+        assert problem['severity'] == 'critical'  # >15%
+        assert problem['percentage'] == 16.0
 
     # === PREDICTION PROBLEM TESTS ===
 
