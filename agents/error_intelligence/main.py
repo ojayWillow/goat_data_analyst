@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 
 class ErrorIntelligence:
-    """Error Intelligence Agent - Tracks and learns from system errors."""
+    """Error Intelligence Agent - Tracks successes and learns from system errors."""
 
     def __init__(self):
         """Initialize error intelligence agent with all workers."""
@@ -55,6 +55,35 @@ class ErrorIntelligence:
         except Exception as e:
             logger.error(f"Failed to save error patterns: {e}")
 
+    def track_success(
+        self,
+        agent_name: str,
+        worker_name: str,
+        operation: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Track a successful operation.
+        
+        Args:
+            agent_name: Name of agent that succeeded
+            worker_name: Name of worker that succeeded
+            operation: Operation that succeeded
+            context: Additional context about the success
+        """
+        # Track the success
+        self.error_tracker.track_success(
+            agent_name=agent_name,
+            worker_name=worker_name,
+            operation=operation,
+            context=context,
+        )
+        
+        # Update error patterns
+        self.error_patterns = self.error_tracker.get_patterns()
+        self._save_error_patterns()
+        
+        logger.info(f"Success tracked: {agent_name}.{worker_name} - {operation}")
+
     def track_error(
         self,
         agent_name: str,
@@ -75,7 +104,7 @@ class ErrorIntelligence:
             context: Additional context about the error
         """
         # Track the error
-        self.error_tracker.track(
+        self.error_tracker.track_error(
             agent_name=agent_name,
             worker_name=worker_name,
             error_type=error_type,

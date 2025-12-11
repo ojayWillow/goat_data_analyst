@@ -6,6 +6,7 @@ from typing import Optional
 
 from agents.aggregator.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,7 @@ class ExponentialWeighted(BaseWorker):
     def __init__(self):
         """Initialize ExponentialWeighted."""
         super().__init__("ExponentialWeighted")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(
         self,
@@ -29,12 +31,35 @@ class ExponentialWeighted(BaseWorker):
         Args:
             df: DataFrame to process
             span: Span for exponential weighting
-            adjust: Whether to apply exponential scaling to account for observation weights
-            **kwargs: Additional arguments
+            adjust: Whether to apply exponential scaling
             
         Returns:
             WorkerResult with EWMA results
         """
+        try:
+            result = self._run_ewma(df, span, adjust, **kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="aggregator",
+                worker_name="ExponentialWeighted",
+                operation="exponential_weighted",
+                context={"span": span}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="ExponentialWeighted",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"span": span}
+            )
+            raise
+    
+    def _run_ewma(self, df, span, adjust, **kwargs) -> WorkerResult:
+        """Calculate exponential weighted moving average."""
         result = self._create_result(task_type="exponential_weighted")
         
         if df is None:
@@ -43,7 +68,6 @@ class ExponentialWeighted(BaseWorker):
             return result
         
         try:
-            # Select numeric columns
             numeric_df = df.select_dtypes(include=[np.number])
             
             if numeric_df.empty:
@@ -56,10 +80,7 @@ class ExponentialWeighted(BaseWorker):
                 result.success = False
                 return result
             
-            # Calculate exponential weighted moving average
             ewma = numeric_df.ewm(span=span, adjust=adjust).mean()
-            
-            # Calculate statistics
             ewma_std = numeric_df.ewm(span=span, adjust=adjust).std()
             
             result.data = {

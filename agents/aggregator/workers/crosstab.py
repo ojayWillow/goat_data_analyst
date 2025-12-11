@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -18,6 +19,7 @@ class CrossTabWorker(BaseWorker):
     
     def __init__(self):
         super().__init__("CrossTabWorker")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Create cross-tabulation.
@@ -32,9 +34,29 @@ class CrossTabWorker(BaseWorker):
         Returns:
             WorkerResult with cross-tabulation
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._run_crosstab(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="aggregator",
+                worker_name="CrossTabWorker",
+                operation="crosstab",
+                context={"rows": kwargs.get('rows'), "columns": kwargs.get('columns')}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="CrossTabWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"rows": kwargs.get('rows'), "columns": kwargs.get('columns')}
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
+    def _run_crosstab(self, **kwargs) -> WorkerResult:
         """Perform cross-tabulation operation."""
         df = kwargs.get('df')
         rows = kwargs.get('rows')
@@ -47,7 +69,6 @@ class CrossTabWorker(BaseWorker):
             quality_score=1.0
         )
         
-        # Validate data
         if df is None or df.empty:
             self._add_error(
                 result,
@@ -63,7 +84,6 @@ class CrossTabWorker(BaseWorker):
         try:
             self.logger.info(f"Creating crosstab: rows={rows}, columns={columns}")
             
-            # Validate required parameters
             if not rows or not columns:
                 self._add_error(
                     result,
@@ -76,7 +96,6 @@ class CrossTabWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
-            # Validate columns exist
             required_cols = [rows, columns]
             if values:
                 required_cols.append(values)
@@ -94,7 +113,6 @@ class CrossTabWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
-            # Create crosstab
             if values:
                 ct = pd.crosstab(
                     df[rows],

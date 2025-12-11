@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from agents.aggregator.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,7 @@ class RollingAggregation(BaseWorker):
     def __init__(self):
         """Initialize RollingAggregation."""
         super().__init__("RollingAggregation")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(
         self,
@@ -30,13 +32,36 @@ class RollingAggregation(BaseWorker):
         Args:
             df: DataFrame to process
             window_size: Size of rolling window
-            columns: Columns to aggregate (None = all numeric)
-            agg_dict: Dict mapping columns to operations {'col': ['mean', 'sum']}
-            **kwargs: Additional arguments
+            columns: Columns to aggregate
+            agg_dict: Dict mapping columns to operations
             
         Returns:
             WorkerResult with aggregation results
         """
+        try:
+            result = self._run_rolling_agg(df, window_size, columns, agg_dict, **kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="aggregator",
+                worker_name="RollingAggregation",
+                operation="rolling_aggregation",
+                context={"window_size": window_size}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="RollingAggregation",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"window_size": window_size}
+            )
+            raise
+    
+    def _run_rolling_agg(self, df, window_size, columns, agg_dict, **kwargs) -> WorkerResult:
+        """Perform rolling aggregation."""
         result = self._create_result(task_type="rolling_aggregation")
         
         if df is None:
@@ -45,7 +70,6 @@ class RollingAggregation(BaseWorker):
             return result
         
         try:
-            # Select numeric columns
             numeric_df = df.select_dtypes(include=[np.number])
             
             if numeric_df.empty:
@@ -58,15 +82,12 @@ class RollingAggregation(BaseWorker):
                 result.success = False
                 return result
             
-            # Default aggregation
             if agg_dict is None:
                 agg_dict = {col: ['mean', 'sum'] for col in numeric_df.columns}
             
-            # Filter to specified columns if provided
             if columns is not None:
                 agg_dict = {k: v for k, v in agg_dict.items() if k in columns}
             
-            # Perform rolling aggregation
             rolling_obj = numeric_df.rolling(window=window_size)
             agg_results = rolling_obj.agg(agg_dict)
             

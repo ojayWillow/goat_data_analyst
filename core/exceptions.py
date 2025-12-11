@@ -21,6 +21,11 @@ class DataLoadError(GOATException):
     pass
 
 
+class DataError(DataLoadError):
+    """Alias for DataLoadError for backward compatibility."""
+    pass
+
+
 class DataValidationError(GOATException):
     """Raised when data validation fails."""
     pass

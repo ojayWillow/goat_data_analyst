@@ -8,14 +8,68 @@ logger = get_logger(__name__)
 
 
 class ErrorTracker:
-    """Tracks errors from all agents and workers."""
+    """Tracks both successes and errors from all agents and workers.
+    
+    Implemented as a singleton to ensure all ErrorIntelligence instances
+    share the same error tracking state.
+    """
+    
+    _instance = None
+
+    def __new__(cls):
+        """Singleton pattern - always return same instance."""
+        if cls._instance is None:
+            cls._instance = super(ErrorTracker, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
 
     def __init__(self):
-        """Initialize error tracker."""
+        """Initialize error tracker (only on first creation)."""
+        if self._initialized:
+            return
+        
         self.errors = {}
+        self._initialized = True
         logger.info("ErrorTracker worker initialized")
 
-    def track(
+    def track_success(
+        self,
+        agent_name: str,
+        worker_name: str,
+        operation: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Track a successful run.
+        
+        Args:
+            agent_name: Name of agent
+            worker_name: Name of worker
+            operation: Operation that succeeded
+            context: Additional context
+        """
+        if agent_name not in self.errors:
+            self.errors[agent_name] = {
+                'total_runs': 0,
+                'successes': 0,
+                'failures': 0,
+                'workers': {},
+            }
+        
+        if worker_name not in self.errors[agent_name]['workers']:
+            self.errors[agent_name]['workers'][worker_name] = {
+                'successes': 0,
+                'failures': 0,
+                'errors': [],
+            }
+        
+        # Increment success counters
+        self.errors[agent_name]['total_runs'] += 1
+        self.errors[agent_name]['successes'] += 1
+        self.errors[agent_name]['workers'][worker_name]['successes'] += 1
+        
+        logger.debug(f"Tracked success: {agent_name}.{worker_name} - {operation}")
+
+    def track_error(
         self,
         agent_name: str,
         worker_name: str,
@@ -37,17 +91,20 @@ class ErrorTracker:
         if agent_name not in self.errors:
             self.errors[agent_name] = {
                 'total_runs': 0,
+                'successes': 0,
                 'failures': 0,
                 'workers': {},
             }
         
         if worker_name not in self.errors[agent_name]['workers']:
             self.errors[agent_name]['workers'][worker_name] = {
+                'successes': 0,
                 'failures': 0,
                 'errors': [],
             }
         
-        # Increment counters
+        # Increment failure counters
+        self.errors[agent_name]['total_runs'] += 1
         self.errors[agent_name]['failures'] += 1
         self.errors[agent_name]['workers'][worker_name]['failures'] += 1
         
@@ -73,6 +130,7 @@ class ErrorTracker:
         if agent_name not in self.errors:
             self.errors[agent_name] = {
                 'total_runs': 0,
+                'successes': 0,
                 'failures': 0,
                 'workers': {},
             }
@@ -100,11 +158,19 @@ class ErrorTracker:
             return {}
         
         stats = self.errors[agent_name].copy()
-        total = stats.get('total_runs', 1)  # Avoid divide by zero
+        total = stats.get('total_runs', 1)
+        successes = stats.get('successes', 0)
+        failures = stats.get('failures', 0)
+        
         stats['success_rate'] = (
-            (total - stats['failures']) / total * 100
+            (successes / total * 100)
             if total > 0 else 0
         )
+        stats['failure_rate'] = (
+            (failures / total * 100)
+            if total > 0 else 0
+        )
+        
         return stats
 
     def clear(self) -> None:

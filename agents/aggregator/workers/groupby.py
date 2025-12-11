@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -18,6 +19,7 @@ class GroupByWorker(BaseWorker):
     
     def __init__(self):
         super().__init__("GroupByWorker")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Perform groupby operation.
@@ -26,15 +28,33 @@ class GroupByWorker(BaseWorker):
             df: DataFrame to group
             group_cols: Column(s) to group by (str or list)
             agg_specs: Aggregation specs (str or dict)
-                      - str: single function like 'sum', 'mean'
-                      - dict: {'col1': 'sum', 'col2': 'mean'}
             
         Returns:
             WorkerResult with grouped data
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._run_groupby(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="aggregator",
+                worker_name="GroupByWorker",
+                operation="groupby_aggregation",
+                context={"group_cols": str(kwargs.get('group_cols'))}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="GroupByWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"group_cols": str(kwargs.get('group_cols'))}
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
+    def _run_groupby(self, **kwargs) -> WorkerResult:
         """Perform groupby aggregation."""
         df = kwargs.get('df')
         group_cols = kwargs.get('group_cols')
@@ -45,7 +65,6 @@ class GroupByWorker(BaseWorker):
             quality_score=1.0
         )
         
-        # Validate data
         if df is None or df.empty:
             self._add_error(
                 result,
@@ -61,11 +80,9 @@ class GroupByWorker(BaseWorker):
         try:
             self.logger.info(f"Performing groupby operation...")
             
-            # Convert single column to list
             if isinstance(group_cols, str):
                 group_cols = [group_cols]
             
-            # Validate group columns exist
             missing_cols = [col for col in group_cols if col not in df.columns]
             if missing_cols:
                 self._add_error(
@@ -79,16 +96,11 @@ class GroupByWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
-            # Perform groupby
             grouped = df.groupby(group_cols)
             
-            # Apply aggregation
             if isinstance(agg_specs, str):
-                # Single aggregation function
                 aggregated = grouped.agg(agg_specs).reset_index()
             elif isinstance(agg_specs, dict):
-                # Multiple aggregations
-                # Validate agg columns
                 missing_agg_cols = [col for col in agg_specs.keys() if col not in df.columns]
                 if missing_agg_cols:
                     self._add_error(

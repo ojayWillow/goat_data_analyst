@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from agents.aggregator.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,7 @@ class WindowFunction(BaseWorker):
     def __init__(self):
         """Initialize WindowFunction."""
         super().__init__("WindowFunction")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(
         self,
@@ -29,16 +31,39 @@ class WindowFunction(BaseWorker):
         Args:
             df: DataFrame to process
             window_size: Size of rolling window
-            operations: List of operations ('mean', 'sum', 'std', 'min', 'max')
-            **kwargs: Additional arguments
+            operations: List of operations
             
         Returns:
             WorkerResult with windowed data
         """
+        try:
+            result = self._run_window(df, window_size, operations, **kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="aggregator",
+                worker_name="WindowFunction",
+                operation="window_functions",
+                context={"window_size": window_size}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="WindowFunction",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"window_size": window_size}
+            )
+            raise
+    
+    def _run_window(self, df, window_size, operations, **kwargs) -> WorkerResult:
+        """Perform window function calculation."""
         result = self._create_result(task_type="window_functions")
         
         if df is None:
-            self._add_error(result, ErrorType.VALIDATION_ERROR, "df required")
+            self._add_error(result, ErrorType.INVALID_PARAMETER, "df required")
             result.success = False
             return result
         
@@ -46,16 +71,15 @@ class WindowFunction(BaseWorker):
             operations = ['mean']
         
         try:
-            # Select numeric columns
             numeric_df = df.select_dtypes(include=[np.number])
             
             if numeric_df.empty:
-                self._add_error(result, ErrorType.LOAD_ERROR, "No numeric columns found")
+                self._add_error(result, ErrorType.DATA_VALIDATION_ERROR, "No numeric columns found")
                 result.success = False
                 return result
             
             if window_size < 1:
-                self._add_error(result, ErrorType.VALIDATION_ERROR, "window_size must be >= 1")
+                self._add_error(result, ErrorType.INVALID_PARAMETER, "window_size must be >= 1")
                 result.success = False
                 return result
             
@@ -75,20 +99,22 @@ class WindowFunction(BaseWorker):
                 else:
                     logger.warning(f"Unknown operation: {operation}")
             
+            # Properly count NaN values from rolling operations
+            rolling_mean = numeric_df.rolling(window=window_size).mean()
+            nan_count = int(rolling_mean.isna().sum().sum())
+            
             result.data = {
                 "window_size": window_size,
                 "operations_applied": list(windowed_results.keys()),
                 "numeric_columns": numeric_df.columns.tolist(),
                 "rows_processed": len(numeric_df),
-                "nan_count_after_windowing": sum(
-                    numeric_df.rolling(window=window_size).mean().isna().sum().sum()
-                )
+                "nan_count_after_windowing": nan_count
             }
             
             logger.info(f"Window functions: window_size={window_size}, operations={operations}")
             return result
         
         except Exception as e:
-            self._add_error(result, ErrorType.LOAD_ERROR, f"Window functions failed: {e}")
+            self._add_error(result, ErrorType.COMPUTATION_ERROR, f"Window functions failed: {e}")
             result.success = False
             return result

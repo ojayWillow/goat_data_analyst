@@ -51,15 +51,22 @@ class WorkerHealth:
         """
         total_runs = agent_data.get('total_runs', 1)
         failures = agent_data.get('failures', 0)
+        successes = agent_data.get('successes', 0)
         
-        success_rate = (
-            ((total_runs - failures) / total_runs * 100)
-            if total_runs > 0 else 0
-        )
+        # Use successes if available (from new tracking system)
+        if successes > 0:
+            success_rate = (successes / total_runs * 100) if total_runs > 0 else 0
+        else:
+            # Fallback to old calculation
+            success_rate = (
+                ((total_runs - failures) / total_runs * 100)
+                if total_runs > 0 else 0
+            )
         
         return {
             'total_runs': total_runs,
             'failures': failures,
+            'successes': successes,
             'success_rate': round(success_rate, 2),
             'status': 'HEALTHY' if success_rate >= 90 else 'DEGRADED' if success_rate >= 70 else 'BROKEN',
         }
@@ -74,22 +81,24 @@ class WorkerHealth:
             Worker health metrics
         """
         failures = worker_data.get('failures', 0)
+        successes = worker_data.get('successes', 0)
         errors = worker_data.get('errors', [])
         
-        # Estimate runs (assume runs = failures + successes)
-        # Conservative estimate: runs = failures + estimated successful runs
-        estimated_runs = max(failures * 2, 1)  # At least as many as failures
+        # Use actual successes and failures if available (from new tracking system)
+        total_runs = successes + failures if (successes > 0 or failures > 0) else 1
         
-        success_rate = (
-            ((estimated_runs - failures) / estimated_runs * 100)
-            if estimated_runs > 0 else 0
-        )
+        if total_runs > 0:
+            success_rate = (successes / total_runs * 100)
+        else:
+            success_rate = 0
         
         # Get most common error
         common_error = errors[0].get('error_type', 'Unknown') if errors else 'None'
         
         return {
             'failures': failures,
+            'successes': successes,
+            'total_runs': total_runs,
             'total_errors': len(errors),
             'success_rate': round(success_rate, 2),
             'status': 'HEALTHY' if success_rate >= 90 else 'DEGRADED' if success_rate >= 70 else 'BROKEN',

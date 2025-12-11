@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from agents.aggregator.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,7 @@ class LagLeadFunction(BaseWorker):
     def __init__(self):
         """Initialize LagLeadFunction."""
         super().__init__("LagLeadFunction")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(
         self,
@@ -30,13 +32,36 @@ class LagLeadFunction(BaseWorker):
         Args:
             df: DataFrame to process
             lag_periods: Number of periods to lag
-            lead_periods: Number of periods to lead (shift forward)
-            columns: Columns to apply lag/lead (None = all numeric)
-            **kwargs: Additional arguments
+            lead_periods: Number of periods to lead
+            columns: Columns to apply lag/lead
             
         Returns:
             WorkerResult with lag/lead results
         """
+        try:
+            result = self._run_lag_lead(df, lag_periods, lead_periods, columns, **kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="aggregator",
+                worker_name="LagLeadFunction",
+                operation="lag_lead_functions",
+                context={"lag_periods": lag_periods, "lead_periods": lead_periods}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="LagLeadFunction",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"lag_periods": lag_periods, "lead_periods": lead_periods}
+            )
+            raise
+    
+    def _run_lag_lead(self, df, lag_periods, lead_periods, columns, **kwargs) -> WorkerResult:
+        """Calculate lag and lead functions."""
         result = self._create_result(task_type="lag_lead_functions")
         
         if df is None:
@@ -45,7 +70,6 @@ class LagLeadFunction(BaseWorker):
             return result
         
         try:
-            # Select numeric columns
             numeric_df = df.select_dtypes(include=[np.number])
             
             if numeric_df.empty:
@@ -63,18 +87,15 @@ class LagLeadFunction(BaseWorker):
                 result.success = False
                 return result
             
-            # Filter to specified columns if provided
             if columns is not None:
                 numeric_df = numeric_df[[col for col in columns if col in numeric_df.columns]]
             
             lag_results = {}
             lead_results = {}
             
-            # Calculate lag
             if lag_periods > 0:
                 lag_results = numeric_df.shift(lag_periods)
             
-            # Calculate lead (negative shift)
             if lead_periods > 0:
                 lead_results = numeric_df.shift(-lead_periods)
             

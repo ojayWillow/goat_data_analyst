@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -18,6 +19,7 @@ class ValueCountWorker(BaseWorker):
     
     def __init__(self):
         super().__init__("ValueCountWorker")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Count values in a column.
@@ -25,14 +27,34 @@ class ValueCountWorker(BaseWorker):
         Args:
             df: DataFrame to analyze
             column: Column to count values
-            top_n: Number of top values to return (default: 10)
+            top_n: Number of top values to return
             
         Returns:
             WorkerResult with value counts
         """
-        return self.safe_execute(**kwargs)
+        try:
+            result = self._run_count_values(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="aggregator",
+                worker_name="ValueCountWorker",
+                operation="value_count",
+                context={"column": kwargs.get('column')}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="aggregator",
+                worker_name="ValueCountWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"column": kwargs.get('column')}
+            )
+            raise
     
-    def execute(self, **kwargs) -> WorkerResult:
+    def _run_count_values(self, **kwargs) -> WorkerResult:
         """Perform value counting operation."""
         df = kwargs.get('df')
         column = kwargs.get('column')
@@ -43,7 +65,6 @@ class ValueCountWorker(BaseWorker):
             quality_score=1.0
         )
         
-        # Validate data
         if df is None or df.empty:
             self._add_error(
                 result,
@@ -59,7 +80,6 @@ class ValueCountWorker(BaseWorker):
         try:
             self.logger.info(f"Computing value counts for '{column}'")
             
-            # Validate column
             if not column:
                 self._add_error(
                     result,
@@ -84,7 +104,6 @@ class ValueCountWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
-            # Validate top_n
             if not isinstance(top_n, int) or top_n < 1:
                 self._add_warning(
                     result,
@@ -92,7 +111,6 @@ class ValueCountWorker(BaseWorker):
                 )
                 top_n = 10
             
-            # Get value counts
             vc = df[column].value_counts().head(top_n)
             
             result_list = []
