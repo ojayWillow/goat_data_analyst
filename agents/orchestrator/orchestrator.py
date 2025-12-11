@@ -115,7 +115,7 @@ class Orchestrator:
             key: Cache key
             data: Data to cache
         """
-        self.data_manager.cache(key, data)
+        self.data_manager.set(key, data)
 
     def get_cached_data(self, key: str) -> Optional[Any]:
         """Retrieve cached data.
