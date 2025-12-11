@@ -8,6 +8,7 @@ Tests the upgraded ProjectManager with:
 - Architecture validation
 - Dependency mapping
 - Comprehensive health reporting
+- Actual test case counting (not just test files)
 
 Run: python scripts/test_project_manager.py
 """
@@ -141,7 +142,8 @@ def test_project_manager():
         print(f"   • Tested: {summary['tested_agents']}")
         print(f"   • Untested: {summary['untested_agents']}")
         print(f"   • Test Coverage: {summary['test_coverage']:.1f}%")
-        print(f"   • Total Tests: {summary['total_tests']}")
+        print(f"   • Total Test Files: {summary['total_tests']}")
+        print(f"   • Total Test Cases: {summary.get('total_test_cases', 'N/A')}")
         print(f"   • With Workers: {summary['agents_with_workers']}")
         
         # ===== CHANGES ====="
@@ -165,7 +167,7 @@ def test_project_manager():
         for test_name in test_agents:
             validation = pm.validate_new_agent(test_name)
             status = "✅" if validation["valid"] else "⚠️ "
-            issues = f" ({', '.join(validation['issues'][:1])}" if validation["issues"] else ""
+            issues = f" ({', '.join(validation['issues'][:1])" if validation["issues"] else ""
             print(f"\n   {test_name or '(empty)':<20} {status}")
             if issues:
                 print(f"   {issues})")
@@ -201,6 +203,7 @@ ProjectManager V2 - Enterprise Features:
    • Worker subfolder detection
    • Type hints & docstring coverage
    • Complexity scoring
+   • Actual test case counting (AST-based)
 
 Ready for Week 1 hardening testing phase! 📊
 """)
