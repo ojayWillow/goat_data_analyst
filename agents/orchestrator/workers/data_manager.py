@@ -29,7 +29,7 @@ class DataManager:
         self.cache: Dict[str, Any] = {}
         self.logger.info("DataManager initialized")
 
-    def cache(self, key: str, data: Any) -> None:
+    def set(self, key: str, data: Any) -> None:
         """Cache data with a key.
         
         Args:
@@ -199,7 +199,7 @@ class DataManager:
                 result = loader_agent.load(params['file_path'])
                 if result.get('status') == 'success':
                     data = result['data']
-                    self.cache('loaded_data', data)
+                    self.set('loaded_data', data)
                     self.logger.info(f"Loaded and cached data from: {params['file_path']}")
                     return data
             except Exception as e:
