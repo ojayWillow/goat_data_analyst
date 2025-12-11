@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,7 @@ class CSVLoaderWorker(BaseWorker):
     def __init__(self):
         """Initialize CSVLoaderWorker."""
         super().__init__("CSVLoaderWorker")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Execute CSV loading with robust error handling.
@@ -27,6 +29,30 @@ class CSVLoaderWorker(BaseWorker):
         Returns:
             WorkerResult with loaded data
         """
+        try:
+            result = self._run_csv_load(**kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="data_loader",
+                worker_name="CSVLoaderWorker",
+                operation="csv_loading",
+                context={"file_path": kwargs.get('file_path')}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="data_loader",
+                worker_name="CSVLoaderWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"file_path": kwargs.get('file_path')}
+            )
+            raise
+    
+    def _run_csv_load(self, **kwargs) -> WorkerResult:
+        """Perform CSV loading."""
         file_path = kwargs.get('file_path')
         
         result = self._create_result(task_type="csv_loading")
