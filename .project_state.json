@@ -19,6 +19,7 @@
     "test_anomaly_detector",
     "test_anomaly_detector_day1",
     "test_config_hardening",
+    "test_contract_fixes",
     "test_data_loader",
     "test_data_loader_week1",
     "test_data_loader_week2",
@@ -62,6 +63,7 @@
     "test_visualizer"
   ],
   "core_systems": [
+    "agent_interface",
     "config",
     "error_recovery",
     "exceptions",
@@ -69,5 +71,5 @@
     "structured_logger",
     "validators"
   ],
-  "timestamp": "2025-12-11T20:59:50.371535"
+  "timestamp": "2025-12-11T22:41:49.171900"
 }
