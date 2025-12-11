@@ -7,5 +7,6 @@ Day 4: StoryBuilder - Build readable narrative
 """
 
 from .insight_extractor import InsightExtractor
+from .problem_identifier import ProblemIdentifier
 
-__all__ = ["InsightExtractor"]
+__all__ = ["InsightExtractor", "ProblemIdentifier"]
