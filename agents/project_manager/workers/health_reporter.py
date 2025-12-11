@@ -66,15 +66,15 @@ class HealthReporter:
     def _get_status(self, score: float) -> str:
         """Get status based on health score."""
         if score >= 90:
-            return "🟢 Excellent"
+            return "Excellent"
         elif score >= 80:
-            return "🟢 Good"
+            return "Good"
         elif score >= 70:
-            return "🟡 Fair"
+            return "Fair"
         elif score >= 50:
-            return "🟠 Needs Work"
+            return "Needs Work"
         else:
-            return "🔴 Critical"
+            return "Critical"
 
     def _get_recommendations(self, agents: Dict, untested: List[str]) -> List[str]:
         """Generate recommendations."""
@@ -90,6 +90,6 @@ class HealthReporter:
             recommendations.append("Continue building agents to establish patterns")
 
         if len(recommendations) == 0:
-            recommendations.append("✅ All systems healthy! Keep maintaining.")
+            recommendations.append("All systems healthy! Keep maintaining.")
 
         return recommendations
