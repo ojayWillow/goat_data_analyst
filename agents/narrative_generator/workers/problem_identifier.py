@@ -18,6 +18,7 @@ from enum import Enum
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import AgentError
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class Severity(Enum):
@@ -46,6 +47,7 @@ class ProblemIdentifier:
         self.name = "ProblemIdentifier"
         self.logger = get_logger("ProblemIdentifier")
         self.structured_logger = get_structured_logger("ProblemIdentifier")
+        self.error_intelligence = ErrorIntelligence()
         self.logger.info("ProblemIdentifier worker initialized")
         
         # Severity thresholds
@@ -285,53 +287,73 @@ class ProblemIdentifier:
         Returns:
             List of problems sorted by severity (highest first)
         """
-        self.logger.info("Starting comprehensive problem identification")
+        try:
+            self.logger.info("Starting comprehensive problem identification")
 
-        problems = []
+            problems = []
 
-        # Identify anomaly problems
-        anomaly_problem = self.identify_anomaly_problems(
-            all_insights.get('anomalies', {})
-        )
-        if anomaly_problem:
-            problems.append(anomaly_problem)
+            # Identify anomaly problems
+            anomaly_problem = self.identify_anomaly_problems(
+                all_insights.get('anomalies', {})
+            )
+            if anomaly_problem:
+                problems.append(anomaly_problem)
 
-        # Identify missing data problems
-        missing_problem = self.identify_missing_data_problems(
-            all_insights.get('statistics', {})
-        )
-        if missing_problem:
-            problems.append(missing_problem)
+            # Identify missing data problems
+            missing_problem = self.identify_missing_data_problems(
+                all_insights.get('statistics', {})
+            )
+            if missing_problem:
+                problems.append(missing_problem)
 
-        # Identify prediction problems
-        prediction_problem = self.identify_prediction_problems(
-            all_insights.get('predictions', {})
-        )
-        if prediction_problem:
-            problems.append(prediction_problem)
+            # Identify prediction problems
+            prediction_problem = self.identify_prediction_problems(
+                all_insights.get('predictions', {})
+            )
+            if prediction_problem:
+                problems.append(prediction_problem)
 
-        # Identify distribution problems
-        distribution_problem = self.identify_distribution_problems(
-            all_insights.get('statistics', {})
-        )
-        if distribution_problem:
-            problems.append(distribution_problem)
+            # Identify distribution problems
+            distribution_problem = self.identify_distribution_problems(
+                all_insights.get('statistics', {})
+            )
+            if distribution_problem:
+                problems.append(distribution_problem)
 
-        # Sort by severity (fix_priority descending)
-        problems.sort(key=lambda x: x['fix_priority'], reverse=True)
+            # Sort by severity (fix_priority descending)
+            problems.sort(key=lambda x: x['fix_priority'], reverse=True)
 
-        self.logger.info(f"Problem identification complete. Found {len(problems)} problems")
-        self.structured_logger.info("Problem identification complete", {
-            'total_problems': len(problems),
-            'by_severity': {
-                'critical': sum(1 for p in problems if p['severity'] == 'critical'),
-                'high': sum(1 for p in problems if p['severity'] == 'high'),
-                'medium': sum(1 for p in problems if p['severity'] == 'medium'),
-                'low': sum(1 for p in problems if p['severity'] == 'low')
-            }
-        })
+            self.logger.info(f"Problem identification complete. Found {len(problems)} problems")
+            self.structured_logger.info("Problem identification complete", {
+                'total_problems': len(problems),
+                'by_severity': {
+                    'critical': sum(1 for p in problems if p['severity'] == 'critical'),
+                    'high': sum(1 for p in problems if p['severity'] == 'high'),
+                    'medium': sum(1 for p in problems if p['severity'] == 'medium'),
+                    'low': sum(1 for p in problems if p['severity'] == 'low')
+                }
+            })
+            
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="narrative_generator",
+                worker_name="ProblemIdentifier",
+                operation="identify_all_problems",
+                context={"total_problems": len(problems)}
+            )
 
-        return problems
+            return problems
+            
+        except Exception as e:
+            self.logger.error(f"Error in identify_all_problems: {e}")
+            self.error_intelligence.track_error(
+                agent_name="narrative_generator",
+                worker_name="ProblemIdentifier",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"operation": "identify_all_problems"}
+            )
+            raise
 
     # === IMPACT DESCRIPTIONS ===
 
