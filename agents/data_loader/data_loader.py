@@ -89,6 +89,7 @@ class DataLoader:
 
     # === MAIN LOADING ===
 
+    @retry_on_error(max_attempts=3, backoff=2)
     def load(self, file_path: str, **kwargs) -> Dict[str, Any]:
         """Load data from a file.
         
@@ -386,6 +387,7 @@ class DataLoader:
 
     # === DATA ACCESS ===
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_data(self) -> Optional[pd.DataFrame]:
         """Get currently loaded data.
         
@@ -394,6 +396,7 @@ class DataLoader:
         """
         return self.loaded_data
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_metadata(self) -> Dict[str, Any]:
         """Get metadata of loaded data.
         
@@ -402,6 +405,7 @@ class DataLoader:
         """
         return self.metadata
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_info(self) -> Dict[str, Any]:
         """Get comprehensive information.
         
@@ -417,6 +421,7 @@ class DataLoader:
             'metadata': self.metadata
         }
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_sample(self, n_rows: int = 5) -> Dict[str, Any]:
         """Get sample of loaded data.
         
@@ -436,6 +441,7 @@ class DataLoader:
             'metadata': {'total_rows': len(self.loaded_data), 'sample_rows': len(sample)}
         }
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def validate_columns(self, required_columns: List[str]) -> Dict[str, Any]:
         """Validate required columns exist.
         
@@ -457,6 +463,7 @@ class DataLoader:
             'missing': missing
         }
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_summary(self) -> str:
         """Get human-readable summary.
         
