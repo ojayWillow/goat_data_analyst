@@ -13,15 +13,18 @@ class LearningEngine:
     def __init__(self):
         """Initialize learning engine."""
         self.learned_fixes = []
-        
-        # Import here to avoid circular dependency
-        try:
-            from agents.error_intelligence.main import ErrorIntelligence
-            self.error_intelligence = ErrorIntelligence()
-        except ImportError:
-            self.error_intelligence = None
-        
+        self.error_intelligence = None  # Lazy load to avoid circular dependency
         logger.info("LearningEngine worker initialized")
+
+    def _get_error_intelligence(self):
+        """Lazy load ErrorIntelligence to avoid circular dependency."""
+        if self.error_intelligence is None:
+            try:
+                from agents.error_intelligence.main import ErrorIntelligence
+                self.error_intelligence = ErrorIntelligence()
+            except ImportError:
+                pass
+        return self.error_intelligence
 
     def record_fix(
         self,
@@ -52,35 +55,9 @@ class LearningEngine:
             
             self.learned_fixes.append(fix_record)
             logger.info(f"Recorded fix: {agent_name}.{worker_name} - {error_type} - {'SUCCESS' if success else 'FAILED'}")
-            
-            # Track in error intelligence
-            if self.error_intelligence:
-                if success:
-                    self.error_intelligence.track_success(
-                        agent_name="error_intelligence",
-                        worker_name="LearningEngine",
-                        operation="record_successful_fix",
-                        context={"original_agent": agent_name, "fix": fix_applied}
-                    )
-                else:
-                    self.error_intelligence.track_error(
-                        agent_name="error_intelligence",
-                        worker_name="LearningEngine",
-                        error_type="fix_failed",
-                        error_message=f"Fix failed for {error_type}: {fix_applied}",
-                        context={"original_agent": agent_name}
-                    )
         
         except Exception as e:
             logger.error(f"LearningEngine.record_fix failed: {e}")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="LearningEngine",
-                    error_type="record_fix_error",
-                    error_message=str(e),
-                )
 
     def get_learned_fixes(self, success_only: bool = True) -> List[Dict[str, Any]]:
         """Get learned fixes.
@@ -98,28 +75,10 @@ class LearningEngine:
             else:
                 result = self.learned_fixes
             
-            # Track success
-            if self.error_intelligence:
-                self.error_intelligence.track_success(
-                    agent_name="error_intelligence",
-                    worker_name="LearningEngine",
-                    operation="get_learned_fixes",
-                    context={"fixes_retrieved": len(result)}
-                )
-            
             return result
         
         except Exception as e:
             logger.error(f"LearningEngine.get_learned_fixes failed: {e}")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="LearningEngine",
-                    error_type="get_learned_fixes_error",
-                    error_message=str(e),
-                )
-            
             return []
 
     def get_fix_effectiveness(
@@ -169,28 +128,10 @@ class LearningEngine:
                     'last_timestamp': relevant_fixes[-1]['timestamp'],
                 }
             
-            # Track success
-            if self.error_intelligence:
-                self.error_intelligence.track_success(
-                    agent_name="error_intelligence",
-                    worker_name="LearningEngine",
-                    operation="get_fix_effectiveness",
-                    context={"agent": agent_name, "error_type": error_type}
-                )
-            
             return result
         
         except Exception as e:
             logger.error(f"LearningEngine.get_fix_effectiveness failed: {e}")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="LearningEngine",
-                    error_type="get_fix_effectiveness_error",
-                    error_message=str(e),
-                )
-            
             return {}
 
     def get_best_practices(self) -> List[str]:
@@ -209,29 +150,10 @@ class LearningEngine:
             practices = list(set(f['fix_applied'] for f in successful_fixes))
             
             logger.info(f"Identified {len(practices)} best practices")
-            
-            # Track success
-            if self.error_intelligence:
-                self.error_intelligence.track_success(
-                    agent_name="error_intelligence",
-                    worker_name="LearningEngine",
-                    operation="get_best_practices",
-                    context={"practices_identified": len(practices)}
-                )
-            
             return practices
         
         except Exception as e:
             logger.error(f"LearningEngine.get_best_practices failed: {e}")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="LearningEngine",
-                    error_type="get_best_practices_error",
-                    error_message=str(e),
-                )
-            
             return []
 
     def suggest_fix_for_error(self, error_type: str) -> str:
@@ -254,15 +176,6 @@ class LearningEngine:
         
         except Exception as e:
             logger.error(f"LearningEngine.suggest_fix_for_error failed: {e}")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_error(
-                    agent_name="error_intelligence",
-                    worker_name="LearningEngine",
-                    error_type="suggest_fix_error",
-                    error_message=str(e),
-                )
-            
             return f"Error suggesting fix: {str(e)}"
 
     def clear_history(self) -> None:
@@ -270,13 +183,6 @@ class LearningEngine:
         try:
             self.learned_fixes = []
             logger.info("Learning history cleared")
-            
-            if self.error_intelligence:
-                self.error_intelligence.track_success(
-                    agent_name="error_intelligence",
-                    worker_name="LearningEngine",
-                    operation="clear_history",
-                )
         
         except Exception as e:
             logger.error(f"LearningEngine.clear_history failed: {e}")
