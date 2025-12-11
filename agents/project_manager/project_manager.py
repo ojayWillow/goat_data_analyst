@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Dict, List, Any
 
 from core.logger import get_logger
+from core.error_recovery import retry_on_error
 from .workers import (
     StructureScanner,
     PatternLearner,
@@ -99,6 +100,7 @@ class ProjectManager:
         self.dependency_consistency = {}
         self.retry_error_recovery = {}
 
+    @retry_on_error(max_attempts=3, backoff=2)
     def execute(self) -> Dict[str, Any]:
         """Execute complete project analysis."""
         try:
@@ -197,6 +199,7 @@ class ProjectManager:
             self.logger.error(f"ProjectManager execution failed: {e}")
             raise
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_intermediate_report(self) -> Dict[str, Any]:
         """Get intermediate report with all health metrics (before final synthesis)."""
         return {
@@ -214,6 +217,7 @@ class ProjectManager:
             "health": {"summary": {}},  # Placeholder for initial health summary
         }
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_report(self) -> Dict[str, Any]:
         """Get complete project analysis report."""
         return {
@@ -233,11 +237,13 @@ class ProjectManager:
             "timestamp": datetime.now().isoformat(),
         }
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def validate_new_agent(self, agent_name: str) -> Dict[str, Any]:
         """Validate if new agent matches patterns."""
         self.logger.info(f"Validating agent '{agent_name}'...")
         return self.validator.validate_agent(agent_name, self.patterns)
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_agent_summary(self) -> str:
         """Get summary of all agents."""
         agents = self.structure.get("agents", {})
@@ -252,6 +258,7 @@ class ProjectManager:
 
         return summary
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def print_report(self) -> None:
         """Print formatted HONEST health report to console."""
         if not self.report:
