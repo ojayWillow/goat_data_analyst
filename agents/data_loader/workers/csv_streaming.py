@@ -6,6 +6,7 @@ import time
 
 from agents.data_loader.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
+from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,7 @@ class CSVStreaming(BaseWorker):
     def __init__(self):
         """Initialize CSVStreaming."""
         super().__init__("CSVStreaming")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, file_path: str = None, **kwargs) -> WorkerResult:
         """Execute CSV streaming for large files.
@@ -27,6 +29,30 @@ class CSVStreaming(BaseWorker):
         Returns:
             WorkerResult with loaded data
         """
+        try:
+            result = self._run_csv_streaming(file_path=file_path, **kwargs)
+            
+            self.error_intelligence.track_success(
+                agent_name="data_loader",
+                worker_name="CSVStreaming",
+                operation="csv_streaming",
+                context={"file_path": file_path}
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error_intelligence.track_error(
+                agent_name="data_loader",
+                worker_name="CSVStreaming",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={"file_path": file_path}
+            )
+            raise
+    
+    def _run_csv_streaming(self, file_path: str = None, **kwargs) -> WorkerResult:
+        """Perform CSV streaming."""
         result = self._create_result(task_type="csv_streaming")
         
         if not file_path:
