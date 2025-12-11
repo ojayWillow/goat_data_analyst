@@ -4,6 +4,7 @@ import pandas as pd
 from scipy import stats
 
 from agents.explorer.workers.base_worker import BaseWorker, WorkerResult, ErrorType
+from agents.error_intelligence.main import ErrorIntelligence
 from core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -15,6 +16,7 @@ class DistributionComparison(BaseWorker):
     def __init__(self):
         """Initialize DistributionComparison."""
         super().__init__("DistributionComparison")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, col1: str = None, col2: str = None, **kwargs) -> WorkerResult:
         """Execute KS test comparing two distributions.
@@ -31,7 +33,7 @@ class DistributionComparison(BaseWorker):
         result = self._create_result(task_type="distribution_comparison")
         
         if df is None or col1 is None or col2 is None:
-            self._add_error(result, ErrorType.VALIDATION_ERROR, "df, col1, col2 required")
+            self._add_error(result, ErrorType.INVALID_PARAMETER, "df, col1, col2 required")
             result.success = False
             return result
         
@@ -40,7 +42,7 @@ class DistributionComparison(BaseWorker):
             s2 = df[col2].dropna()
             
             if len(s1) < 2 or len(s2) < 2:
-                self._add_error(result, ErrorType.LOAD_ERROR, "Need at least 2 values in each column")
+                self._add_error(result, ErrorType.INSUFFICIENT_DATA, "Need at least 2 values in each column")
                 result.success = False
                 return result
             
@@ -55,10 +57,26 @@ class DistributionComparison(BaseWorker):
                 "distributions_equal": bool(p_value > 0.05)
             }
             
+            self.error_intelligence.track_success(
+                agent_name="explorer",
+                worker_name="DistributionComparison",
+                operation="execute",
+                context={"col1": col1, "col2": col2, "p_value": float(p_value)}
+            )
+            
             logger.info(f"KS test {col1} vs {col2}: p_value={p_value}")
             return result
         
         except Exception as e:
-            self._add_error(result, ErrorType.LOAD_ERROR, f"KS test failed: {e}")
+            self._add_error(result, ErrorType.COMPUTATION_ERROR, f"KS test failed: {e}")
             result.success = False
+            
+            self.error_intelligence.track_error(
+                agent_name="explorer",
+                worker_name="DistributionComparison",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={}
+            )
+            
             return result
