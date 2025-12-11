@@ -3,6 +3,7 @@
 import pandas as pd
 from typing import Any, Dict, Optional
 from .base_worker import BaseWorker, WorkerResult, ErrorType
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class MissingDataAnalyzer(BaseWorker):
