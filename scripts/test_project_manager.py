@@ -167,10 +167,8 @@ def test_project_manager():
         for test_name in test_agents:
             validation = pm.validate_new_agent(test_name)
             status = "✅" if validation["valid"] else "⚠️ "
-            issues = f" ({', '.join(validation['issues'][:1])" if validation["issues"] else ""
-            print(f"\n   {test_name or '(empty)':<20} {status}")
-            if issues:
-                print(f"   {issues})")
+            issues = f" ({', '.join(validation['issues'][:1])})" if validation["issues"] else ""
+            print(f"\n   {test_name or '(empty)':<20} {status}{issues}")
         
         # ===== SUMMARY ====="
         print_header("✅ TEST RESULTS")
