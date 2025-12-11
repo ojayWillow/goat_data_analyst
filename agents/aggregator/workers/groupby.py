@@ -33,14 +33,13 @@ class GroupByWorker(BaseWorker):
             WorkerResult with grouped data
         """
         try:
-            result = self._perform_groupby(**kwargs)
+            result = self._run_groupby(**kwargs)
             
-            self.error_intelligence.track_error(
+            self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="GroupByWorker",
-                error_type="SUCCESS",
-                error_message="GroupBy operation successful",
-                context={"operation": "groupby_aggregation"}
+                operation="groupby_aggregation",
+                context={"group_cols": str(kwargs.get('group_cols'))}
             )
             
             return result
@@ -51,14 +50,11 @@ class GroupByWorker(BaseWorker):
                 worker_name="GroupByWorker",
                 error_type=type(e).__name__,
                 error_message=str(e),
-                context={
-                    "operation": "groupby_aggregation",
-                    "group_cols": kwargs.get('group_cols'),
-                }
+                context={"group_cols": str(kwargs.get('group_cols'))}
             )
             raise
     
-    def _perform_groupby(self, **kwargs) -> WorkerResult:
+    def _run_groupby(self, **kwargs) -> WorkerResult:
         """Perform groupby aggregation."""
         df = kwargs.get('df')
         group_cols = kwargs.get('group_cols')

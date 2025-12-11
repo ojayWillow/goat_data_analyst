@@ -39,14 +39,13 @@ class LagLeadFunction(BaseWorker):
             WorkerResult with lag/lead results
         """
         try:
-            result = self._calculate_lag_lead(df, lag_periods, lead_periods, columns, **kwargs)
+            result = self._run_lag_lead(df, lag_periods, lead_periods, columns, **kwargs)
             
-            self.error_intelligence.track_error(
+            self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="LagLeadFunction",
-                error_type="SUCCESS",
-                error_message="Lag/Lead calculated successfully",
-                context={"operation": "lag_lead_functions"}
+                operation="lag_lead_functions",
+                context={"lag_periods": lag_periods, "lead_periods": lead_periods}
             )
             
             return result
@@ -57,15 +56,11 @@ class LagLeadFunction(BaseWorker):
                 worker_name="LagLeadFunction",
                 error_type=type(e).__name__,
                 error_message=str(e),
-                context={
-                    "operation": "lag_lead_functions",
-                    "lag_periods": lag_periods,
-                    "lead_periods": lead_periods,
-                }
+                context={"lag_periods": lag_periods, "lead_periods": lead_periods}
             )
             raise
     
-    def _calculate_lag_lead(self, df, lag_periods, lead_periods, columns, **kwargs) -> WorkerResult:
+    def _run_lag_lead(self, df, lag_periods, lead_periods, columns, **kwargs) -> WorkerResult:
         """Calculate lag and lead functions."""
         result = self._create_result(task_type="lag_lead_functions")
         

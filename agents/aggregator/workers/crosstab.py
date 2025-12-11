@@ -35,14 +35,13 @@ class CrossTabWorker(BaseWorker):
             WorkerResult with cross-tabulation
         """
         try:
-            result = self._create_crosstab(**kwargs)
+            result = self._run_crosstab(**kwargs)
             
-            self.error_intelligence.track_error(
+            self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="CrossTabWorker",
-                error_type="SUCCESS",
-                error_message="Crosstab created successfully",
-                context={"operation": "crosstab"}
+                operation="crosstab",
+                context={"rows": kwargs.get('rows'), "columns": kwargs.get('columns')}
             )
             
             return result
@@ -53,15 +52,11 @@ class CrossTabWorker(BaseWorker):
                 worker_name="CrossTabWorker",
                 error_type=type(e).__name__,
                 error_message=str(e),
-                context={
-                    "operation": "crosstab",
-                    "rows": kwargs.get('rows'),
-                    "columns": kwargs.get('columns'),
-                }
+                context={"rows": kwargs.get('rows'), "columns": kwargs.get('columns')}
             )
             raise
     
-    def _create_crosstab(self, **kwargs) -> WorkerResult:
+    def _run_crosstab(self, **kwargs) -> WorkerResult:
         """Perform cross-tabulation operation."""
         df = kwargs.get('df')
         rows = kwargs.get('rows')

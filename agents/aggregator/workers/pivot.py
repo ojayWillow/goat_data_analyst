@@ -35,14 +35,13 @@ class PivotWorker(BaseWorker):
             WorkerResult with pivot table
         """
         try:
-            result = self._create_pivot(**kwargs)
+            result = self._run_pivot(**kwargs)
             
-            self.error_intelligence.track_error(
+            self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="PivotWorker",
-                error_type="SUCCESS",
-                error_message="Pivot table created successfully",
-                context={"operation": "pivot_table"}
+                operation="pivot_table",
+                context={"index": kwargs.get('index'), "columns": kwargs.get('columns')}
             )
             
             return result
@@ -53,15 +52,11 @@ class PivotWorker(BaseWorker):
                 worker_name="PivotWorker",
                 error_type=type(e).__name__,
                 error_message=str(e),
-                context={
-                    "operation": "pivot_table",
-                    "index": kwargs.get('index'),
-                    "columns": kwargs.get('columns'),
-                }
+                context={"index": kwargs.get('index'), "columns": kwargs.get('columns')}
             )
             raise
     
-    def _create_pivot(self, **kwargs) -> WorkerResult:
+    def _run_pivot(self, **kwargs) -> WorkerResult:
         """Perform pivot table operation."""
         df = kwargs.get('df')
         index = kwargs.get('index')

@@ -32,15 +32,14 @@ class StatisticsWorker(BaseWorker):
             WorkerResult with summary statistics
         """
         try:
-            result = self._compute_statistics(**kwargs)
+            result = self._run_statistics(**kwargs)
             
             # Track success
-            self.error_intelligence.track_error(
+            self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="StatisticsWorker",
-                error_type="SUCCESS",
-                error_message="Statistics computed successfully",
-                context={"operation": "summary_statistics"}
+                operation="summary_statistics",
+                context={"group_column": kwargs.get('group_column')}
             )
             
             return result
@@ -52,16 +51,11 @@ class StatisticsWorker(BaseWorker):
                 worker_name="StatisticsWorker",
                 error_type=type(e).__name__,
                 error_message=str(e),
-                context={
-                    "operation": "summary_statistics",
-                    "group_column": kwargs.get('group_column'),
-                }
+                context={"group_column": kwargs.get('group_column')}
             )
-            
-            # Re-raise to maintain existing behavior
             raise
     
-    def _compute_statistics(self, **kwargs) -> WorkerResult:
+    def _run_statistics(self, **kwargs) -> WorkerResult:
         """Perform summary statistics computation."""
         df = kwargs.get('df')
         group_column = kwargs.get('group_column')
@@ -71,7 +65,6 @@ class StatisticsWorker(BaseWorker):
             quality_score=1.0
         )
         
-        # Validate data
         if df is None or df.empty:
             self._add_error(
                 result,
@@ -87,7 +80,6 @@ class StatisticsWorker(BaseWorker):
         try:
             self.logger.info(f"Computing summary statistics grouped by '{group_column}'")
             
-            # Validate group column
             if not group_column:
                 self._add_error(
                     result,
@@ -112,7 +104,6 @@ class StatisticsWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
-            # Get numeric columns
             numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
             
             if not numeric_cols:
@@ -128,7 +119,6 @@ class StatisticsWorker(BaseWorker):
                 result.quality_score = 0.5
                 return result
             
-            # Compute statistics for each group
             grouped = df.groupby(group_column)
             stats = {}
             

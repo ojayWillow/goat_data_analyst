@@ -37,14 +37,13 @@ class ExponentialWeighted(BaseWorker):
             WorkerResult with EWMA results
         """
         try:
-            result = self._calculate_ewma(df, span, adjust, **kwargs)
+            result = self._run_ewma(df, span, adjust, **kwargs)
             
-            self.error_intelligence.track_error(
+            self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="ExponentialWeighted",
-                error_type="SUCCESS",
-                error_message="EWMA calculated successfully",
-                context={"operation": "exponential_weighted"}
+                operation="exponential_weighted",
+                context={"span": span}
             )
             
             return result
@@ -55,14 +54,11 @@ class ExponentialWeighted(BaseWorker):
                 worker_name="ExponentialWeighted",
                 error_type=type(e).__name__,
                 error_message=str(e),
-                context={
-                    "operation": "exponential_weighted",
-                    "span": span,
-                }
+                context={"span": span}
             )
             raise
     
-    def _calculate_ewma(self, df, span, adjust, **kwargs) -> WorkerResult:
+    def _run_ewma(self, df, span, adjust, **kwargs) -> WorkerResult:
         """Calculate exponential weighted moving average."""
         result = self._create_result(task_type="exponential_weighted")
         

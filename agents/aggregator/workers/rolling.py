@@ -34,14 +34,13 @@ class RollingWorker(BaseWorker):
             WorkerResult with rolling aggregation
         """
         try:
-            result = self._perform_rolling(**kwargs)
+            result = self._run_rolling(**kwargs)
             
-            self.error_intelligence.track_error(
+            self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="RollingWorker",
-                error_type="SUCCESS",
-                error_message="Rolling aggregation successful",
-                context={"operation": "rolling_aggregation"}
+                operation="rolling_aggregation",
+                context={"column": kwargs.get('column'), "window": kwargs.get('window')}
             )
             
             return result
@@ -52,15 +51,11 @@ class RollingWorker(BaseWorker):
                 worker_name="RollingWorker",
                 error_type=type(e).__name__,
                 error_message=str(e),
-                context={
-                    "operation": "rolling_aggregation",
-                    "column": kwargs.get('column'),
-                    "window": kwargs.get('window'),
-                }
+                context={"column": kwargs.get('column'), "window": kwargs.get('window')}
             )
             raise
     
-    def _perform_rolling(self, **kwargs) -> WorkerResult:
+    def _run_rolling(self, **kwargs) -> WorkerResult:
         """Perform rolling window operation."""
         df = kwargs.get('df')
         column = kwargs.get('column')

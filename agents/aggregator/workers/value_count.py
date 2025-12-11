@@ -33,14 +33,13 @@ class ValueCountWorker(BaseWorker):
             WorkerResult with value counts
         """
         try:
-            result = self._count_values(**kwargs)
+            result = self._run_count_values(**kwargs)
             
-            self.error_intelligence.track_error(
+            self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="ValueCountWorker",
-                error_type="SUCCESS",
-                error_message="Value count successful",
-                context={"operation": "value_count"}
+                operation="value_count",
+                context={"column": kwargs.get('column')}
             )
             
             return result
@@ -51,14 +50,11 @@ class ValueCountWorker(BaseWorker):
                 worker_name="ValueCountWorker",
                 error_type=type(e).__name__,
                 error_message=str(e),
-                context={
-                    "operation": "value_count",
-                    "column": kwargs.get('column'),
-                }
+                context={"column": kwargs.get('column')}
             )
             raise
     
-    def _count_values(self, **kwargs) -> WorkerResult:
+    def _run_count_values(self, **kwargs) -> WorkerResult:
         """Perform value counting operation."""
         df = kwargs.get('df')
         column = kwargs.get('column')

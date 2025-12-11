@@ -37,14 +37,13 @@ class WindowFunction(BaseWorker):
             WorkerResult with windowed data
         """
         try:
-            result = self._calculate_window(df, window_size, operations, **kwargs)
+            result = self._run_window(df, window_size, operations, **kwargs)
             
-            self.error_intelligence.track_error(
+            self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="WindowFunction",
-                error_type="SUCCESS",
-                error_message="Window functions successful",
-                context={"operation": "window_functions"}
+                operation="window_functions",
+                context={"window_size": window_size}
             )
             
             return result
@@ -55,14 +54,11 @@ class WindowFunction(BaseWorker):
                 worker_name="WindowFunction",
                 error_type=type(e).__name__,
                 error_message=str(e),
-                context={
-                    "operation": "window_functions",
-                    "window_size": window_size,
-                }
+                context={"window_size": window_size}
             )
             raise
     
-    def _calculate_window(self, df, window_size, operations, **kwargs) -> WorkerResult:
+    def _run_window(self, df, window_size, operations, **kwargs) -> WorkerResult:
         """Perform window function calculation."""
         result = self._create_result(task_type="window_functions")
         

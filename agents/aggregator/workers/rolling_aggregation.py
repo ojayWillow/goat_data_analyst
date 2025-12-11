@@ -39,14 +39,13 @@ class RollingAggregation(BaseWorker):
             WorkerResult with aggregation results
         """
         try:
-            result = self._perform_rolling_agg(df, window_size, columns, agg_dict, **kwargs)
+            result = self._run_rolling_agg(df, window_size, columns, agg_dict, **kwargs)
             
-            self.error_intelligence.track_error(
+            self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="RollingAggregation",
-                error_type="SUCCESS",
-                error_message="Rolling aggregation successful",
-                context={"operation": "rolling_aggregation"}
+                operation="rolling_aggregation",
+                context={"window_size": window_size}
             )
             
             return result
@@ -57,14 +56,11 @@ class RollingAggregation(BaseWorker):
                 worker_name="RollingAggregation",
                 error_type=type(e).__name__,
                 error_message=str(e),
-                context={
-                    "operation": "rolling_aggregation",
-                    "window_size": window_size,
-                }
+                context={"window_size": window_size}
             )
             raise
     
-    def _perform_rolling_agg(self, df, window_size, columns, agg_dict, **kwargs) -> WorkerResult:
+    def _run_rolling_agg(self, df, window_size, columns, agg_dict, **kwargs) -> WorkerResult:
         """Perform rolling aggregation."""
         result = self._create_result(task_type="rolling_aggregation")
         
