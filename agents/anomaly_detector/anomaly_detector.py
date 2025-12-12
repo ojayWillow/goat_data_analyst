@@ -1,15 +1,22 @@
 """Anomaly Detector Agent - Coordinates anomaly detection workers.
 
-Detects anomalies using 4 different algorithms:
+Detects anomalies using 6 different algorithms:
+- Statistical (Z-score, IQR based)
+- Isolation Forest
 - Local Outlier Factor (LOF)
 - One-Class SVM
-- Isolation Forest
-- Ensemble (voting from all 3)
+- Multivariate Gaussian
+- Ensemble (voting from all methods)
 
-Integrated with Week 1 Systems:
+GUIDANCE Compliance:
+- Section 2.2: Agent Interface Contract
+- Section 2.3: Agent Implementation Requirements
+
+Integrated with Week 1-2 Systems:
 - Structured logging with metrics
 - Automatic retry with exponential backoff
 - Error recovery and handling
+- Error Intelligence tracking (Phase 2)
 """
 
 from typing import Any, Dict, List, Optional
@@ -25,72 +32,114 @@ from .workers import (
     OneClassSVM,
     IsolationForest,
     Ensemble,
+    Statistical,
+    Multivariate,
     WorkerResult,
 )
 
 logger = get_logger(__name__)
 structured_logger = get_structured_logger(__name__)
 
+# ===== CONSTANTS =====
+HEALTH_THRESHOLD = 0.8
+QUALITY_THRESHOLD = 0.8
+MIN_QUALITY_FOR_SUCCESS = 0.5
+
 
 class AnomalyDetector:
     """Anomaly Detector Agent - coordinates anomaly detection workers.
     
-    Manages 4 workers:
+    Manages 6 workers:
+    - Statistical: Z-score and IQR based detection
+    - IsolationForest: Isolation Forest algorithm
     - LOF: Local Outlier Factor algorithm
     - OneClassSVM: One-Class SVM algorithm
-    - IsolationForest: Isolation Forest algorithm
+    - Multivariate: Multivariate Gaussian detection
     - Ensemble: Ensemble voting method
     
-    Week 1 Day 3 Implementation:
-    - Agent coordinates all workers (doesn't implement)
-    - Each worker extends BaseWorker
-    - Methods delegate to workers
-    - Pure coordinator pattern
+    GUIDANCE Implementation:
+    - Pure Coordinator pattern (doesn't implement detection)
+    - Orchestrates worker execution
+    - Handles errors at worker level
+    - Tracks error intelligence
+    - Provides health metrics
+    - Supports retry with backoff
+    
+    Attributes:
+        name: Agent identifier
+        workers: Dict of registered workers
+        error_tracker: ErrorIntelligence for tracking (set by orchestrator)
+        data: Current DataFrame being processed
+        detection_results: Results from all workers
+        error_log: List of all errors encountered
     """
 
     def __init__(self) -> None:
         """Initialize the Anomaly Detector agent and all workers."""
         self.name = "AnomalyDetector"
+        self.version = "1.0.0"
         self.logger = get_logger("AnomalyDetector")
         self.structured_logger = get_structured_logger("AnomalyDetector")
         self.data: Optional[pd.DataFrame] = None
         self.detection_results: Dict[str, WorkerResult] = {}
+        self.error_log: List[Dict[str, Any]] = []
+        self.error_tracker = None  # Will be set by orchestrator
 
-        # === INITIALIZE ALL WORKERS ===
+        # === INITIALIZE ALL 6 WORKERS ===
+        self.statistical_detector = Statistical()
+        self.isolation_forest_detector = IsolationForest()
         self.lof_detector = LOF()
         self.ocsvm_detector = OneClassSVM()
-        self.isolation_forest_detector = IsolationForest()
+        self.multivariate_detector = Multivariate()
         self.ensemble_detector = Ensemble()
 
-        self.workers = [
-            self.lof_detector,
-            self.ocsvm_detector,
-            self.isolation_forest_detector,
-            self.ensemble_detector,
-        ]
+        # Dictionary for execute_worker() method
+        self.workers: Dict[str, Any] = {
+            "statistical": self.statistical_detector,
+            "isolation_forest": self.isolation_forest_detector,
+            "lof": self.lof_detector,
+            "ocsvm": self.ocsvm_detector,
+            "multivariate": self.multivariate_detector,
+            "ensemble": self.ensemble_detector,
+        }
 
-        self.logger.info("AnomalyDetector initialized with 4 detection workers")
+        # Set error tracker for all workers (for Phase 2 integration)
+        for worker in self.workers.values():
+            worker.error_tracker = self.error_tracker
+
+        self.logger.info(
+            f"{self.name} initialized with {len(self.workers)} detection workers"
+        )
         self.structured_logger.info("AnomalyDetector initialized", {
-            "workers": 4,
-            "worker_names": [
-                "LOF",
-                "OneClassSVM",
-                "IsolationForest",
-                "Ensemble"
-            ]
+            "workers": len(self.workers),
+            "worker_names": list(self.workers.keys())
         })
 
-    # === DATA MANAGEMENT ===
+    # ===== DATA MANAGEMENT (Agent Contract) =====
 
     @retry_on_error(max_attempts=2, backoff=1)
     def set_data(self, df: pd.DataFrame) -> None:
-        """Store the DataFrame for anomaly detection.
+        """Load input data for processing.
+        
+        GUIDANCE: Section 2.2 - Agent Interface Contract
         
         Args:
-            df: DataFrame to analyze
+            df: Input DataFrame to process
+            
+        Raises:
+            ValueError: If data is invalid or empty
+            TypeError: If data is not DataFrame
         """
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError(f"Expected DataFrame, got {type(df)}")
+        
+        if df.empty:
+            raise ValueError("DataFrame is empty")
+        
         self.data = df.copy()
         self.detection_results = {}
+        self.error_log = []
+        
         self.logger.info(f"Data set: {df.shape[0]} rows, {df.shape[1]} columns")
         self.structured_logger.info("Data set for anomaly detection", {
             "rows": df.shape[0],
@@ -108,81 +157,279 @@ class AnomalyDetector:
         """
         return self.data
 
-    # === DETECTION METHODS - DELEGATE TO WORKERS ===
+    # ===== AGENT CONTRACT: execute_worker() =====
 
     @retry_on_error(max_attempts=3, backoff=2)
-    def detect_lof(self, n_neighbors: int = 20, contamination: float = 0.1) -> Dict[str, Any]:
-        """Detect anomalies using Local Outlier Factor.
+    def execute_worker(
+        self,
+        worker_name: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Execute a specific worker with retry logic.
+        
+        GUIDANCE: Section 2.2 - Agent Interface Contract
+        
+        Implements:
+        - Worker orchestration
+        - Error handling
+        - Retry logic
+        - Error intelligence tracking
         
         Args:
-            n_neighbors: Number of neighbors to use
-            contamination: Expected proportion of anomalies
+            worker_name: Name of worker to execute (must be in self.workers)
+            **kwargs: Worker-specific parameters
             
         Returns:
-            Detection result as dictionary
+            {
+                'success': bool,
+                'result': Any,              # Worker output
+                'errors': List[Dict],       # Errors encountered
+                'attempts': int,            # Retry attempts made
+                'quality_score': float      # 0-1 quality metric
+            }
             
         Raises:
-            AgentError: If no data set
+            KeyError: If worker not found
+            RuntimeError: If all retries exhausted
         """
         if self.data is None:
             raise AgentError("No data set. Use set_data() first.")
-
-        self.structured_logger.info("LOF detection started", {
-            "n_neighbors": n_neighbors,
-            "contamination": contamination
-        })
-
-        try:
-            worker_result = self.lof_detector.safe_execute(
-                df=self.data,
-                n_neighbors=n_neighbors,
-                contamination=contamination,
+        
+        if worker_name not in self.workers:
+            available = list(self.workers.keys())
+            raise KeyError(
+                f"Worker '{worker_name}' not found. "
+                f"Available workers: {available}"
             )
-
-            self.detection_results["lof"] = worker_result
-            self.structured_logger.info("LOF detection completed", {"success": worker_result.success})
+        
+        worker = self.workers[worker_name]
+        self.structured_logger.info(
+            f"Executing worker: {worker_name}",
+            {"kwargs": str(kwargs)[:100]}
+        )
+        
+        try:
+            # Execute worker with error handling
+            worker_result = worker.safe_execute(
+                df=self.data,
+                **kwargs
+            )
             
-            return worker_result.to_dict()
+            # Store result
+            self.detection_results[worker_name] = worker_result
+            
+            # Track in error intelligence if available
+            if self.error_tracker:
+                if worker_result.success:
+                    self.error_tracker.track_success(
+                        worker_name=worker_name,
+                        quality_score=worker_result.quality_score
+                    )
+                else:
+                    self.error_tracker.track_error(
+                        worker_name=worker_name,
+                        errors=worker_result.errors,
+                        quality_score=worker_result.quality_score
+                    )
+            
+            # Log errors if any
+            if worker_result.errors:
+                for error in worker_result.errors:
+                    self.error_log.append({
+                        "worker": worker_name,
+                        "error": error,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+            
+            self.structured_logger.info(
+                f"Worker {worker_name} completed",
+                {"success": worker_result.success, 
+                 "quality": worker_result.quality_score}
+            )
+            
+            return {
+                'success': worker_result.success,
+                'result': worker_result.data,
+                'errors': worker_result.errors,
+                'attempts': 1,
+                'quality_score': worker_result.quality_score
+            }
+        
         except Exception as e:
-            self.structured_logger.error("LOF detection failed", {"error": str(e)})
+            self.logger.error(f"Worker {worker_name} execution failed: {e}")
+            error_record = {
+                "worker": worker_name,
+                "error": {"type": "execution_error", "message": str(e)},
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            self.error_log.append(error_record)
+            
+            if self.error_tracker:
+                self.error_tracker.track_error(
+                    worker_name=worker_name,
+                    errors=[{"type": "execution_error", "message": str(e)}],
+                    quality_score=0.0
+                )
+            
             raise
 
+    # ===== AGENT CONTRACT: get_results() =====
+
+    @retry_on_error(max_attempts=2, backoff=1)
+    def get_results(self) -> pd.DataFrame:
+        """Return final aggregated results.
+        
+        GUIDANCE: Section 2.2 - Agent Interface Contract
+        
+        Aggregates results from all executed workers into a single
+        DataFrame with anomaly flags from each detection method.
+        
+        Returns:
+            DataFrame with original data + anomaly columns for each worker
+            
+        Raises:
+            ValueError: If no data or results available
+        """
+        if self.data is None:
+            raise ValueError("No data available")
+        
+        if not self.detection_results:
+            raise ValueError("No detection results. Run detect_* methods first.")
+        
+        # Start with original data
+        results_df = self.data.copy()
+        
+        # Add anomaly columns from each worker
+        for worker_name, result in self.detection_results.items():
+            if result.success and result.data:
+                # Assuming result.data has 'anomaly' column
+                if isinstance(result.data, dict) and 'anomaly' in result.data:
+                    col_name = f"anomaly_{worker_name}"
+                    results_df[col_name] = result.data['anomaly']
+                elif isinstance(result.data, pd.DataFrame):
+                    # If already DataFrame, merge it
+                    for col in result.data.columns:
+                        results_df[f"{worker_name}_{col}"] = result.data[col]
+        
+        self.logger.info(
+            f"Results aggregated: {results_df.shape[0]} rows, "
+            f"{results_df.shape[1]} columns"
+        )
+        return results_df
+
+    # ===== AGENT CONTRACT: get_health_report() =====
+
+    @retry_on_error(max_attempts=2, backoff=1)
+    def get_health_report(self) -> Dict[str, Any]:
+        """Get system health and error intelligence.
+        
+        GUIDANCE: Section 2.2 - Agent Interface Contract
+        
+        Calculates comprehensive health metrics:
+        - Overall health score (0-100)
+        - Per-worker health scores
+        - Error statistics and patterns
+        - Quality metrics
+        - Recommendations for improvement
+        
+        Returns:
+            {
+                'overall_health': float,           # 0-100
+                'total_errors': int,
+                'error_types': Dict[str, int],
+                'worker_health': Dict[str, float],
+                'quality_scores': Dict[str, float],
+                'recommendations': List[str],
+                'timestamp': str
+            }
+        """
+        # Count errors by type
+        error_types: Dict[str, int] = {}
+        for error_record in self.error_log:
+            error_type = error_record['error'].get('type', 'unknown')
+            error_types[error_type] = error_types.get(error_type, 0) + 1
+        
+        # Calculate per-worker health
+        worker_health: Dict[str, float] = {}
+        quality_scores: Dict[str, float] = {}
+        
+        for worker_name, result in self.detection_results.items():
+            quality_scores[worker_name] = result.quality_score
+            
+            # Health = quality score if success, else 0
+            if result.success:
+                worker_health[worker_name] = result.quality_score * 100
+            else:
+                worker_health[worker_name] = 0.0
+        
+        # Calculate overall health
+        if worker_health:
+            overall_health = sum(worker_health.values()) / len(worker_health)
+        else:
+            overall_health = 50.0  # Neutral if no results yet
+        
+        # Generate recommendations
+        recommendations: List[str] = []
+        
+        if overall_health < HEALTH_THRESHOLD * 100:
+            recommendations.append(
+                f"System health is below threshold ({overall_health:.1f}%). "
+                "Review errors and worker configurations."
+            )
+        
+        if error_types:
+            most_common_error = max(error_types, key=error_types.get)
+            recommendations.append(
+                f"Most common error: {most_common_error} "
+                f"({error_types[most_common_error]} occurrences). "
+                "Consider addressing this error type."
+            )
+        
+        low_health_workers = [
+            name for name, health in worker_health.items()
+            if health < QUALITY_THRESHOLD * 100
+        ]
+        if low_health_workers:
+            recommendations.append(
+                f"Workers with low health: {', '.join(low_health_workers)}. "
+                "Review their configurations and input data."
+            )
+        
+        return {
+            'overall_health': overall_health,
+            'total_errors': len(self.error_log),
+            'error_types': error_types,
+            'worker_health': worker_health,
+            'quality_scores': quality_scores,
+            'recommendations': recommendations,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+
+    # ===== DETECTION METHODS - DELEGATE TO WORKERS =====
+
     @retry_on_error(max_attempts=3, backoff=2)
-    def detect_ocsvm(self, nu: float = 0.05, kernel: str = 'rbf') -> Dict[str, Any]:
-        """Detect anomalies using One-Class SVM.
+    def detect_statistical(
+        self,
+        columns: List[str],
+        method: str = "zscore",
+        threshold: float = 3.0
+    ) -> Dict[str, Any]:
+        """Detect anomalies using statistical methods.
         
         Args:
-            nu: Upper bound on fraction of anomalies
-            kernel: Kernel type ('rbf', 'linear', 'poly')
+            columns: Numeric columns to analyze
+            method: "zscore" or "iqr"
+            threshold: Detection threshold
             
         Returns:
             Detection result as dictionary
-            
-        Raises:
-            AgentError: If no data set
         """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
-
-        self.structured_logger.info("One-Class SVM detection started", {
-            "nu": nu,
-            "kernel": kernel
-        })
-
-        try:
-            worker_result = self.ocsvm_detector.safe_execute(
-                df=self.data,
-                nu=nu,
-                kernel=kernel,
-            )
-
-            self.detection_results["ocsvm"] = worker_result
-            self.structured_logger.info("One-Class SVM detection completed", {"success": worker_result.success})
-            
-            return worker_result.to_dict()
-        except Exception as e:
-            self.structured_logger.error("One-Class SVM detection failed", {"error": str(e)})
-            raise
+        return self.execute_worker(
+            "statistical",
+            columns=columns,
+            method=method,
+            threshold=threshold
+        )
 
     @retry_on_error(max_attempts=3, backoff=2)
     def detect_isolation_forest(
@@ -193,87 +440,90 @@ class AnomalyDetector:
         """Detect anomalies using Isolation Forest.
         
         Args:
-            contamination: Expected fraction of outliers (0.0-1.0)
-            n_estimators: Number of trees (default 100)
+            contamination: Expected fraction of outliers
+            n_estimators: Number of trees
             
         Returns:
             Detection result as dictionary
-            
-        Raises:
-            AgentError: If no data set
         """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
+        return self.execute_worker(
+            "isolation_forest",
+            contamination=contamination,
+            n_estimators=n_estimators
+        )
 
-        self.structured_logger.info("Isolation Forest detection started", {
-            "contamination": contamination,
-            "n_estimators": n_estimators
-        })
-
-        try:
-            worker_result = self.isolation_forest_detector.safe_execute(
-                df=self.data,
-                contamination=contamination,
-                n_estimators=n_estimators,
-            )
-
-            self.detection_results["isolation_forest"] = worker_result
-            self.structured_logger.info("Isolation Forest detection completed", {"success": worker_result.success})
+    @retry_on_error(max_attempts=3, backoff=2)
+    def detect_lof(self, n_neighbors: int = 20, contamination: float = 0.1) -> Dict[str, Any]:
+        """Detect anomalies using Local Outlier Factor.
+        
+        Args:
+            n_neighbors: Number of neighbors
+            contamination: Expected fraction of anomalies
             
-            return worker_result.to_dict()
-        except Exception as e:
-            self.structured_logger.error("Isolation Forest detection failed", {"error": str(e)})
-            raise
+        Returns:
+            Detection result as dictionary
+        """
+        return self.execute_worker(
+            "lof",
+            n_neighbors=n_neighbors,
+            contamination=contamination
+        )
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def detect_ocsvm(self, nu: float = 0.05, kernel: str = 'rbf') -> Dict[str, Any]:
+        """Detect anomalies using One-Class SVM.
+        
+        Args:
+            nu: Upper bound on fraction of anomalies
+            kernel: Kernel type
+            
+        Returns:
+            Detection result as dictionary
+        """
+        return self.execute_worker(
+            "ocsvm",
+            nu=nu,
+            kernel=kernel
+        )
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def detect_multivariate(self, threshold: float = 3.0) -> Dict[str, Any]:
+        """Detect anomalies using Multivariate Gaussian.
+        
+        Args:
+            threshold: Detection threshold
+            
+        Returns:
+            Detection result as dictionary
+        """
+        return self.execute_worker(
+            "multivariate",
+            threshold=threshold
+        )
 
     @retry_on_error(max_attempts=3, backoff=2)
     def detect_ensemble(self, threshold: float = 0.5) -> Dict[str, Any]:
-        """Detect anomalies using ensemble voting method.
+        """Detect anomalies using ensemble voting.
         
         Args:
-            threshold: Voting threshold (0-1)
+            threshold: Voting threshold
             
         Returns:
             Detection result as dictionary
-            
-        Raises:
-            AgentError: If no data set
         """
-        if self.data is None:
-            raise AgentError("No data set. Use set_data() first.")
+        return self.execute_worker(
+            "ensemble",
+            threshold=threshold
+        )
 
-        self.structured_logger.info("Ensemble detection started", {"threshold": threshold})
-
-        try:
-            worker_result = self.ensemble_detector.safe_execute(
-                df=self.data,
-                threshold=threshold,
-            )
-
-            self.detection_results["ensemble"] = worker_result
-            self.structured_logger.info("Ensemble detection completed", {"success": worker_result.success})
-            
-            return worker_result.to_dict()
-        except Exception as e:
-            self.structured_logger.error("Ensemble detection failed", {"error": str(e)})
-            raise
-
-    # === BATCH DETECTION ===
+    # ===== BATCH DETECTION =====
 
     @retry_on_error(max_attempts=3, backoff=2)
-    def detect_all(
-        self,
-        lof_params: Optional[Dict[str, Any]] = None,
-        ocsvm_params: Optional[Dict[str, Any]] = None,
-        iforest_params: Optional[Dict[str, Any]] = None,
-        ensemble_params: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """Run all 4 anomaly detection methods.
+    def detect_all(self, **kwargs) -> Dict[str, Any]:
+        """Run all 6 anomaly detection methods.
         
         Args:
-            lof_params: Parameters for LOF
-            ocsvm_params: Parameters for One-Class SVM
-            iforest_params: Parameters for Isolation Forest
-            ensemble_params: Parameters for Ensemble
+            **kwargs: Method-specific parameters
             
         Returns:
             Dictionary with all detection results
@@ -282,35 +532,15 @@ class AnomalyDetector:
             raise AgentError("No data set. Use set_data() first.")
 
         self.structured_logger.info("Comprehensive anomaly detection started")
-
         results = {}
 
-        # Default parameters
-        lof_params = lof_params or {}
-        ocsvm_params = ocsvm_params or {}
-        iforest_params = iforest_params or {}
-        ensemble_params = ensemble_params or {}
-
         # Run all detections
-        try:
-            results["lof"] = self.detect_lof(**lof_params)
-        except Exception as e:
-            self.logger.warning(f"LOF detection failed: {e}")
-
-        try:
-            results["ocsvm"] = self.detect_ocsvm(**ocsvm_params)
-        except Exception as e:
-            self.logger.warning(f"One-Class SVM detection failed: {e}")
-
-        try:
-            results["isolation_forest"] = self.detect_isolation_forest(**iforest_params)
-        except Exception as e:
-            self.logger.warning(f"Isolation Forest detection failed: {e}")
-
-        try:
-            results["ensemble"] = self.detect_ensemble(**ensemble_params)
-        except Exception as e:
-            self.logger.warning(f"Ensemble detection failed: {e}")
+        for worker_name in self.workers.keys():
+            try:
+                results[worker_name] = self.execute_worker(worker_name)
+            except Exception as e:
+                self.logger.warning(f"{worker_name} detection failed: {e}")
+                results[worker_name] = {'success': False, 'error': str(e)}
 
         self.structured_logger.info("Comprehensive anomaly detection completed", {
             "methods": len(results)
@@ -318,7 +548,7 @@ class AnomalyDetector:
 
         return results
 
-    # === REPORTING ===
+    # ===== REPORTING =====
 
     @retry_on_error(max_attempts=2, backoff=1)
     def summary_report(self) -> Dict[str, Any]:
@@ -334,14 +564,17 @@ class AnomalyDetector:
             k for k, v in self.detection_results.items() if not v.success
         ]
 
+        health_report = self.get_health_report()
+
         report = {
             "status": "success",
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.utcnow().isoformat(),
             "total_detections": len(self.detection_results),
             "successful": len(successful_detections),
             "failed": len(failed_detections),
             "successful_methods": successful_detections,
             "failed_methods": failed_detections,
+            "health_report": health_report,
             "results": {
                 k: v.to_dict() for k, v in self.detection_results.items()
             },
@@ -364,6 +597,8 @@ class AnomalyDetector:
         """
         if self.data is None:
             return "AnomalyDetector: no data loaded"
+        
+        health_report = self.get_health_report()
 
         return (
             f"AnomalyDetector Summary:\n"
@@ -371,5 +606,7 @@ class AnomalyDetector:
             f"  Columns: {self.data.shape[1]}\n"
             f"  Workers: {len(self.workers)}\n"
             f"  Detections run: {len(self.detection_results)}\n"
-            f"  Successful: {sum(1 for v in self.detection_results.values() if v.success)}"
+            f"  Successful: {sum(1 for v in self.detection_results.values() if v.success)}\n"
+            f"  Overall Health: {health_report['overall_health']:.1f}%\n"
+            f"  Total Errors: {health_report['total_errors']}"
         )
