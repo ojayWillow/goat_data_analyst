@@ -299,7 +299,12 @@ class TestErrorPatternAnalysis:
             for agent, workers in health.items():
                 print(f"   • {agent}:")
                 for worker, score in list(workers.items())[:3]:
-                    print(f"      - {worker}: {score:.1%}")
+                    # Handle both numeric and dict scores
+                    if isinstance(score, (int, float)):
+                        score_str = f"{score:.1%}"
+                    else:
+                        score_str = str(score)[:30]
+                    print(f"      - {worker}: {score_str}")
 
     def test_fix_recommendations(self):
         """Test generating fix recommendations."""
