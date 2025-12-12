@@ -12,6 +12,7 @@ class DistributionAnalyzer(BaseWorker):
     
     def __init__(self):
         super().__init__("distribution_analyzer")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, df: pd.DataFrame, **kwargs) -> WorkerResult:
         """Analyze distributions and generate recommendations.
@@ -36,6 +37,13 @@ class DistributionAnalyzer(BaseWorker):
                     ErrorType.DATA_VALIDATION_ERROR,
                     "DataFrame is empty or None",
                     severity="error"
+                )
+                self.error_intelligence.track_error(
+                    agent_name="recommender",
+                    worker_name="DistributionAnalyzer",
+                    operation="analyze_distributions",
+                    error_type="DataValidationError",
+                    error_message="DataFrame is empty or None"
                 )
                 return result
             
@@ -102,6 +110,11 @@ class DistributionAnalyzer(BaseWorker):
             }
             
             self.logger.info(f"Distribution analysis: {len(numeric_cols)} columns analyzed")
+            self.error_intelligence.track_success(
+                agent_name="recommender",
+                worker_name="DistributionAnalyzer",
+                operation="analyze_distributions"
+            )
             
         except Exception as e:
             self._add_error(
@@ -111,5 +124,12 @@ class DistributionAnalyzer(BaseWorker):
                 severity="error"
             )
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="recommender",
+                worker_name="DistributionAnalyzer",
+                operation="analyze_distributions",
+                error_type=type(e).__name__,
+                error_message=str(e)
+            )
         
         return result
