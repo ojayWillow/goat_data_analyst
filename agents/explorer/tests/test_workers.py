@@ -3,23 +3,48 @@
 Tests all 12 workers with valid/invalid inputs, edge cases, and error scenarios.
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Add parent directories to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+
 import pytest
 import pandas as pd
 import numpy as np
 from typing import Dict, Any
 
-from agents.explorer.workers import (
-    NumericAnalyzer,
-    CategoricalAnalyzer,
-    CorrelationAnalyzer,
-    QualityAssessor,
-    NormalityTester,
-    DistributionFitter,
-    DistributionComparison,
-    SkewnessKurtosisAnalyzer,
-    OutlierDetector,
-    CorrelationMatrix,
-)
+try:
+    # Try absolute imports first
+    from agents.explorer.workers import (
+        NumericAnalyzer,
+        CategoricalAnalyzer,
+        CorrelationAnalyzer,
+        QualityAssessor,
+        NormalityTester,
+        DistributionFitter,
+        DistributionComparison,
+        SkewnessKurtosisAnalyzer,
+        OutlierDetector,
+        CorrelationMatrix,
+    )
+except ModuleNotFoundError:
+    # Fallback to relative imports
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from workers import (
+        NumericAnalyzer,
+        CategoricalAnalyzer,
+        CorrelationAnalyzer,
+        QualityAssessor,
+        NormalityTester,
+        DistributionFitter,
+        DistributionComparison,
+        SkewnessKurtosisAnalyzer,
+        OutlierDetector,
+        CorrelationMatrix,
+    )
 
 
 # ============================================================================
@@ -508,14 +533,14 @@ class TestCorrelationMatrix:
 class TestErrorHandling:
     """Test error handling across all workers."""
     
-    def test_never_raises_numeric_analyzer(self, clean_dataframe):
+    def test_never_raises_numeric_analyzer(self):
         """Test that NumericAnalyzer never raises."""
         analyzer = NumericAnalyzer()
         try:
             result = analyzer.safe_execute(df=None)
             assert result.success is False
-        except Exception:
-            pytest.fail("safe_execute() should never raise")
+        except Exception as e:
+            pytest.fail(f"safe_execute() should never raise: {e}")
     
     def test_never_raises_categorical_analyzer(self):
         """Test that CategoricalAnalyzer never raises."""
@@ -523,8 +548,8 @@ class TestErrorHandling:
         try:
             result = analyzer.safe_execute(df=None)
             assert result.success is False
-        except Exception:
-            pytest.fail("safe_execute() should never raise")
+        except Exception as e:
+            pytest.fail(f"safe_execute() should never raise: {e}")
     
     def test_never_raises_all_workers(self):
         """Test that all workers never raise on bad input."""
@@ -545,8 +570,8 @@ class TestErrorHandling:
             try:
                 result = worker.safe_execute(df=None)
                 assert result.success is False
-            except Exception:
-                pytest.fail(f"{worker.__class__.__name__} raised exception")
+            except Exception as e:
+                pytest.fail(f"{worker.__class__.__name__} raised exception: {e}")
     
     def test_quality_score_in_range(self, clean_dataframe):
         """Test that quality score is always 0-1."""
