@@ -22,6 +22,7 @@ class ModelValidatorWorker(BaseWorker):
     
     def __init__(self):
         super().__init__("ModelValidatorWorker")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Execute model validation.
@@ -50,6 +51,13 @@ class ModelValidatorWorker(BaseWorker):
         if X is None or y is None:
             self._add_error(result, ErrorType.MISSING_DATA, "X or y not provided")
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="ModelValidatorWorker",
+                error_type=ErrorType.MISSING_DATA,
+                error_message="X or y not provided",
+                context={"model_type": model_type, "cv_folds": cv_folds}
+            )
             return result
         
         # Convert to numpy arrays
@@ -61,6 +69,13 @@ class ModelValidatorWorker(BaseWorker):
         if len(X) != len(y):
             self._add_error(result, ErrorType.INVALID_PARAMETER, "X and y length mismatch")
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="ModelValidatorWorker",
+                error_type=ErrorType.INVALID_PARAMETER,
+                error_message="X and y length mismatch",
+                context={"X_len": len(X), "y_len": len(y), "model_type": model_type}
+            )
             return result
         
         if len(X) < cv_folds + 1:
@@ -70,6 +85,18 @@ class ModelValidatorWorker(BaseWorker):
                 f"Need at least {cv_folds + 1} samples, got {len(X)}"
             )
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="ModelValidatorWorker",
+                error_type=ErrorType.INSUFFICIENT_DATA,
+                error_message=f"Need at least {cv_folds + 1} samples, got {len(X)}",
+                context={
+                    "samples": len(X),
+                    "min_required": cv_folds + 1,
+                    "cv_folds": cv_folds,
+                    "model_type": model_type
+                }
+            )
             return result
         
         # VALIDATION
@@ -81,6 +108,13 @@ class ModelValidatorWorker(BaseWorker):
             except ImportError:
                 self._add_error(result, ErrorType.MODEL_ERROR, "scikit-learn not available")
                 result.success = False
+                self.error_intelligence.track_error(
+                    agent_name="predictor",
+                    worker_name="ModelValidatorWorker",
+                    error_type="ImportError",
+                    error_message="scikit-learn not available",
+                    context={"model_type": model_type, "cv_folds": cv_folds}
+                )
                 return result
             
             # Create model
@@ -91,6 +125,13 @@ class ModelValidatorWorker(BaseWorker):
             else:
                 self._add_error(result, ErrorType.INVALID_PARAMETER, f"Unknown model_type: {model_type}")
                 result.success = False
+                self.error_intelligence.track_error(
+                    agent_name="predictor",
+                    worker_name="ModelValidatorWorker",
+                    error_type=ErrorType.INVALID_PARAMETER,
+                    error_message=f"Unknown model_type: {model_type}",
+                    context={"model_type": model_type, "cv_folds": cv_folds}
+                )
                 return result
             
             # Cross-validation
@@ -161,6 +202,23 @@ class ModelValidatorWorker(BaseWorker):
                 f"Model validation complete: R2={r2_score:.4f}, CV R2={np.mean(cv_scores):.4f}"
             )
             
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="predictor",
+                worker_name="ModelValidatorWorker",
+                operation="model_validation",
+                context={
+                    "model_type": model_type,
+                    "cv_folds": cv_folds,
+                    "samples": len(X),
+                    "features": X.shape[1],
+                    "r2_score": round(r2_score, 4),
+                    "cv_r2_mean": round(float(np.mean(cv_scores)), 4),
+                    "rmse": round(rmse, 4),
+                    "mae": round(mae, 4)
+                }
+            )
+            
         except Exception as e:
             self._add_error(
                 result,
@@ -169,5 +227,18 @@ class ModelValidatorWorker(BaseWorker):
             )
             result.success = False
             self.logger.error(f"Validation error: {e}")
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="ModelValidatorWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={
+                    "model_type": model_type,
+                    "cv_folds": cv_folds,
+                    "samples": len(X),
+                    "features": X.shape[1],
+                    "error_details": str(e)
+                }
+            )
         
         return result
