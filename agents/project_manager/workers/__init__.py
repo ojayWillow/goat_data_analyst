@@ -14,6 +14,7 @@ from .integration_tester import IntegrationTester
 from .contract_validator import ContractValidator
 from .dependency_consistency_checker import DependencyConsistencyChecker
 from .retry_error_recovery_checker import RetryErrorRecoveryChecker
+from .coverage_audit_tool import CoverageAuditTool
 
 __all__ = [
     "StructureScanner",
@@ -30,4 +31,5 @@ __all__ = [
     "ContractValidator",
     "DependencyConsistencyChecker",
     "RetryErrorRecoveryChecker",
+    "CoverageAuditTool",
 ]
