@@ -122,7 +122,6 @@ class Predictor:
     
     # ===== LINEAR REGRESSION =====
     
-    @retry_on_error(max_attempts=3, backoff=2)
     def predict_linear(
         self,
         features: List[str],
@@ -140,6 +139,7 @@ class Predictor:
         Raises:
             AgentError: If validation fails
         """
+        # Validate BEFORE retry decorator
         if self.data is None:
             error_msg = "No data set"
             self.structured_logger.error("Linear regression prediction failed", {
@@ -147,9 +147,27 @@ class Predictor:
             })
             raise AgentError(error_msg)
         
-        # Validate inputs
+        # Validate inputs BEFORE retry decorator
         self._validate_features_and_target(features, target)
         
+        # Now call the actual prediction with retry decorator
+        return self._predict_linear_internal(features, target)
+    
+    @retry_on_error(max_attempts=3, backoff=2)
+    def _predict_linear_internal(
+        self,
+        features: List[str],
+        target: str,
+    ) -> Dict[str, Any]:
+        """Internal linear regression prediction (retryable).
+        
+        Args:
+            features: List of feature column names
+            target: Target column name
+            
+        Returns:
+            Dictionary with predictions and metrics
+        """
         self.structured_logger.info("Linear regression started", {
             "features": len(features),
             "target": target,
@@ -180,7 +198,6 @@ class Predictor:
     
     # ===== DECISION TREE =====
     
-    @retry_on_error(max_attempts=3, backoff=2)
     def predict_tree(
         self,
         features: List[str],
@@ -202,6 +219,7 @@ class Predictor:
         Raises:
             AgentError: If validation fails
         """
+        # Validate BEFORE retry decorator
         if self.data is None:
             error_msg = "No data set"
             self.structured_logger.error("Decision tree prediction failed", {
@@ -209,9 +227,31 @@ class Predictor:
             })
             raise AgentError(error_msg)
         
-        # Validate inputs
+        # Validate inputs BEFORE retry decorator
         self._validate_features_and_target(features, target)
         
+        # Now call the actual prediction with retry decorator
+        return self._predict_tree_internal(features, target, mode, max_depth)
+    
+    @retry_on_error(max_attempts=3, backoff=2)
+    def _predict_tree_internal(
+        self,
+        features: List[str],
+        target: str,
+        mode: str = 'auto',
+        max_depth: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Internal decision tree prediction (retryable).
+        
+        Args:
+            features: List of feature column names
+            target: Target column name
+            mode: 'regression', 'classification', or 'auto'
+            max_depth: Maximum tree depth
+            
+        Returns:
+            Dictionary with predictions and feature importance
+        """
         self.structured_logger.info("Decision tree prediction started", {
             "features": len(features),
             "target": target,
@@ -246,7 +286,6 @@ class Predictor:
     
     # ===== TIME SERIES =====
     
-    @retry_on_error(max_attempts=3, backoff=2)
     def forecast_timeseries(
         self,
         series_column: str,
@@ -268,6 +307,7 @@ class Predictor:
         Raises:
             AgentError: If validation fails
         """
+        # Validate BEFORE retry decorator
         if self.data is None:
             error_msg = "No data set"
             self.structured_logger.error("Time series forecasting failed", {
@@ -283,6 +323,28 @@ class Predictor:
             })
             raise AgentError(error_msg)
         
+        # Now call the actual forecasting with retry decorator
+        return self._forecast_timeseries_internal(series_column, periods, method, decompose)
+    
+    @retry_on_error(max_attempts=3, backoff=2)
+    def _forecast_timeseries_internal(
+        self,
+        series_column: str,
+        periods: int = 12,
+        method: str = 'auto',
+        decompose: bool = True,
+    ) -> Dict[str, Any]:
+        """Internal time series forecasting (retryable).
+        
+        Args:
+            series_column: Column name with time series data
+            periods: Number of periods to forecast
+            method: 'arima', 'exponential_smoothing', or 'auto'
+            decompose: Whether to decompose time series
+            
+        Returns:
+            Dictionary with forecasts and confidence intervals
+        """
         self.structured_logger.info("Time series forecasting started", {
             "series_column": series_column,
             "periods": periods,
@@ -317,7 +379,6 @@ class Predictor:
     
     # ===== MODEL VALIDATION =====
     
-    @retry_on_error(max_attempts=3, backoff=2)
     def validate_model(
         self,
         features: List[str],
@@ -339,6 +400,7 @@ class Predictor:
         Raises:
             AgentError: If validation fails
         """
+        # Validate BEFORE retry decorator
         if self.data is None:
             error_msg = "No data set"
             self.structured_logger.error("Model validation failed", {
@@ -346,9 +408,31 @@ class Predictor:
             })
             raise AgentError(error_msg)
         
-        # Validate inputs
+        # Validate inputs BEFORE retry decorator
         self._validate_features_and_target(features, target)
         
+        # Now call the actual validation with retry decorator
+        return self._validate_model_internal(features, target, model_type, cv_folds)
+    
+    @retry_on_error(max_attempts=3, backoff=2)
+    def _validate_model_internal(
+        self,
+        features: List[str],
+        target: str,
+        model_type: str = 'linear',
+        cv_folds: int = 5,
+    ) -> Dict[str, Any]:
+        """Internal model validation (retryable).
+        
+        Args:
+            features: List of feature column names
+            target: Target column name
+            model_type: 'linear' or 'tree'
+            cv_folds: Number of cross-validation folds
+            
+        Returns:
+            Dictionary with validation metrics
+        """
         self.structured_logger.info("Model validation started", {
             "features": len(features),
             "target": target,
