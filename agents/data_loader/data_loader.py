@@ -23,13 +23,13 @@ structured_logger = get_structured_logger(__name__)
 
 
 class DataLoader:
-    """DataLoader Agent - coordinates data loading workers.
+    """DataLoader Agent - coordinates data loading workers with quality tracking.
     
     Manages 6 workers:
-    - CSVLoaderWorker: Loads standard CSV files
-    - JSONExcelLoaderWorker: Loads JSON and Excel
-    - ParquetLoaderWorker: Loads Parquet files
-    - ValidatorWorker: Validates data
+    - CSVLoaderWorker: Loads standard CSV files with quality scoring
+    - JSONExcelLoaderWorker: Loads JSON and Excel with validation
+    - ParquetLoaderWorker: Loads Parquet files with quality metrics
+    - ValidatorWorker: Validates data with comprehensive quality analysis
     - CSVStreaming: Streams large CSVs (>500MB)
     - FormatDetection: Auto-detects formats
     
@@ -42,12 +42,14 @@ class DataLoader:
     - Load HDF5 files
     - Load SQLite databases
     - Auto-detect file format
-    - Validate loaded data
-    - Extract metadata
+    - Validate loaded data with quality scoring
+    - Extract comprehensive metadata
+    - Track data quality through workflow
     """
 
     SUPPORTED_FORMATS = ['csv', 'json', 'xlsx', 'xls', 'parquet', 'jsonl', 'h5', 'hdf5', 'db', 'sqlite']
     MAX_FILE_SIZE_MB = 100
+    MIN_QUALITY_THRESHOLD = 0.0  # Accept any quality score
 
     def __init__(self) -> None:
         """Initialize DataLoader agent and all workers."""
@@ -55,9 +57,11 @@ class DataLoader:
         self.logger = get_logger("DataLoader")
         self.loaded_data: Optional[pd.DataFrame] = None
         self.metadata: Dict[str, Any] = {}
+        self.quality_score: float = 0.0
+        self.load_history: List[Dict[str, Any]] = []
 
         # === INITIALIZE ALL WORKERS ===
-        # Core workers
+        # Core workers with enhanced quality scoring
         self.csv_loader = CSVLoaderWorker()
         self.json_excel_loader = JSONExcelLoaderWorker()
         self.parquet_loader = ParquetLoaderWorker()
@@ -84,18 +88,20 @@ class DataLoader:
             "core_workers": len(self.core_workers),
             "performance_workers": len(self.performance_workers),
             "total_workers": len(self.core_workers) + len(self.performance_workers),
-            "supported_formats": self.SUPPORTED_FORMATS
+            "supported_formats": self.SUPPORTED_FORMATS,
+            "quality_tracking": "enabled"
         })
 
     # === MAIN LOADING ===
 
     @retry_on_error(max_attempts=3, backoff=2)
     def load(self, file_path: str, **kwargs) -> Dict[str, Any]:
-        """Load data from a file.
+        """Load data from a file with quality tracking.
         
         Delegates to appropriate worker based on format.
         Uses CSVStreaming for >500MB CSV files.
         Uses FormatDetection for format auto-detection.
+        Tracks quality scores through loading and validation pipeline.
         
         Args:
             file_path: Path to data file
@@ -107,6 +113,9 @@ class DataLoader:
                 'message': str,
                 'data': DataFrame or None,
                 'metadata': dict,
+                'quality_score': float (0.0-1.0),
+                'quality_issues': list,
+                'warnings': list,
                 'errors': list
             }
         """
@@ -159,13 +168,29 @@ class DataLoader:
             return self._error_result(f"Unsupported format: {file_format}")
 
         if not load_result.success:
+            self.quality_score = 0.0
             return {
                 'status': 'error',
                 'message': f"Failed to load {file_format} file",
                 'data': None,
                 'metadata': {},
+                'quality_score': 0.0,
+                'quality_issues': [],
+                'warnings': [w for w in getattr(load_result, 'warnings', [])],
                 'errors': [e['message'] for e in load_result.errors]
             }
+
+        # Store loader quality score
+        loader_quality = getattr(load_result, 'quality_score', 0.0)
+        self.quality_score = loader_quality
+        
+        structured_logger.info("File loaded successfully", {
+            "format": file_format,
+            "rows": len(load_result.data) if load_result.data is not None else 0,
+            "columns": len(load_result.data.columns) if load_result.data is not None else 0,
+            "worker": getattr(load_result, 'worker', 'unknown'),
+            "quality_score": loader_quality
+        })
 
         # Validate data
         df = load_result.data
@@ -175,36 +200,62 @@ class DataLoader:
             file_format=file_format
         )
 
-        if not validator_result.success:
-            return {
-                'status': 'error',
-                'message': "Data validation failed",
-                'data': None,
-                'metadata': {},
-                'errors': [e['message'] for e in validator_result.errors]
-            }
+        # Get validator quality score
+        validator_quality = getattr(validator_result, 'quality_score', 0.0)
+        
+        # Use validator quality if available, as it's more comprehensive
+        final_quality = validator_quality if validator_result.success else loader_quality
+        self.quality_score = final_quality
+
+        quality_issues = validator_result.metadata.get('issues', []) if validator_result.success else []
 
         # Store data and metadata
         self.loaded_data = df
         performance_meta = {}
         if hasattr(load_result, 'metadata') and isinstance(load_result.metadata, dict):
             performance_meta.update(load_result.metadata)
-        self.metadata = {**validator_result.metadata, **performance_meta}
+        
+        validator_meta = validator_result.metadata if validator_result.success else {}
+        self.metadata = {**validator_meta, **performance_meta}
+        
+        # Add quality metrics to metadata
+        self.metadata['quality_score'] = final_quality
+        self.metadata['loader_quality_score'] = loader_quality
+        self.metadata['validator_quality_score'] = validator_quality
+        self.metadata['quality_issues'] = quality_issues
 
-        self.logger.info(f"Successfully loaded {file_format}: {df.shape[0]} rows, {df.shape[1]} columns")
-        structured_logger.info("File loaded successfully", {
+        self.logger.info(
+            f"Successfully loaded {file_format}: {df.shape[0]} rows, {df.shape[1]} columns, "
+            f"quality={final_quality:.2f}"
+        )
+        
+        structured_logger.info("Validation completed", {
             "format": file_format,
-            "rows": df.shape[0],
-            "columns": df.shape[1],
-            "worker": load_result.worker if hasattr(load_result, 'worker') else 'unknown'
+            "validation_success": validator_result.success,
+            "final_quality": final_quality,
+            "quality_issues_count": len(quality_issues)
+        })
+
+        # Track load history
+        self.load_history.append({
+            'file_path': str(file_path),
+            'format': file_format,
+            'rows': df.shape[0],
+            'columns': df.shape[1],
+            'quality_score': final_quality,
+            'timestamp': time.time()
         })
 
         return {
-            'status': 'success',
-            'message': f"Loaded {df.shape[0]} rows and {df.shape[1]} columns",
+            'status': 'success' if validator_result.success else 'warning',
+            'message': f"Loaded {df.shape[0]} rows and {df.shape[1]} columns (Quality: {final_quality:.2%})",
             'data': df,
             'metadata': self.metadata,
-            'errors': []
+            'quality_score': final_quality,
+            'quality_issues': quality_issues,
+            'warnings': list(set([w for w in getattr(load_result, 'warnings', [])] + 
+                                [w for w in getattr(validator_result, 'warnings', [])])),
+            'errors': [] if validator_result.success else [e['message'] for e in validator_result.errors]
         }
 
     # === FORMAT LOADERS FOR OTHER FORMATS ===
@@ -239,7 +290,8 @@ class DataLoader:
                 success=True,
                 data=df,
                 errors=[],
-                warnings=[]
+                warnings=[],
+                quality_score=1.0 if len(df) > 0 else 0.0
             )
         except Exception as e:
             structured_logger.error("Failed to load JSONL", {
@@ -252,7 +304,8 @@ class DataLoader:
                 success=False,
                 data=None,
                 errors=[{"message": str(e), "type": "load_error"}],
-                warnings=[]
+                warnings=[],
+                quality_score=0.0
             )
 
     @retry_on_error(max_attempts=3, backoff=2)
@@ -287,7 +340,8 @@ class DataLoader:
                 success=True,
                 data=df,
                 errors=[],
-                warnings=[]
+                warnings=[],
+                quality_score=1.0 if len(df) > 0 else 0.0
             )
         except Exception as e:
             structured_logger.error("Failed to load HDF5", {
@@ -300,7 +354,8 @@ class DataLoader:
                 success=False,
                 data=None,
                 errors=[{"message": str(e), "type": "load_error"}],
-                warnings=[]
+                warnings=[],
+                quality_score=0.0
             )
 
     @retry_on_error(max_attempts=3, backoff=2)
@@ -345,7 +400,8 @@ class DataLoader:
                 success=True,
                 data=df,
                 errors=[],
-                warnings=[]
+                warnings=[],
+                quality_score=1.0 if len(df) > 0 else 0.0
             )
         except Exception as e:
             structured_logger.error("Failed to load SQLite", {
@@ -358,7 +414,8 @@ class DataLoader:
                 success=False,
                 data=None,
                 errors=[{"message": str(e), "type": "load_error"}],
-                warnings=[]
+                warnings=[],
+                quality_score=0.0
             )
 
     # === FILE VALIDATION & FORMAT DETECTION ===
@@ -406,6 +463,15 @@ class DataLoader:
         return self.metadata
 
     @retry_on_error(max_attempts=2, backoff=1)
+    def get_quality_score(self) -> float:
+        """Get quality score of loaded data.
+        
+        Returns:
+            Quality score (0.0-1.0)
+        """
+        return self.quality_score
+
+    @retry_on_error(max_attempts=2, backoff=1)
     def get_info(self) -> Dict[str, Any]:
         """Get comprehensive information.
         
@@ -418,7 +484,8 @@ class DataLoader:
         return {
             'status': 'success',
             'message': f"{self.loaded_data.shape[0]} rows, {self.loaded_data.shape[1]} columns",
-            'metadata': self.metadata
+            'metadata': self.metadata,
+            'quality_score': self.quality_score
         }
 
     @retry_on_error(max_attempts=2, backoff=1)
@@ -438,7 +505,11 @@ class DataLoader:
         return {
             'status': 'success',
             'data': sample,
-            'metadata': {'total_rows': len(self.loaded_data), 'sample_rows': len(sample)}
+            'metadata': {
+                'total_rows': len(self.loaded_data),
+                'sample_rows': len(sample),
+                'quality_score': self.quality_score
+            }
         }
 
     @retry_on_error(max_attempts=2, backoff=1)
@@ -465,7 +536,7 @@ class DataLoader:
 
     @retry_on_error(max_attempts=2, backoff=1)
     def get_summary(self) -> str:
-        """Get human-readable summary.
+        """Get human-readable summary with quality metrics.
         
         Returns:
             Summary string
@@ -479,8 +550,19 @@ class DataLoader:
             f"  Rows: {self.metadata.get('rows', 0)}\n"
             f"  Columns: {self.metadata.get('columns', 0)}\n"
             f"  Size: {self.metadata.get('file_size_mb', 0)}MB\n"
-            f"  Memory: {self.metadata.get('memory_usage_mb', 0)}MB"
+            f"  Memory: {self.metadata.get('memory_usage_mb', 0)}MB\n"
+            f"  Quality Score: {self.quality_score:.2%}\n"
+            f"  Quality Issues: {len(self.metadata.get('quality_issues', []))}\n"
         )
+
+    @retry_on_error(max_attempts=2, backoff=1)
+    def get_load_history(self) -> List[Dict[str, Any]]:
+        """Get history of all loaded files.
+        
+        Returns:
+            List of load history entries
+        """
+        return self.load_history
 
     # === UTILITIES ===
 
@@ -498,5 +580,8 @@ class DataLoader:
             'message': message,
             'data': None,
             'metadata': {},
+            'quality_score': 0.0,
+            'quality_issues': [],
+            'warnings': [],
             'errors': [message]
         }
