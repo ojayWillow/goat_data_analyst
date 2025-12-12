@@ -119,6 +119,33 @@ class StatisticsWorker(BaseWorker):
                 result.quality_score = 0.5
                 return result
             
+            # FIX #1: Check for null values in numeric columns
+            null_count = 0
+            for col in numeric_cols:
+                null_count += df[col].isnull().sum()
+            
+            if null_count > 0:
+                self._add_warning(
+                    result,
+                    f"Found {null_count} null values in numeric columns. They will be ignored in calculations."
+                )
+                result.quality_score = 0.8  # Reduce quality score for imperfect data
+            
+            # Reject if too many nulls (>50%)
+            null_percentage = (null_count / (len(df) * len(numeric_cols)) * 100) if (len(df) * len(numeric_cols)) > 0 else 0
+            
+            if null_percentage > 50:
+                self._add_error(
+                    result,
+                    ErrorType.VALIDATION_ERROR,
+                    f"Data too dirty: {null_percentage:.1f}% nulls",
+                    severity="error",
+                    suggestion="Provide cleaner data with <50% nulls"
+                )
+                result.success = False
+                result.quality_score = 0
+                return result
+            
             grouped = df.groupby(group_column)
             stats = {}
             
