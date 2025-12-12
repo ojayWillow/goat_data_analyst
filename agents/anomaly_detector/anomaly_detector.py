@@ -1,11 +1,9 @@
 """Anomaly Detector Agent - Coordinates anomaly detection workers.
 
-Detects anomalies using 6 different algorithms:
-- Statistical (Z-score, IQR based)
+Detects anomalies using 4 different algorithms:
 - Isolation Forest
 - Local Outlier Factor (LOF)
 - One-Class SVM
-- Multivariate Gaussian
 - Ensemble (voting from all methods)
 
 GUIDANCE Compliance:
@@ -32,8 +30,6 @@ from .workers import (
     OneClassSVM,
     IsolationForest,
     Ensemble,
-    Statistical,
-    Multivariate,
     WorkerResult,
 )
 
@@ -49,12 +45,10 @@ MIN_QUALITY_FOR_SUCCESS = 0.5
 class AnomalyDetector:
     """Anomaly Detector Agent - coordinates anomaly detection workers.
     
-    Manages 6 workers:
-    - Statistical: Z-score and IQR based detection
+    Manages 4 workers:
     - IsolationForest: Isolation Forest algorithm
     - LOF: Local Outlier Factor algorithm
     - OneClassSVM: One-Class SVM algorithm
-    - Multivariate: Multivariate Gaussian detection
     - Ensemble: Ensemble voting method
     
     GUIDANCE Implementation:
@@ -85,21 +79,17 @@ class AnomalyDetector:
         self.error_log: List[Dict[str, Any]] = []
         self.error_tracker = None  # Will be set by orchestrator
 
-        # === INITIALIZE ALL 6 WORKERS ===
-        self.statistical_detector = Statistical()
+        # === INITIALIZE ALL 4 WORKERS ===
         self.isolation_forest_detector = IsolationForest()
         self.lof_detector = LOF()
         self.ocsvm_detector = OneClassSVM()
-        self.multivariate_detector = Multivariate()
         self.ensemble_detector = Ensemble()
 
         # Dictionary for execute_worker() method
         self.workers: Dict[str, Any] = {
-            "statistical": self.statistical_detector,
             "isolation_forest": self.isolation_forest_detector,
             "lof": self.lof_detector,
             "ocsvm": self.ocsvm_detector,
-            "multivariate": self.multivariate_detector,
             "ensemble": self.ensemble_detector,
         }
 
@@ -408,30 +398,6 @@ class AnomalyDetector:
     # ===== DETECTION METHODS - DELEGATE TO WORKERS =====
 
     @retry_on_error(max_attempts=3, backoff=2)
-    def detect_statistical(
-        self,
-        columns: List[str],
-        method: str = "zscore",
-        threshold: float = 3.0
-    ) -> Dict[str, Any]:
-        """Detect anomalies using statistical methods.
-        
-        Args:
-            columns: Numeric columns to analyze
-            method: "zscore" or "iqr"
-            threshold: Detection threshold
-            
-        Returns:
-            Detection result as dictionary
-        """
-        return self.execute_worker(
-            "statistical",
-            columns=columns,
-            method=method,
-            threshold=threshold
-        )
-
-    @retry_on_error(max_attempts=3, backoff=2)
     def detect_isolation_forest(
         self,
         contamination: float = 0.1,
@@ -487,21 +453,6 @@ class AnomalyDetector:
         )
 
     @retry_on_error(max_attempts=3, backoff=2)
-    def detect_multivariate(self, threshold: float = 3.0) -> Dict[str, Any]:
-        """Detect anomalies using Multivariate Gaussian.
-        
-        Args:
-            threshold: Detection threshold
-            
-        Returns:
-            Detection result as dictionary
-        """
-        return self.execute_worker(
-            "multivariate",
-            threshold=threshold
-        )
-
-    @retry_on_error(max_attempts=3, backoff=2)
     def detect_ensemble(self, threshold: float = 0.5) -> Dict[str, Any]:
         """Detect anomalies using ensemble voting.
         
@@ -520,7 +471,7 @@ class AnomalyDetector:
 
     @retry_on_error(max_attempts=3, backoff=2)
     def detect_all(self, **kwargs) -> Dict[str, Any]:
-        """Run all 6 anomaly detection methods.
+        """Run all 4 anomaly detection methods.
         
         Args:
             **kwargs: Method-specific parameters
