@@ -1,16 +1,21 @@
 """Aggregator Agent - Coordinates data aggregation and time series operations.
 
-Aggregates and transforms data using 4 specialized workers:
+Aggregates and transforms data using 10 specialized workers:
 - WindowFunction: Rolling window operations
 - RollingAggregation: Multi-column rolling aggregations
 - ExponentialWeighted: EWMA calculations
 - LagLeadFunction: Time series lag/lead shifts
+- CrossTab: Cross-tabulation analysis
+- GroupBy: Group-based aggregations
+- Pivot: Pivot table operations
+- Statistics: Statistical aggregations
+- ValueCount: Value counting operations
 
-Week 1 Day 4 - NEW AGENT IMPLEMENTATION:
-- Agent coordinates all workers (doesn't implement logic)
+Week 1 Day 4 - FULL WORKER INTEGRATION:
+- Agent coordinates all 10 workers (doesn't implement logic)
 - Each worker extends BaseWorker for standardization
 - Methods delegate to workers
-- Pure coordinator pattern consistent with DataLoader, Explorer, AnomalyDetector
+- Pure coordinator pattern consistent with other agents
 
 Integrated with Week 1 Systems:
 - Structured logging with metrics
@@ -31,6 +36,11 @@ from .workers import (
     RollingAggregation,
     ExponentialWeighted,
     LagLeadFunction,
+    CrossTabWorker,
+    GroupByWorker,
+    PivotWorker,
+    StatisticsWorker,
+    ValueCountWorker,
     WorkerResult,
 )
 
@@ -41,48 +51,68 @@ structured_logger = get_structured_logger(__name__)
 class Aggregator:
     """Aggregator Agent - coordinates data aggregation workers.
     
-    Manages 4 workers:
+    Manages 10 workers:
     - WindowFunction: Rolling window operations
     - RollingAggregation: Multi-column rolling aggregations
     - ExponentialWeighted: EWMA calculations
     - LagLeadFunction: Time series lag/lead shifts
+    - CrossTab: Cross-tabulation analysis
+    - GroupBy: Group-based aggregations
+    - Pivot: Pivot table operations
+    - Statistics: Statistical aggregations
+    - ValueCount: Value counting operations
     
     Week 1 Day 4 Implementation:
-    - Agent coordinates all workers (doesn't implement)
+    - Agent coordinates all 10 workers (doesn't implement)
     - Each worker extends BaseWorker
     - Methods delegate to workers
     - Pure coordinator pattern
     """
 
     def __init__(self) -> None:
-        """Initialize the Aggregator agent and all workers."""
+        """Initialize the Aggregator agent and all 10 workers."""
         self.name = "Aggregator"
         self.logger = get_logger("Aggregator")
         self.structured_logger = get_structured_logger("Aggregator")
         self.data: Optional[pd.DataFrame] = None
         self.aggregation_results: Dict[str, WorkerResult] = {}
 
-        # === INITIALIZE ALL WORKERS ===
+        # === INITIALIZE ALL 10 WORKERS ===
         self.window_function = WindowFunction()
         self.rolling_aggregation = RollingAggregation()
         self.exponential_weighted = ExponentialWeighted()
         self.lag_lead_function = LagLeadFunction()
+        self.crosstab = CrossTabWorker()
+        self.groupby = GroupByWorker()
+        self.pivot = PivotWorker()
+        self.statistics = StatisticsWorker()
+        self.value_count = ValueCountWorker()
 
         self.workers = [
             self.window_function,
             self.rolling_aggregation,
             self.exponential_weighted,
             self.lag_lead_function,
+            self.crosstab,
+            self.groupby,
+            self.pivot,
+            self.statistics,
+            self.value_count,
         ]
 
-        self.logger.info("Aggregator initialized with 4 aggregation workers")
+        self.logger.info("Aggregator initialized with 10 aggregation workers")
         self.structured_logger.info("Aggregator initialized", {
-            "workers": 4,
+            "workers": 10,
             "worker_names": [
                 "WindowFunction",
                 "RollingAggregation",
                 "ExponentialWeighted",
-                "LagLeadFunction"
+                "LagLeadFunction",
+                "CrossTab",
+                "GroupBy",
+                "Pivot",
+                "Statistics",
+                "ValueCount",
             ]
         })
 
@@ -284,6 +314,211 @@ class Aggregator:
             self.structured_logger.error("Lag/Lead function failed", {"error": str(e)})
             raise
 
+    @retry_on_error(max_attempts=3, backoff=2)
+    def apply_crosstab(
+        self,
+        rows: str,
+        columns: str,
+        values: Optional[str] = None,
+        aggfunc: str = 'count',
+    ) -> Dict[str, Any]:
+        """Apply cross-tabulation.
+        
+        Args:
+            rows: Column for rows
+            columns: Column for columns
+            values: Column to aggregate (optional)
+            aggfunc: Aggregation function (default: 'count')
+            
+        Returns:
+            Cross-tabulation result as dictionary
+            
+        Raises:
+            AgentError: If no data set
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+
+        self.structured_logger.info("Crosstab started", {
+            "rows": rows,
+            "columns": columns
+        })
+
+        try:
+            worker_result = self.crosstab.safe_execute(
+                df=self.data,
+                rows=rows,
+                columns=columns,
+                values=values,
+                aggfunc=aggfunc,
+            )
+
+            self.aggregation_results["crosstab"] = worker_result
+            self.structured_logger.info("Crosstab completed", {"success": worker_result.success})
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Crosstab failed", {"error": str(e)})
+            raise
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def apply_groupby(
+        self,
+        by: str,
+        agg_dict: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        """Apply group-based aggregation.
+        
+        Args:
+            by: Column to group by
+            agg_dict: Dict mapping columns to aggregation functions
+            
+        Returns:
+            GroupBy result as dictionary
+            
+        Raises:
+            AgentError: If no data set
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+
+        self.structured_logger.info("GroupBy started", {"by": by})
+
+        try:
+            worker_result = self.groupby.safe_execute(
+                df=self.data,
+                by=by,
+                agg_dict=agg_dict,
+            )
+
+            self.aggregation_results["groupby"] = worker_result
+            self.structured_logger.info("GroupBy completed", {"success": worker_result.success})
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("GroupBy failed", {"error": str(e)})
+            raise
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def apply_pivot(
+        self,
+        index: str,
+        columns: str,
+        values: Optional[str] = None,
+        aggfunc: str = 'mean',
+    ) -> Dict[str, Any]:
+        """Apply pivot table operation.
+        
+        Args:
+            index: Column for index
+            columns: Column for columns
+            values: Column to aggregate
+            aggfunc: Aggregation function (default: 'mean')
+            
+        Returns:
+            Pivot result as dictionary
+            
+        Raises:
+            AgentError: If no data set
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+
+        self.structured_logger.info("Pivot started", {
+            "index": index,
+            "columns": columns
+        })
+
+        try:
+            worker_result = self.pivot.safe_execute(
+                df=self.data,
+                index=index,
+                columns=columns,
+                values=values,
+                aggfunc=aggfunc,
+            )
+
+            self.aggregation_results["pivot"] = worker_result
+            self.structured_logger.info("Pivot completed", {"success": worker_result.success})
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Pivot failed", {"error": str(e)})
+            raise
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def apply_statistics(
+        self,
+        columns: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Apply statistical aggregations.
+        
+        Args:
+            columns: Columns to analyze (None = all numeric)
+            
+        Returns:
+            Statistics result as dictionary
+            
+        Raises:
+            AgentError: If no data set
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+
+        self.structured_logger.info("Statistics started")
+
+        try:
+            worker_result = self.statistics.safe_execute(
+                df=self.data,
+                columns=columns,
+            )
+
+            self.aggregation_results["statistics"] = worker_result
+            self.structured_logger.info("Statistics completed", {"success": worker_result.success})
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Statistics failed", {"error": str(e)})
+            raise
+
+    @retry_on_error(max_attempts=3, backoff=2)
+    def apply_value_count(
+        self,
+        column: str,
+        normalize: bool = False,
+    ) -> Dict[str, Any]:
+        """Apply value counting operation.
+        
+        Args:
+            column: Column to count values
+            normalize: Whether to normalize (return proportions)
+            
+        Returns:
+            Value count result as dictionary
+            
+        Raises:
+            AgentError: If no data set
+        """
+        if self.data is None:
+            raise AgentError("No data set. Use set_data() first.")
+
+        self.structured_logger.info("Value count started", {"column": column})
+
+        try:
+            worker_result = self.value_count.safe_execute(
+                df=self.data,
+                column=column,
+                normalize=normalize,
+            )
+
+            self.aggregation_results["value_count"] = worker_result
+            self.structured_logger.info("Value count completed", {"success": worker_result.success})
+            
+            return worker_result.to_dict()
+        except Exception as e:
+            self.structured_logger.error("Value count failed", {"error": str(e)})
+            raise
+
     # === BATCH AGGREGATION ===
 
     @retry_on_error(max_attempts=3, backoff=2)
@@ -293,14 +528,24 @@ class Aggregator:
         rolling_params: Optional[Dict[str, Any]] = None,
         ewma_params: Optional[Dict[str, Any]] = None,
         lag_lead_params: Optional[Dict[str, Any]] = None,
+        crosstab_params: Optional[Dict[str, Any]] = None,
+        groupby_params: Optional[Dict[str, Any]] = None,
+        pivot_params: Optional[Dict[str, Any]] = None,
+        statistics_params: Optional[Dict[str, Any]] = None,
+        value_count_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Run all 4 aggregation methods.
+        """Run all 10 aggregation methods.
         
         Args:
             window_params: Parameters for window function
             rolling_params: Parameters for rolling aggregation
             ewma_params: Parameters for exponential weighted
             lag_lead_params: Parameters for lag/lead
+            crosstab_params: Parameters for crosstab
+            groupby_params: Parameters for groupby
+            pivot_params: Parameters for pivot
+            statistics_params: Parameters for statistics
+            value_count_params: Parameters for value count
             
         Returns:
             Dictionary with all aggregation results
@@ -317,6 +562,11 @@ class Aggregator:
         rolling_params = rolling_params or {}
         ewma_params = ewma_params or {}
         lag_lead_params = lag_lead_params or {}
+        crosstab_params = crosstab_params or {}
+        groupby_params = groupby_params or {}
+        pivot_params = pivot_params or {}
+        statistics_params = statistics_params or {}
+        value_count_params = value_count_params or {}
 
         # Run all aggregations
         try:
@@ -338,6 +588,31 @@ class Aggregator:
             results["lag_lead_function"] = self.apply_lag_lead_function(**lag_lead_params)
         except Exception as e:
             self.logger.warning(f"Lag/Lead function failed: {e}")
+
+        try:
+            results["crosstab"] = self.apply_crosstab(**crosstab_params)
+        except Exception as e:
+            self.logger.warning(f"Crosstab failed: {e}")
+
+        try:
+            results["groupby"] = self.apply_groupby(**groupby_params)
+        except Exception as e:
+            self.logger.warning(f"GroupBy failed: {e}")
+
+        try:
+            results["pivot"] = self.apply_pivot(**pivot_params)
+        except Exception as e:
+            self.logger.warning(f"Pivot failed: {e}")
+
+        try:
+            results["statistics"] = self.apply_statistics(**statistics_params)
+        except Exception as e:
+            self.logger.warning(f"Statistics failed: {e}")
+
+        try:
+            results["value_count"] = self.apply_value_count(**value_count_params)
+        except Exception as e:
+            self.logger.warning(f"Value count failed: {e}")
 
         self.structured_logger.info("Comprehensive aggregation completed", {
             "methods": len(results)
