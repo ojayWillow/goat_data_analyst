@@ -10,6 +10,7 @@ Responsibility:
 Integrated with Week 1 systems:
 - Structured logging
 - Error handling with validation
+- Error Intelligence monitoring
 """
 
 from typing import Any, Dict, List, Optional
@@ -17,6 +18,7 @@ from datetime import datetime
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import WorkerError
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class ReportFormatter:
@@ -27,6 +29,7 @@ class ReportFormatter:
         self.name = "ReportFormatter"
         self.logger = get_logger("ReportFormatter")
         self.structured_logger = get_structured_logger("ReportFormatter")
+        self.error_intelligence = ErrorIntelligence()
         self.logger.info(f"{self.name} initialized")
 
     def format_to_html(
@@ -87,12 +90,30 @@ class ReportFormatter:
                 'sections': len(selected_charts) if selected_charts else 0
             })
             
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="ReportFormatter",
+                operation="format_to_html",
+                context={
+                    'title': title,
+                    'html_size_kb': round(len(html_content) / 1024, 2),
+                    'chart_sections': len(selected_charts) if selected_charts else 0
+                }
+            )
+            
             return html_content
         
         except WorkerError:
             raise
         except Exception as e:
             self.logger.error(f"HTML formatting failed: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="ReportFormatter",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={'title': title, 'format': 'html'}
+            )
             raise WorkerError(f"HTML formatting failed: {e}")
 
     def format_to_markdown(
@@ -165,12 +186,30 @@ class ReportFormatter:
                 'size_kb': len(markdown_content) / 1024
             })
             
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="ReportFormatter",
+                operation="format_to_markdown",
+                context={
+                    'title': title,
+                    'markdown_size_kb': round(len(markdown_content) / 1024, 2),
+                    'chart_sections': len(selected_charts) if selected_charts else 0
+                }
+            )
+            
             return markdown_content
         
         except WorkerError:
             raise
         except Exception as e:
             self.logger.error(f"Markdown formatting failed: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="ReportFormatter",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={'title': title, 'format': 'markdown'}
+            )
             raise WorkerError(f"Markdown formatting failed: {e}")
 
     def _build_html_header(self, title: str, metadata: Optional[Dict[str, Any]]) -> str:
