@@ -14,6 +14,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from core.exceptions import AgentError
+from core.error_recovery import RecoveryError
 from agents.predictor import Predictor
 from tests.predictor_test_fixtures import PredictorTestData, PredictorTestUtils
 
@@ -108,7 +109,7 @@ class TestPredictorLinearRegression:
         """Test error when predicting without data."""
         agent = Predictor()  # No data set
         
-        with pytest.raises(AgentError):
+        with pytest.raises(RecoveryError):
             agent.predict_linear(
                 features=self.features,
                 target=self.target
@@ -176,7 +177,7 @@ class TestPredictorDecisionTree:
         """Test error when predicting without data."""
         agent = Predictor()  # No data set
         
-        with pytest.raises(AgentError):
+        with pytest.raises(RecoveryError):
             agent.predict_tree(
                 features=self.features,
                 target=self.target
@@ -204,11 +205,13 @@ class TestPredictorTimeSeries:
         
         assert result_dict['success']
         assert 'forecast' in result_dict['data']
-        assert len(result_dict['data']['forecast']) == 6
+        forecast_list = result_dict['data']['forecast']
+        # Handle both list and numpy array
+        assert (len(forecast_list) == 6 or (hasattr(forecast_list, '__len__') and len(forecast_list) == 6))
     
     def test_forecast_timeseries_invalid_column(self):
         """Test error with invalid series column."""
-        with pytest.raises(AgentError):
+        with pytest.raises(RecoveryError):
             self.agent.forecast_timeseries(
                 series_column='nonexistent_column',
                 periods=6
@@ -218,7 +221,7 @@ class TestPredictorTimeSeries:
         """Test error when forecasting without data."""
         agent = Predictor()  # No data set
         
-        with pytest.raises(AgentError):
+        with pytest.raises(RecoveryError):
             agent.forecast_timeseries(
                 series_column='value',
                 periods=6
@@ -248,13 +251,15 @@ class TestPredictorModelValidation:
         assert result_dict['success']
         assert 'cv_mean' in result_dict['data']
         assert 'cv_std' in result_dict['data']
-        assert len(result_dict['data']['cv_scores']) == 5
+        cv_scores = result_dict['data']['cv_scores']
+        # Handle both list and numpy array
+        assert (len(cv_scores) == 5 or (hasattr(cv_scores, '__len__') and len(cv_scores) == 5))
     
     def test_validate_model_no_data(self):
         """Test error when validating without data."""
         agent = Predictor()  # No data set
         
-        with pytest.raises(AgentError):
+        with pytest.raises(RecoveryError):
             agent.validate_model(
                 features=self.features,
                 target=self.target
