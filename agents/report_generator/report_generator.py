@@ -5,7 +5,6 @@ Integrated with Week 1 systems:
 - Structured logging
 - Error recovery with retry logic
 - Input/output validation
-- Error Intelligence monitoring
 """
 
 from typing import Any, Dict, List, Optional
@@ -15,7 +14,6 @@ from core.structured_logger import get_structured_logger
 from core.exceptions import WorkerError
 from core.error_recovery import retry_on_error
 from core.validators import validate_output
-from agents.error_intelligence.main import ErrorIntelligence
 from agents.report_generator.workers.topic_analyzer import TopicAnalyzer
 from agents.report_generator.workers.chart_mapper import ChartMapper
 from agents.report_generator.workers.chart_selector import ChartSelector
@@ -32,7 +30,6 @@ class ReportGenerator:
     - Intelligently select relevant charts
     - Format professional reports
     - Handle user customization
-    - Monitor health via Error Intelligence
     
     Workers:
     - TopicAnalyzer: Extract topics from narrative
@@ -41,14 +38,12 @@ class ReportGenerator:
     - ReportFormatter: Create formatted output
     - CustomizationEngine: Handle user preferences
     
-    Monitoring:
-    - ErrorIntelligence: Track success/failure patterns
-    
     Architecture:
     - Uses worker pattern for separation of concerns
     - Each worker handles one specific responsibility
     - Clean interfaces between components
     - Integrated with Week 1 systems
+    - Error Intelligence monitoring at worker level
     """
 
     def __init__(self) -> None:
@@ -56,7 +51,6 @@ class ReportGenerator:
         self.name = "ReportGenerator"
         self.logger = get_logger("ReportGenerator")
         self.structured_logger = get_structured_logger("ReportGenerator")
-        self.error_intelligence = ErrorIntelligence()
         
         # Initialize workers
         self.topic_analyzer = TopicAnalyzer()
@@ -77,15 +71,8 @@ class ReportGenerator:
                 'ChartSelector',
                 'ReportFormatter',
                 'CustomizationEngine'
-            ],
-            'error_intelligence': 'enabled'
+            ]
         })
-        
-        self.error_intelligence.track_success(
-            agent_name="report_generator",
-            worker_name="ReportGenerator",
-            operation="initialization"
-        )
 
     # ========== Topic Analysis ==========
 
@@ -104,22 +91,9 @@ class ReportGenerator:
         """
         try:
             self.logger.info("Analyzing narrative")
-            result = self.topic_analyzer.analyze_narrative(narrative)
-            self.error_intelligence.track_success(
-                agent_name="report_generator",
-                worker_name="ReportGenerator",
-                operation="analyze_narrative"
-            )
-            return result
+            return self.topic_analyzer.analyze_narrative(narrative)
         except Exception as e:
             self.logger.error(f"Narrative analysis failed: {e}")
-            self.error_intelligence.track_error(
-                agent_name="report_generator",
-                worker_name="ReportGenerator",
-                operation="analyze_narrative",
-                error_type=type(e).__name__,
-                error_message=str(e)
-            )
             raise
 
     # ========== Chart Selection ==========
@@ -166,23 +140,10 @@ class ReportGenerator:
             summary = self.chart_selector.get_selection_summary(selected)
             self.structured_logger.info("Chart selection complete", summary)
             
-            self.error_intelligence.track_success(
-                agent_name="report_generator",
-                worker_name="ReportGenerator",
-                operation="select_charts_for_narrative"
-            )
-            
             return selected
         
         except Exception as e:
             self.logger.error(f"Chart selection failed: {e}")
-            self.error_intelligence.track_error(
-                agent_name="report_generator",
-                worker_name="ReportGenerator",
-                operation="select_charts_for_narrative",
-                error_type=type(e).__name__,
-                error_message=str(e)
-            )
             raise WorkerError(f"Chart selection failed: {e}")
 
     # ========== Report Generation ==========
@@ -215,31 +176,10 @@ class ReportGenerator:
             WorkerError: If generation fails
         """
         if not narrative:
-            self.error_intelligence.track_error(
-                agent_name="report_generator",
-                worker_name="ReportGenerator",
-                operation="generate_report",
-                error_type="ValidationError",
-                error_message="Narrative is required"
-            )
             raise WorkerError("Narrative is required")
         if not available_charts:
-            self.error_intelligence.track_error(
-                agent_name="report_generator",
-                worker_name="ReportGenerator",
-                operation="generate_report",
-                error_type="ValidationError",
-                error_message="At least one chart is required"
-            )
             raise WorkerError("At least one chart is required")
         if output_format not in ['html', 'markdown', 'pdf']:
-            self.error_intelligence.track_error(
-                agent_name="report_generator",
-                worker_name="ReportGenerator",
-                operation="generate_report",
-                error_type="ValidationError",
-                error_message=f"Unsupported format: {output_format}"
-            )
             raise WorkerError(f"Unsupported format: {output_format}")
         
         try:
@@ -314,25 +254,12 @@ class ReportGenerator:
                 'size_kb': len(formatted) / 1024
             })
             
-            self.error_intelligence.track_success(
-                agent_name="report_generator",
-                worker_name="ReportGenerator",
-                operation="generate_report"
-            )
-            
             return report
         
         except WorkerError:
             raise
         except Exception as e:
             self.logger.error(f"Report generation failed: {e}")
-            self.error_intelligence.track_error(
-                agent_name="report_generator",
-                worker_name="ReportGenerator",
-                operation="generate_report",
-                error_type=type(e).__name__,
-                error_message=str(e)
-            )
             raise WorkerError(f"Report generation failed: {e}")
 
     # ========== Quick Report Methods ==========
@@ -433,8 +360,7 @@ class ReportGenerator:
             'status': 'active',
             'workers': 5,
             'reports_generated': len(self.generated_reports),
-            'last_report': self.generated_reports[-1] if self.generated_reports else None,
-            'error_intelligence': 'enabled'
+            'last_report': self.generated_reports[-1] if self.generated_reports else None
         }
 
     @validate_output('dict')
@@ -456,13 +382,11 @@ class ReportGenerator:
             },
             'reports_generated': len(self.generated_reports),
             'reports': self.generated_reports[-10:] if self.generated_reports else [],
-            'error_intelligence': 'enabled',
             'capabilities': {
                 'formats': ['html', 'markdown', 'pdf'],
                 'chart_selection': True,
                 'customization': True,
-                'user_preferences': True,
-                'error_monitoring': True
+                'user_preferences': True
             }
         }
 
@@ -472,18 +396,8 @@ class ReportGenerator:
         """Reset report generator (clear history)."""
         self.generated_reports = []
         self.logger.info("ReportGenerator reset")
-        self.error_intelligence.track_success(
-            agent_name="report_generator",
-            worker_name="ReportGenerator",
-            operation="reset"
-        )
 
     def shutdown(self) -> None:
         """Shutdown report generator."""
         self.reset()
         self.logger.info("ReportGenerator shutdown")
-        self.error_intelligence.track_success(
-            agent_name="report_generator",
-            worker_name="ReportGenerator",
-            operation="shutdown"
-        )
