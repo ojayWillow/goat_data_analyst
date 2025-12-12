@@ -12,6 +12,7 @@ class CorrelationAnalyzer(BaseWorker):
     
     def __init__(self):
         super().__init__("correlation_analyzer")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, df: pd.DataFrame, **kwargs) -> WorkerResult:
         """Analyze correlations and generate recommendations.
@@ -37,6 +38,13 @@ class CorrelationAnalyzer(BaseWorker):
                     "DataFrame is empty or None",
                     severity="error"
                 )
+                self.error_intelligence.track_error(
+                    agent_name="recommender",
+                    worker_name="CorrelationAnalyzer",
+                    operation="analyze_correlations",
+                    error_type="DataValidationError",
+                    error_message="DataFrame is empty or None"
+                )
                 return result
             
             numeric_data = df.select_dtypes(include=[np.number])
@@ -48,6 +56,13 @@ class CorrelationAnalyzer(BaseWorker):
                     "insights": [],
                     "recommendations": [],
                 }
+                self.error_intelligence.track_error(
+                    agent_name="recommender",
+                    worker_name="CorrelationAnalyzer",
+                    operation="analyze_correlations",
+                    error_type="InsufficientDataError",
+                    error_message="Need at least 2 numeric columns for correlation"
+                )
                 return result
             
             corr_matrix = numeric_data.corr()
@@ -105,6 +120,11 @@ class CorrelationAnalyzer(BaseWorker):
             }
             
             self.logger.info(f"Correlation analysis: {len(strong_corrs)} strong correlations found")
+            self.error_intelligence.track_success(
+                agent_name="recommender",
+                worker_name="CorrelationAnalyzer",
+                operation="analyze_correlations"
+            )
             
         except Exception as e:
             self._add_error(
@@ -114,5 +134,12 @@ class CorrelationAnalyzer(BaseWorker):
                 severity="error"
             )
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="recommender",
+                worker_name="CorrelationAnalyzer",
+                operation="analyze_correlations",
+                error_type=type(e).__name__,
+                error_message=str(e)
+            )
         
         return result
