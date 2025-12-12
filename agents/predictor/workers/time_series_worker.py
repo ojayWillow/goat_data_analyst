@@ -24,6 +24,7 @@ class TimeSeriesWorker(BaseWorker):
         super().__init__("TimeSeriesWorker")
         self.model = None
         self.method = None
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Execute time series forecasting.
@@ -52,6 +53,13 @@ class TimeSeriesWorker(BaseWorker):
         if series is None:
             self._add_error(result, ErrorType.MISSING_DATA, "No time series data provided")
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="TimeSeriesWorker",
+                error_type=ErrorType.MISSING_DATA,
+                error_message="No time series data provided",
+                context={"periods": periods, "method": method}
+            )
             return result
         
         # Convert to pandas Series
@@ -60,16 +68,37 @@ class TimeSeriesWorker(BaseWorker):
         elif not isinstance(series, pd.Series):
             self._add_error(result, ErrorType.INVALID_PARAMETER, "Series must be list, array, or pandas Series")
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="TimeSeriesWorker",
+                error_type=ErrorType.INVALID_PARAMETER,
+                error_message="Series must be list, array, or pandas Series",
+                context={"series_type": str(type(series)), "periods": periods, "method": method}
+            )
             return result
         
         if len(series) < 4:
             self._add_error(result, ErrorType.INSUFFICIENT_DATA, f"Need at least 4 values, got {len(series)}")
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="TimeSeriesWorker",
+                error_type=ErrorType.INSUFFICIENT_DATA,
+                error_message=f"Need at least 4 values, got {len(series)}",
+                context={"series_length": len(series), "periods": periods, "method": method}
+            )
             return result
         
         if periods < 1:
             self._add_error(result, ErrorType.INVALID_PARAMETER, "Periods must be >= 1")
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="TimeSeriesWorker",
+                error_type=ErrorType.INVALID_PARAMETER,
+                error_message="Periods must be >= 1",
+                context={"periods": periods, "series_length": len(series), "method": method}
+            )
             return result
         
         # FORECASTING
@@ -81,6 +110,13 @@ class TimeSeriesWorker(BaseWorker):
             except ImportError:
                 self._add_error(result, ErrorType.MODEL_ERROR, "statsmodels not available")
                 result.success = False
+                self.error_intelligence.track_error(
+                    agent_name="predictor",
+                    worker_name="TimeSeriesWorker",
+                    error_type="ImportError",
+                    error_message="statsmodels not available",
+                    context={"periods": periods, "method": method}
+                )
                 return result
             
             # Remove any NaN values
@@ -156,6 +192,18 @@ class TimeSeriesWorker(BaseWorker):
                         f"Both ARIMA and exponential smoothing failed: {str(e)}"
                     )
                     result.success = False
+                    self.error_intelligence.track_error(
+                        agent_name="predictor",
+                        worker_name="TimeSeriesWorker",
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        context={
+                            "periods": periods,
+                            "method": method,
+                            "series_length": len(series),
+                            "error_details": str(e)
+                        }
+                    )
                     return result
             
             # DECOMPOSITION
@@ -182,6 +230,20 @@ class TimeSeriesWorker(BaseWorker):
             
             result.success = True
             
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="predictor",
+                worker_name="TimeSeriesWorker",
+                operation="time_series_forecasting",
+                context={
+                    "periods": periods,
+                    "method": forecast_data.get('method', 'unknown'),
+                    "series_length": len(series),
+                    "has_decomposition": bool(decomp_data),
+                    "forecast_values": len(forecast_data.get('forecast', []))
+                }
+            )
+            
         except Exception as e:
             self._add_error(
                 result,
@@ -190,5 +252,17 @@ class TimeSeriesWorker(BaseWorker):
             )
             result.success = False
             self.logger.error(f"Forecasting error: {e}")
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="TimeSeriesWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={
+                    "periods": periods,
+                    "method": method,
+                    "series_length": len(series),
+                    "error_details": str(e)
+                }
+            )
         
         return result
