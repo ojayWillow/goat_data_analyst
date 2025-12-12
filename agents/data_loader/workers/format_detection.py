@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import pandas as pd
+from typing import Any, Dict
 
 from agents.data_loader.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
@@ -18,6 +19,37 @@ class FormatDetection(BaseWorker):
         super().__init__("FormatDetection")
         self.error_intelligence = ErrorIntelligence()
         self.supported_formats = {'.csv', '.json', '.xlsx', '.xls', '.parquet', '.pkl'}
+    
+    def validate_input(self, input_data: Dict[str, Any]) -> bool:
+        """Validate input before format detection.
+        
+        Args:
+            input_data: Dictionary with 'file_path' key
+            
+        Returns:
+            True if valid
+            
+        Raises:
+            ValueError: If validation fails
+            TypeError: If wrong data types
+        """
+        if 'file_path' not in input_data:
+            raise ValueError("file_path is required")
+        
+        file_path = input_data['file_path']
+        
+        if file_path is None:
+            raise ValueError("file_path cannot be None")
+        
+        if not isinstance(file_path, (str, Path)):
+            raise TypeError("file_path must be str or Path")
+        
+        file_path = Path(file_path)
+        
+        if not file_path.exists():
+            raise ValueError(f"File not found: {file_path}")
+        
+        return True
     
     def execute(self, file_path: str = None, **kwargs) -> WorkerResult:
         """Detect file format from extension and content.
@@ -102,6 +134,8 @@ class FormatDetection(BaseWorker):
                 "file_size_mb": round(file_size_mb, 2),
                 "is_supported": True
             }
+            result.quality_score = 1.0
+            result.success = True
             
             logger.info(f"Format detected: {detected_format} ({extension})")
             return result
