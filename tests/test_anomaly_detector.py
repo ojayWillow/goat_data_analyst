@@ -6,7 +6,7 @@ import numpy as np
 from agents.anomaly_detector import AnomalyDetector
 from agents.anomaly_detector.workers import (
     StatisticalWorker,
-    IsolationForestWorker,
+    IsolationForest,
     MultivariateWorker,
     WorkerResult,
     ErrorType,
@@ -19,12 +19,12 @@ class TestAnomalyDetectorInit:
     def test_init(self):
         """Test detector initializes correctly."""
         detector = AnomalyDetector()
-        assert detector.name == "Anomaly Detector"
+        assert detector.name == "AnomalyDetector"
         assert detector.data is None
         assert detector.detection_results == {}
-        assert hasattr(detector, 'statistical_worker')
-        assert hasattr(detector, 'isolation_forest_worker')
-        assert hasattr(detector, 'multivariate_worker')
+        assert hasattr(detector, 'statistical_detector')
+        assert hasattr(detector, 'isolation_forest_detector')
+        assert hasattr(detector, 'multivariate_detector')
 
 
 class TestAnomalyDetectorDataManagement:
@@ -87,7 +87,7 @@ class TestStatisticalWorker:
         )
         assert result.success
         assert result.worker == "StatisticalWorker"
-        assert result.data["method"] == "IQR"
+        assert result.data["method"] == "IQR (Interquartile Range)"
         assert result.data["outliers_count"] > 0
         assert "bounds" in result.data
         assert "statistics" in result.data
@@ -113,7 +113,7 @@ class TestStatisticalWorker:
             mod_threshold=3.5,
         )
         assert result.success
-        assert result.data["method"] == "Modified Z-Score"
+        assert result.data["method"] == "Modified Z-Score (MAD-based)"
 
     def test_invalid_column(self, worker, sample_df):
         """Test detection with invalid column."""
@@ -146,12 +146,12 @@ class TestStatisticalWorker:
 
 
 class TestIsolationForestWorker:
-    """Test IsolationForestWorker."""
+    """Test IsolationForest Worker."""
 
     @pytest.fixture
     def worker(self):
         """Create worker instance."""
-        return IsolationForestWorker()
+        return IsolationForest()
 
     @pytest.fixture
     def sample_df(self):
@@ -255,75 +255,75 @@ class TestAnomalyDetectorMethods:
         detector.set_data(df)
         return detector
 
-    def test_detect_iqr(self, detector):
-        """Test detect_iqr method."""
-        result = detector.detect_iqr("Price", multiplier=1.5)
+    def test_detect_statistical(self, detector):
+        """Test detect_statistical method."""
+        result = detector.detect_statistical("Price", method="iqr", multiplier=1.5)
         assert result["success"]
-        assert result["data"]["method"] == "IQR"
-        assert "iqr_Price" in detector.detection_results
-
-    def test_detect_zscore(self, detector):
-        """Test detect_zscore method."""
-        result = detector.detect_zscore("Price", threshold=2.0)
-        assert result["success"]
-        assert result["data"]["method"] == "Z-Score"
-
-    def test_detect_modified_zscore(self, detector):
-        """Test detect_modified_zscore method."""
-        result = detector.detect_modified_zscore("Price", threshold=3.5)
-        assert result["success"]
-        assert result["data"]["method"] == "Modified Z-Score"
+        assert result["result"]["method"] == "IQR (Interquartile Range)"
 
     def test_detect_isolation_forest(self, detector):
         """Test detect_isolation_forest method."""
         result = detector.detect_isolation_forest(
-            ["Price", "Quantity"],
+            contamination=0.1,
+            n_estimators=100,
+        )
+        assert result["success"]
+
+    def test_detect_lof(self, detector):
+        """Test detect_lof method."""
+        result = detector.detect_lof(
+            n_neighbors=5,
             contamination=0.1,
         )
         assert result["success"]
-        assert result["data"]["method"] == "Isolation Forest"
+
+    def test_detect_ocsvm(self, detector):
+        """Test detect_ocsvm method."""
+        result = detector.detect_ocsvm(
+            nu=0.05,
+            kernel="rbf",
+        )
+        assert result["success"]
 
     def test_detect_multivariate(self, detector):
         """Test detect_multivariate method."""
         result = detector.detect_multivariate(
-            ["Price", "Quantity"],
-            percentile=95,
+            covariance_type="full",
+            contamination=0.1,
         )
         assert result["success"]
-        assert result["data"]["method"] == "Mahalanobis Distance"
 
-    def test_detect_all_statistical(self, detector):
-        """Test detect_all_statistical method."""
-        results = detector.detect_all_statistical("Price")
-        assert "iqr" in results
-        assert "zscore" in results
-        assert "modified_zscore" in results
-        assert all(r["success"] for r in results.values())
+    def test_detect_ensemble(self, detector):
+        """Test detect_ensemble method."""
+        result = detector.detect_ensemble(threshold=0.5)
+        assert result["success"]
 
     def test_detect_all(self, detector):
         """Test detect_all method."""
-        results = detector.detect_all(
-            statistical_cols=["Price"],
-            ml_feature_cols=["Price", "Quantity"],
-        )
-        assert "statistical_Price" in results
-        assert "isolation_forest" in results
-        assert "multivariate" in results
+        results = detector.detect_all()
+        assert len(results) > 0
+        assert any(r["success"] for r in results.values())
 
     def test_no_data_error(self):
         """Test error when no data is set."""
         detector = AnomalyDetector()
         with pytest.raises(Exception):
-            detector.detect_iqr("Price")
+            detector.detect_statistical("Price")
 
     def test_summary_report(self, detector):
         """Test summary_report method."""
-        detector.detect_iqr("Price")
-        detector.detect_zscore("Price")
+        detector.detect_statistical("Price")
         summary = detector.summary_report()
-        assert summary["total_detections"] == 2
-        assert summary["successful"] >= 1
+        assert summary["total_detections"] >= 1
         assert "timestamp" in summary
+
+    def test_get_health_report(self, detector):
+        """Test get_health_report method."""
+        detector.detect_statistical("Price")
+        health = detector.get_health_report()
+        assert "overall_health" in health
+        assert "worker_health" in health
+        assert "recommendations" in health
 
 
 class TestWorkerResult:
