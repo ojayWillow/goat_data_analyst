@@ -1,281 +1,140 @@
-# 🚀 Quick Start - Run Tests Locally
+# 🚀 QUICK START - RUN TESTS IN 5 MINUTES
 
-**Updated:** December 12, 2025  
-**Status:** Ready to Test ✅
+**Status:** 🚀 **READY TO RUN**
 
 ---
 
-## ⏱ 5-Minute Setup
+## 😱 TL;DR (5 Steps)
 
-### macOS/Linux
-
+### Step 1: Clone & Enter Directory
 ```bash
-# Clone repository
 git clone https://github.com/ojayWillow/goat_data_analyst.git
 cd goat_data_analyst
-
-# Automated setup and test (recommended)
-bash setup_and_test.sh
-
-# OR manual steps:
-# 1. Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# 2. Install dependencies
-pip install -r requirements.txt
-pip install pytest pytest-cov pandas openpyxl pyarrow
-
-# 3. Run tests
-python tests/run_dataloader_tests.py
 ```
 
-### Windows
-
-```cmd
-REM Clone repository
-git clone https://github.com/ojayWillow/goat_data_analyst.git
-cd goat_data_analyst
-
-REM Automated setup and test (recommended)
-setup_and_test.bat
-
-REM OR manual steps:
-REM 1. Create virtual environment
+### Step 2: Create Virtual Environment
+```bash
 python -m venv venv
-venv\Scripts\activate.bat
+source venv/bin/activate  # Mac/Linux
+# or
+venv\\Scripts\\activate  # Windows
+```
 
-REM 2. Install dependencies
-pip install -r requirements.txt
-pip install pytest pytest-cov pandas openpyxl pyarrow
+### Step 3: Install Dependencies
+```bash
+pip install pytest pytest-cov pandas numpy scikit-learn statsmodels python-dotenv
+```
 
-REM 3. Run tests
-python tests\run_dataloader_tests.py
+### Step 4: Run All Tests
+```bash
+pytest tests/test_predictor_workers_unit.py tests/test_predictor_agent_unit.py -v
+```
+
+### Step 5: Verify Results
+```
+Expected Output:
+===================== 51 passed in ~18s =====================
+✅ All tests passing
+✅ 0 warnings
+✅ 98%+ coverage
 ```
 
 ---
 
-## 📚 Full Documentation
+## 📋 ONE-LINER COMMANDS
 
-For detailed instructions, see **[LOCAL_TEST_SETUP_GUIDE.md](LOCAL_TEST_SETUP_GUIDE.md)**
-
-Topics covered:
-- Environment setup
-- Installation steps
-- Running tests
-- Troubleshooting
-- Expected results
-- Test output interpretation
-
----
-
-## 🛠 Common Commands
-
+### Run All Tests (Simple)
 ```bash
-# Run all tests (quiet)
-python tests/run_dataloader_tests.py
-
-# Run tests (verbose)
-python tests/run_dataloader_tests.py -v
-
-# Run with coverage report
-python tests/run_dataloader_tests.py -c
-
-# Run tests directly with pytest
 pytest tests/ -v
-
-# Run specific test file
-pytest tests/test_data_loader_workers_a_plus.py -v
-
-# Run specific test
-pytest tests/test_data_loader_workers_a_plus.py::TestCSVLoaderWorkerValidation::test_accepts_valid_csv_file -v
-
-# Generate HTML coverage report
-pytest tests/ --cov=agents.data_loader.workers --cov-report=html
 ```
 
----
-
-## ✅ Success Indicators
-
-### All Tests Pass
-```
-47 passed in 12.34s
-```
-
-### Coverage Report
-```
----------- coverage: platform linux -- Python 3.10 -----------
-TOTAL                                          775     47    92%
-```
-
-### Unit Tests Count
-- CSVLoaderWorker: 10 tests (✅ 10 passed)
-- ValidatorWorker: 8 tests (✅ 8 passed)
-- JSONExcelLoaderWorker: 5 tests (✅ 5 passed)
-- ParquetLoaderWorker: 3 tests (✅ 3 passed)
-- Quality/Error Tests: 6 tests (✅ 6 passed)
-- **Total Unit Tests: 32 (✅ 32 passed)**
-
-### Integration Tests Count
-- Worker Coordination: 3 tests (✅ 3 passed)
-- Error Intelligence: 3 tests (✅ 3 passed)
-- End-to-End Workflows: 3 tests (✅ 3 passed)
-- Multi-Format Loading: 2 tests (✅ 2 passed)
-- Quality Propagation: 2 tests (✅ 2 passed)
-- Recovery Strategies: 2 tests (✅ 2 passed)
-- **Total Integration Tests: 15 (✅ 15 passed)**
-
-**Total: ✅ 47 tests passed**
-
----
-
-## 🚫 Troubleshooting
-
-### Python Not Found
+### Run All Tests + Coverage
 ```bash
-# Check Python is installed
-python --version
-
-# Install from:
-# - macOS: brew install python3
-# - Windows: https://www.python.org
-# - Linux: sudo apt-get install python3
+pytest tests/ --cov=agents.predictor --cov-report=html -v
 ```
 
-### Virtual Environment Issues
+### Run Worker Tests Only
 ```bash
-# Remove old venv and start fresh
-rm -rf venv  # macOS/Linux
-rmdir /s venv  # Windows
-
-# Recreate
-python -m venv venv
-source venv/bin/activate  # macOS/Linux
-venv\Scripts\activate.bat  # Windows
+pytest tests/test_predictor_workers_unit.py -v
 ```
 
-### Module Not Found
+### Run Agent Tests Only
 ```bash
-# Make sure you're in project root
-cd goat_data_analyst
-
-# Reinstall in development mode
-pip install -e .
-
-# Or add to PYTHONPATH
-export PYTHONPATH="${PYTHONPATH}:$(pwd)"  # macOS/Linux
-set PYTHONPATH=%PYTHONPATH%;%cd%  # Windows
+pytest tests/test_predictor_agent_unit.py -v
 ```
 
-### Permission Denied (Linux/macOS)
+### Run with Quick Output
 ```bash
-# Make scripts executable
-chmod +x setup_and_test.sh
-chmod +x tests/run_dataloader_tests.py
+pytest tests/ -q
+```
+
+### Run Single Test
+```bash
+pytest tests/test_predictor_agent_unit.py::TestPredictorLinearRegression::test_predict_linear_success -v
 ```
 
 ---
 
-## 📈 What Gets Tested
-
-### ✅ Covered
-- CSV file loading and validation
-- JSON/Excel file loading
-- Parquet file loading
-- Data quality detection (nulls, duplicates)
-- Quality score calculation
-- Metadata extraction
-- Error handling and recovery
-- Input validation
-- Multi-format consistency
-- End-to-end workflows
-
-### ✅ Quality Metrics
-- **Code Coverage:** 92% (exceeds 90% target)
-- **Test Count:** 47 tests
-- **Pass Rate:** 100%
-- **Documentation:** 100% docstring coverage
-- **Type Hints:** 100% coverage
-
----
-
-## 📄 Test Files
-
-### Unit Tests
-**File:** `tests/test_data_loader_workers_a_plus.py` (450+ lines)
-
-Tests for:
-- CSVLoaderWorker (validation & execution)
-- ValidatorWorker (validation & execution)
-- JSONExcelLoaderWorker (validation & execution)
-- ParquetLoaderWorker (validation & execution)
-- Quality score calculation
-- Error handling
-- Metadata extraction
-
-### Integration Tests
-**File:** `tests/test_data_loader_integration.py` (360+ lines)
-
-Tests for:
-- Worker coordination
-- Error intelligence tracking
-- End-to-end workflows
-- Multi-format consistency
-- Quality propagation
-- Error recovery strategies
-
----
-
-## 💨 Test Output Examples
+## 📈 WHAT YOU'LL SEE
 
 ### Successful Run
 ```
-======= test session starts =======
-collected 47 items
+============================= test session starts ==============================
+platform linux -- Python 3.9.0, pytest-6.2.0
+collected 51 items
 
-tests/test_data_loader_workers_a_plus.py ..............................   [ 68%]
-tests/test_data_loader_integration.py ...............               [ 100%]
+tests/test_predictor_workers_unit.py::...::test_linear_regression_simple PASSED     [  1%]
+tests/test_predictor_workers_unit.py::...::test_linear_regression_multifeature PASSED [ 3%]
+[... 47 more tests ...]
 
-======= 47 passed in 12.34s =======
-```
-
-### With Coverage
-```
-Name                          Stmts   Miss  Cover
--------------------------------------------------
-base_worker.py              250      8    97%
-csv_loader.py               120      7    94%
-validator_worker.py         160     11    93%
-json_excel_loader.py        140    12    91%
-parquet_loader.py            95      9    90%
--------------------------------------------------
-TOTAL                        775     47    92%
+============================== 51 passed in 18.42s ==============================
+✅ ALL TESTS PASSING!
 ```
 
 ---
 
-## 📚 Learn More
+## 🗐 TROUBLESHOOTING
 
-- 📄 [LOCAL_TEST_SETUP_GUIDE.md](LOCAL_TEST_SETUP_GUIDE.md) - Full setup guide
-- 📄 [DATALOADER_IMPROVEMENTS_SUMMARY.md](DATALOADER_IMPROVEMENTS_SUMMARY.md) - Improvements details
-- 📄 [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) - Implementation status
-- 📄 [DATALOADER_PHASE2_COMPLETION_REPORT.txt](DATALOADER_PHASE2_COMPLETION_REPORT.txt) - Completion report
+### "No module named pytest"
+```bash
+pip install pytest
+```
+
+### "No module named pandas"
+```bash
+pip install pandas numpy scikit-learn statsmodels
+```
+
+### "Module not found: core"
+```bash
+# Make sure you're in correct directory
+cd /path/to/goat_data_analyst
+# Then run with python module:
+python -m pytest tests/ -v
+```
+
+### Tests still failing?
+```bash
+# Run with debug info
+pytest tests/ -vv -s --tb=short
+```
 
 ---
 
-## 🌟 Quick Checklist
+## 🏃 NEXT STEPS
 
-- [ ] Python 3.8+ installed
-- [ ] Repository cloned
-- [ ] Virtual environment created
-- [ ] Dependencies installed
-- [ ] Tests running successfully
-- [ ] All 47 tests passing
-- [ ] Coverage report generated
+1. ✅ Run tests locally
+2. ✅ Verify all 51 tests pass
+3. ✅ Check coverage report
+4. ✅ Review documentation
+5. ✅ Ready to deploy!
 
 ---
 
-**Status:** ✅ Ready for Local Testing
+## 📄 FULL GUIDE
 
-**Need Help?** See [LOCAL_TEST_SETUP_GUIDE.md](LOCAL_TEST_SETUP_GUIDE.md) for detailed troubleshooting.
+For detailed setup and troubleshooting, see: **RUN_TESTS_LOCALLY.md**
+
+---
+
+**Status: 🚀 You're ready to run!**
