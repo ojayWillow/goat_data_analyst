@@ -1,32 +1,10 @@
 """Pytest configuration for GOAT Data Analyst tests."""
 
 import pytest
-import logging
-import sys
 import warnings
-from pathlib import Path
 
-# Suppress ALL closed file warnings and I/O errors globally
-warnings.filterwarnings("ignore", category=ResourceWarning)
-warnings.filterwarnings("ignore", message=".*I/O operation on closed file.*")
-warnings.filterwarnings("ignore", message=".*unclosed file.*")
-
-# Disable verbose logging during tests to avoid file I/O issues
-logging.disable(logging.CRITICAL)
-
-
-def pytest_configure(config):
-    """Configure pytest at session start."""
-    # Minimal configuration - avoid file handlers
-    pass
-
-
-@pytest.fixture(autouse=True)
-def suppress_logging():
-    """Suppress logging during tests to avoid I/O errors."""
-    # Keep logging disabled
-    yield
-    # Cleanup happens automatically
+# Suppress ALL warnings
+warnings.filterwarnings("ignore")
 
 
 @pytest.fixture
