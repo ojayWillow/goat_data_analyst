@@ -363,6 +363,7 @@ class ProjectManager:
         
         print("\n" + "="*70 + "\n")
 
+    @retry_on_error(max_attempts=2, backoff=1)
     def _analyze_all_agents(self) -> Dict[str, Dict[str, Any]]:
         """Analyze code for all agents."""
         analysis = {}
