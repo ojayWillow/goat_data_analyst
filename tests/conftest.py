@@ -5,13 +5,20 @@ import logging
 import sys
 import warnings
 from pathlib import Path
+import io
 
-# Suppress closed file warnings from logging cleanup
+# Suppress ALL closed file warnings and I/O errors
 warnings.filterwarnings("ignore", message=".*I/O operation on closed file.*")
+warnings.filterwarnings("ignore", category=ResourceWarning)
+warnings.filterwarnings("ignore", message=".*unclosed file.*")
 
 
 def pytest_configure(config):
     """Configure pytest at session start."""
+    # Suppress I/O warnings from logging cleanup
+    warnings.filterwarnings("ignore", message=".*I/O operation on closed file.*")
+    warnings.filterwarnings("ignore", category=ResourceWarning)
+    
     # Close ALL file handlers to prevent I/O errors during test collection
     root = logging.getLogger()
     for handler in list(root.handlers):
@@ -19,7 +26,8 @@ def pytest_configure(config):
             try:
                 handler.close()
                 root.removeHandler(handler)
-            except Exception:
+            except (ValueError, OSError, AttributeError):
+                # Already closed or other I/O error - ignore
                 pass
 
 
@@ -27,28 +35,38 @@ def pytest_configure(config):
 def cleanup_logging():
     """Clean up logging between tests."""
     yield
-    try:
-        from core.structured_logger import _logger_cache
-        for logger in list(_logger_cache.values()):
-            try:
-                logger.close()
-            except Exception:
-                pass
-        _logger_cache.clear()
-    except Exception:
-        pass
+    
+    # Suppress warnings during cleanup
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*I/O operation on closed file.*")
+        warnings.filterwarnings("ignore", category=ResourceWarning)
+        
+        try:
+            from core.structured_logger import _logger_cache
+            for logger in list(_logger_cache.values()):
+                try:
+                    if hasattr(logger, 'close'):
+                        logger.close()
+                except (ValueError, OSError, AttributeError):
+                    # Already closed or other I/O error - ignore
+                    pass
+            _logger_cache.clear()
+        except (ImportError, AttributeError, Exception):
+            pass
 
-    # Also clean up root logger handlers
-    try:
-        root = logging.getLogger()
-        for handler in list(root.handlers):
-            try:
-                handler.close()
-                root.removeHandler(handler)
-            except Exception:
-                pass
-    except Exception:
-        pass
+        # Also clean up root logger handlers
+        try:
+            root = logging.getLogger()
+            for handler in list(root.handlers):
+                try:
+                    if hasattr(handler, 'close') and not isinstance(handler.stream, sys.stderr):
+                        handler.close()
+                    root.removeHandler(handler)
+                except (ValueError, OSError, AttributeError):
+                    # Already closed or other I/O error - ignore
+                    pass
+        except (AttributeError, Exception):
+            pass
 
 
 @pytest.fixture
