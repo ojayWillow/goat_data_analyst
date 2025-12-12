@@ -210,23 +210,27 @@ class TestMultivariateWorker:
         return pd.DataFrame({
             "X": np.random.normal(100, 10, 100),
             "Y": np.random.normal(50, 5, 100),
+            "Z": np.random.normal(75, 8, 100),
         })
 
     def test_multivariate_detection(self, worker, sample_df):
         """Test Mahalanobis distance detection."""
         result = worker.safe_execute(
             df=sample_df,
-            threshold_percentile=95,
+            feature_cols=["X", "Y", "Z"],
+            percentile=95,
         )
         assert result.success
         assert result.data["method"] == "Mahalanobis Distance"
-        assert "anomalies_detected" in result.data
+        assert "outliers_count" in result.data
+        assert "distance_threshold" in result.data
 
     def test_invalid_percentile(self, worker, sample_df):
         """Test with invalid percentile."""
         result = worker.safe_execute(
             df=sample_df,
-            threshold_percentile=150,  # > 100 is invalid
+            feature_cols=["X", "Y"],
+            percentile=150,  # > 100 is invalid
         )
         assert not result.success
         assert len(result.errors) > 0
@@ -276,15 +280,6 @@ class TestAnomalyDetectorMethods:
             kernel="rbf",
         )
         assert result["success"]
-
-    def test_detect_multivariate(self, detector):
-        """Test detect_multivariate method."""
-        result = detector.detect_multivariate(
-            covariance_type="full",
-            contamination=0.1,
-        )
-        # Multivariate requires specific data structure, may not work with all data
-        assert "success" in result
 
     def test_detect_ensemble(self, detector):
         """Test detect_ensemble method."""
