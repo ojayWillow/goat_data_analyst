@@ -1,20 +1,22 @@
 """Predictor Workers - Machine learning specialists.
 
 Each worker handles a specific ML task:
-- Linear Regression: Simple linear regression predictions
-- DecisionTree: Tree-based predictions (regression & classification)
-- TimeSeries: Time series forecasting
-- ModelValidator: Model validation and comparison
+- LinearRegressionWorker: Simple linear regression predictions
+- DecisionTreeWorker: Tree-based predictions (regression & classification)
+- TimeSeriesWorker: Time series forecasting
+- ModelValidatorWorker: Model validation and comparison
+
+Note: These are the _worker versions that include full ErrorIntelligence integration.
 """
 
-from .base import Base, WorkerResult, ErrorType
-from .linear_regression import LinearRegression
-from .decision_tree import DecisionTree
-from .time_series import TimeSeries
-from .model_validator import ModelValidator
+from .base_worker import BaseWorker, WorkerResult, ErrorType
+from .linear_regression_worker import LinearRegressionWorker as LinearRegression
+from .decision_tree_worker import DecisionTreeWorker as DecisionTree
+from .time_series_worker import TimeSeriesWorker as TimeSeries
+from .model_validator_worker import ModelValidatorWorker as ModelValidator
 
 __all__ = [
-    'Base',
+    'BaseWorker',
     'WorkerResult',
     'ErrorType',
     'LinearRegression',
