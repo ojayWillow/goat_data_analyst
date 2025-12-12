@@ -110,6 +110,22 @@ class PivotWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
+            # FIX #2: Check for duplicate keys before pivot
+            key_combination = df[[index, columns]].copy()
+            duplicates = key_combination.duplicated().sum()
+            
+            if duplicates > 0:
+                self._add_error(
+                    result,
+                    ErrorType.VALIDATION_ERROR,
+                    f"Found {duplicates} duplicate (index, column) combinations",
+                    severity="error",
+                    suggestion="Each (index, column) pair must be unique. Use aggfunc='sum' or 'mean' to combine duplicates."
+                )
+                result.success = False
+                result.quality_score = 0
+                return result
+            
             pivot = pd.pivot_table(
                 df,
                 index=index,
