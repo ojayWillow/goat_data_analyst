@@ -7,7 +7,7 @@ Ensures consistent quality standards and error reporting.
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timezone
 import traceback
 import time
 
@@ -45,7 +45,7 @@ class WorkerError:
         self.severity = severity
         self.details = details or {}
         self.suggestion = suggestion
-        self.timestamp = datetime.utcnow().isoformat()
+        self.timestamp = datetime.now(timezone.utc).isoformat()
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert error to dictionary format."""
@@ -97,7 +97,7 @@ class WorkerResult:
         self.warnings = warnings or []
         self.quality_score = max(0, min(1, quality_score))  # Clamp 0-1
         self.metadata = metadata or {}
-        self.timestamp = datetime.utcnow().isoformat()
+        self.timestamp = datetime.now(timezone.utc).isoformat()
         self.execution_time_ms = 0
     
     def to_dict(self) -> Dict[str, Any]:
