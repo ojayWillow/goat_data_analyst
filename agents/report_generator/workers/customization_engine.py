@@ -10,12 +10,14 @@ Responsibility:
 Integrated with Week 1 systems:
 - Structured logging
 - Error handling with validation
+- Error Intelligence monitoring
 """
 
 from typing import Any, Dict, List, Optional
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import WorkerError
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class CustomizationEngine:
@@ -81,6 +83,7 @@ class CustomizationEngine:
         self.name = "CustomizationEngine"
         self.logger = get_logger("CustomizationEngine")
         self.structured_logger = get_structured_logger("CustomizationEngine")
+        self.error_intelligence = ErrorIntelligence()
         self.logger.info(f"{self.name} initialized")
 
     def get_customization_options(
@@ -127,10 +130,25 @@ class CustomizationEngine:
             }
             
             self.logger.info(f"Generated customization options")
+            
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="CustomizationEngine",
+                operation="get_customization_options",
+                context={'chart_types_count': len(chart_types)}
+            )
+            
             return options
         
         except Exception as e:
             self.logger.error(f"Failed to generate customization options: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="CustomizationEngine",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={}
+            )
             raise WorkerError(f"Options generation failed: {e}")
 
     def get_preset(self, preset_name: str) -> Dict[str, Any]:
@@ -146,7 +164,21 @@ class CustomizationEngine:
             WorkerError: If preset not found
         """
         if preset_name not in self.PRESETS:
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="CustomizationEngine",
+                error_type="ValueError",
+                error_message=f"Unknown preset: {preset_name}",
+                context={'preset_name': preset_name}
+            )
             raise WorkerError(f"Unknown preset: {preset_name}")
+        
+        self.error_intelligence.track_success(
+            agent_name="report_generator",
+            worker_name="CustomizationEngine",
+            operation="get_preset",
+            context={'preset_name': preset_name}
+        )
         
         return self.PRESETS[preset_name].copy()
 
@@ -281,10 +313,25 @@ class CustomizationEngine:
                 result = preferred + others
             
             self.logger.info(f"Applied preferences: {len(items)} -> {len(result)} items")
+            
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="CustomizationEngine",
+                operation="apply_preferences",
+                context={'input_count': len(items), 'output_count': len(result)}
+            )
+            
             return result
         
         except Exception as e:
             self.logger.error(f"Failed to apply preferences: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="CustomizationEngine",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={'input_count': len(items)}
+            )
             return items
 
     def merge_preferences(
@@ -317,12 +364,27 @@ class CustomizationEngine:
                 base.update(custom_overrides)
             
             self.logger.info(f"Merged preset '{preset}' with {len(custom_overrides or {})} overrides")
+            
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="CustomizationEngine",
+                operation="merge_preferences",
+                context={'preset_name': preset, 'override_count': len(custom_overrides or {})}
+            )
+            
             return base
         
         except WorkerError:
             raise
         except Exception as e:
             self.logger.error(f"Failed to merge preferences: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="CustomizationEngine",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={'preset_name': preset}
+            )
             raise WorkerError(f"Merge failed: {e}")
 
     def get_preference_impact(
