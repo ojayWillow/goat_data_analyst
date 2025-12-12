@@ -11,6 +11,7 @@ class MissingDataAnalyzer(BaseWorker):
     
     def __init__(self):
         super().__init__("missing_data_analyzer")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, df: pd.DataFrame, **kwargs) -> WorkerResult:
         """Analyze missing data and generate recommendations.
@@ -35,6 +36,13 @@ class MissingDataAnalyzer(BaseWorker):
                     ErrorType.DATA_VALIDATION_ERROR,
                     "DataFrame is empty or None",
                     severity="error"
+                )
+                self.error_intelligence.track_error(
+                    agent_name="recommender",
+                    worker_name="MissingDataAnalyzer",
+                    operation="analyze_missing_data",
+                    error_type="DataValidationError",
+                    error_message="DataFrame is empty or None"
                 )
                 return result
             
@@ -95,6 +103,11 @@ class MissingDataAnalyzer(BaseWorker):
             }
             
             self.logger.info(f"Missing data analysis: {null_pct:.2f}% null")
+            self.error_intelligence.track_success(
+                agent_name="recommender",
+                worker_name="MissingDataAnalyzer",
+                operation="analyze_missing_data"
+            )
             
         except Exception as e:
             self._add_error(
@@ -104,5 +117,12 @@ class MissingDataAnalyzer(BaseWorker):
                 severity="error"
             )
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="recommender",
+                worker_name="MissingDataAnalyzer",
+                operation="analyze_missing_data",
+                error_type=type(e).__name__,
+                error_message=str(e)
+            )
         
         return result
