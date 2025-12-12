@@ -9,12 +9,14 @@ Responsibility:
 Integrated with Week 1 systems:
 - Structured logging
 - Error handling with validation
+- Error Intelligence monitoring
 """
 
 from typing import Any, Dict, List, Optional
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import WorkerError
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class ChartMapper:
@@ -110,6 +112,7 @@ class ChartMapper:
         self.name = "ChartMapper"
         self.logger = get_logger("ChartMapper")
         self.structured_logger = get_structured_logger("ChartMapper")
+        self.error_intelligence = ErrorIntelligence()
         self.logger.info(f"{self.name} initialized")
 
     def get_topic_chart_mapping(self) -> Dict[str, Dict[str, Any]]:
@@ -138,6 +141,13 @@ class ChartMapper:
             WorkerError: If topic not recognized
         """
         if topic not in self.TOPIC_CHART_MAPPING:
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="ChartMapper",
+                error_type="ValueError",
+                error_message=f"Unknown topic: {topic}",
+                context={'topic': topic}
+            )
             raise WorkerError(f"Unknown topic: {topic}")
         
         try:
@@ -154,10 +164,27 @@ class ChartMapper:
                 recommended = [c for c in recommended if c in available_types]
             
             self.logger.info(f"Charts for topic '{topic}': {len(recommended)} available")
+            
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="ChartMapper",
+                operation="get_charts_for_topic",
+                context={'topic': topic, 'chart_count': len(recommended)}
+            )
+            
             return recommended
         
+        except WorkerError:
+            raise
         except Exception as e:
             self.logger.error(f"Failed to get charts for topic {topic}: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="ChartMapper",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={'topic': topic}
+            )
             raise WorkerError(f"Chart lookup failed: {e}")
 
     def get_charts_for_topics(
@@ -182,10 +209,25 @@ class ChartMapper:
                     result[topic] = charts
             
             self.logger.info(f"Generated chart recommendations for {len(result)} topics")
+            
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="ChartMapper",
+                operation="get_charts_for_topics",
+                context={'topic_count': len(topics), 'result_count': len(result)}
+            )
+            
             return result
         
         except Exception as e:
             self.logger.error(f"Failed to get charts for topics: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="ChartMapper",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={'topic_count': len(topics)}
+            )
             raise WorkerError(f"Multi-topic lookup failed: {e}")
 
     def rank_charts_for_topic(
@@ -231,10 +273,26 @@ class ChartMapper:
             
             # Sort by score descending
             ranked_sorted = sorted(ranked, key=lambda x: x[1], reverse=True)
-            return [chart for chart, _ in ranked_sorted]
+            result = [chart for chart, _ in ranked_sorted]
+            
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="ChartMapper",
+                operation="rank_charts_for_topic",
+                context={'topic': topic, 'ranked_count': len(result)}
+            )
+            
+            return result
         
         except Exception as e:
             self.logger.error(f"Chart ranking failed: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="ChartMapper",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={'topic': topic}
+            )
             raise WorkerError(f"Ranking failed: {e}")
 
     def get_topic_info(self, topic: str) -> Dict[str, Any]:
