@@ -12,6 +12,7 @@ class DuplicateAnalyzer(BaseWorker):
     
     def __init__(self):
         super().__init__("duplicate_analyzer")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, df: pd.DataFrame, **kwargs) -> WorkerResult:
         """Analyze duplicates and generate recommendations.
@@ -36,6 +37,13 @@ class DuplicateAnalyzer(BaseWorker):
                     ErrorType.DATA_VALIDATION_ERROR,
                     "DataFrame is empty or None",
                     severity="error"
+                )
+                self.error_intelligence.track_error(
+                    agent_name="recommender",
+                    worker_name="DuplicateAnalyzer",
+                    operation="analyze_duplicates",
+                    error_type="DataValidationError",
+                    error_message="DataFrame is empty or None"
                 )
                 return result
             
@@ -87,6 +95,11 @@ class DuplicateAnalyzer(BaseWorker):
             }
             
             self.logger.info(f"Duplicate analysis: {duplicates} duplicates found")
+            self.error_intelligence.track_success(
+                agent_name="recommender",
+                worker_name="DuplicateAnalyzer",
+                operation="analyze_duplicates"
+            )
             
         except Exception as e:
             self._add_error(
@@ -96,5 +109,12 @@ class DuplicateAnalyzer(BaseWorker):
                 severity="error"
             )
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="recommender",
+                worker_name="DuplicateAnalyzer",
+                operation="analyze_duplicates",
+                error_type=type(e).__name__,
+                error_message=str(e)
+            )
         
         return result
