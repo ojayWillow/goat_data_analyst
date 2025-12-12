@@ -29,6 +29,8 @@ class LinearRegressionWorker(BaseWorker):
     def execute(self, **kwargs) -> WorkerResult:
         """Execute linear regression fitting.
         
+        Wraps entire task with try-except for proper error tracking.
+        
         Args:
             df: DataFrame with features and target
             features: List of feature column names
@@ -36,6 +38,42 @@ class LinearRegressionWorker(BaseWorker):
             
         Returns:
             WorkerResult with model metrics and predictions
+        """
+        try:
+            result = self._run_linear_regression(**kwargs)
+            
+            # Track success AFTER entire task completes
+            self.error_intelligence.track_success(
+                agent_name="predictor",
+                worker_name="LinearRegressionWorker",
+                operation="linear_regression",
+                context={
+                    k: v for k, v in kwargs.items() 
+                    if k != 'df' and not isinstance(v, pd.DataFrame)
+                }
+            )
+            
+            return result
+            
+        except Exception as e:
+            # Track error ONLY in exception handler
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="LinearRegressionWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={
+                    k: v for k, v in kwargs.items() 
+                    if k != 'df' and not isinstance(v, pd.DataFrame)
+                }
+            )
+            raise
+    
+    def _run_linear_regression(self, **kwargs) -> WorkerResult:
+        """Perform actual linear regression work.
+        
+        This method contains all the actual ML logic.
+        execute() wraps this with try-except for error tracking.
         """
         result = self._create_result(
             task_type="linear_regression",
@@ -51,37 +89,16 @@ class LinearRegressionWorker(BaseWorker):
         if df is None or df.empty:
             self._add_error(result, ErrorType.MISSING_DATA, "No data provided")
             result.success = False
-            self.error_intelligence.track_error(
-                agent_name="predictor",
-                worker_name="LinearRegressionWorker",
-                error_type=ErrorType.MISSING_DATA,
-                error_message="No data provided",
-                context={"features": features, "target": target}
-            )
             return result
         
         if not isinstance(features, (list, tuple)) or len(features) == 0:
             self._add_error(result, ErrorType.INVALID_PARAMETER, "Features must be non-empty list")
             result.success = False
-            self.error_intelligence.track_error(
-                agent_name="predictor",
-                worker_name="LinearRegressionWorker",
-                error_type=ErrorType.INVALID_PARAMETER,
-                error_message="Features must be non-empty list",
-                context={"features": features, "target": target}
-            )
             return result
         
         if target is None:
             self._add_error(result, ErrorType.INVALID_PARAMETER, "Target column not specified")
             result.success = False
-            self.error_intelligence.track_error(
-                agent_name="predictor",
-                worker_name="LinearRegressionWorker",
-                error_type=ErrorType.INVALID_PARAMETER,
-                error_message="Target column not specified",
-                context={"features": features, "target": target}
-            )
             return result
         
         # Check columns exist
@@ -93,13 +110,6 @@ class LinearRegressionWorker(BaseWorker):
                 f"Missing columns: {missing_cols}"
             )
             result.success = False
-            self.error_intelligence.track_error(
-                agent_name="predictor",
-                worker_name="LinearRegressionWorker",
-                error_type=ErrorType.INVALID_COLUMN,
-                error_message=f"Missing columns: {missing_cols}",
-                context={"features": features, "target": target, "missing_cols": missing_cols}
-            )
             return result
         
         # Check data size
@@ -110,13 +120,6 @@ class LinearRegressionWorker(BaseWorker):
                 f"Need at least {len(features) + 1} rows, got {len(df)}"
             )
             result.success = False
-            self.error_intelligence.track_error(
-                agent_name="predictor",
-                worker_name="LinearRegressionWorker",
-                error_type=ErrorType.INSUFFICIENT_DATA,
-                error_message=f"Need at least {len(features) + 1} rows, got {len(df)}",
-                context={"features": len(features), "rows": len(df), "target": target}
-            )
             return result
         
         # TRAINING
@@ -160,21 +163,6 @@ class LinearRegressionWorker(BaseWorker):
             
             self.logger.info(f"Linear regression trained: R²={r2_score:.4f}, RMSE={rmse:.4f}")
             
-            # Track success
-            self.error_intelligence.track_success(
-                agent_name="predictor",
-                worker_name="LinearRegressionWorker",
-                operation="linear_regression",
-                context={
-                    "features": len(features),
-                    "samples": len(df),
-                    "r2_score": round(r2_score, 4),
-                    "rmse": round(rmse, 4),
-                    "mae": round(mae, 4),
-                    "target": target
-                }
-            )
-            
         except ImportError:
             self._add_error(
                 result,
@@ -182,13 +170,6 @@ class LinearRegressionWorker(BaseWorker):
                 "scikit-learn not available"
             )
             result.success = False
-            self.error_intelligence.track_error(
-                agent_name="predictor",
-                worker_name="LinearRegressionWorker",
-                error_type="ImportError",
-                error_message="scikit-learn not available",
-                context={"features": len(features), "target": target}
-            )
         except Exception as e:
             self._add_error(
                 result,
@@ -197,17 +178,5 @@ class LinearRegressionWorker(BaseWorker):
             )
             result.success = False
             self.logger.error(f"Training error: {e}")
-            self.error_intelligence.track_error(
-                agent_name="predictor",
-                worker_name="LinearRegressionWorker",
-                error_type=type(e).__name__,
-                error_message=str(e),
-                context={
-                    "features": len(features),
-                    "target": target,
-                    "samples": len(df),
-                    "error_details": str(e)
-                }
-            )
         
         return result
