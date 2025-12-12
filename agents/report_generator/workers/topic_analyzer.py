@@ -10,6 +10,7 @@ Responsibility:
 Integrated with Week 1 systems:
 - Structured logging
 - Error handling with validation
+- Error Intelligence monitoring
 """
 
 import re
@@ -17,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import WorkerError
+from agents.error_intelligence.main import ErrorIntelligence
 
 
 class TopicAnalyzer:
@@ -76,6 +78,7 @@ class TopicAnalyzer:
         self.name = "TopicAnalyzer"
         self.logger = get_logger("TopicAnalyzer")
         self.structured_logger = get_structured_logger("TopicAnalyzer")
+        self.error_intelligence = ErrorIntelligence()
         self.logger.info(f"{self.name} initialized")
 
     def analyze_narrative(self, narrative: str) -> Dict[str, Any]:
@@ -119,12 +122,37 @@ class TopicAnalyzer:
                 'word_count': result['word_count']
             })
             
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="TopicAnalyzer",
+                operation="analyze_narrative",
+                context={
+                    'narrative_length': len(narrative),
+                    'word_count': result['word_count'],
+                    'topic_count': len(topics)
+                }
+            )
+            
             return result
         
         except WorkerError:
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="TopicAnalyzer",
+                error_type="WorkerError",
+                error_message="Narrative validation failed",
+                context={'narrative_length': len(narrative) if narrative else 0}
+            )
             raise
         except Exception as e:
             self.logger.error(f"Topic analysis failed: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="TopicAnalyzer",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={'narrative_length': len(narrative) if narrative else 0}
+            )
             raise WorkerError(f"Analysis failed: {e}")
 
     def _extract_topics(self, narrative: str) -> Dict[str, float]:
@@ -234,10 +262,25 @@ class TopicAnalyzer:
                 })
             
             self.logger.info(f"Extracted {len(sections)} sections")
+            
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="TopicAnalyzer",
+                operation="extract_narrative_sections",
+                context={'section_count': len(sections)}
+            )
+            
             return sections
         
         except Exception as e:
             self.logger.error(f"Section extraction failed: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="TopicAnalyzer",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={'narrative_length': len(narrative) if narrative else 0}
+            )
             raise WorkerError(f"Section extraction failed: {e}")
 
     def _determine_importance(self, section_text: str, topics: Dict[str, float]) -> str:
