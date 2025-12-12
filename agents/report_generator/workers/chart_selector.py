@@ -10,12 +10,14 @@ Responsibility:
 Integrated with Week 1 systems:
 - Structured logging
 - Error handling with validation
+- Error Intelligence monitoring
 """
 
 from typing import Any, Dict, List, Optional
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
 from core.exceptions import WorkerError
+from agents.error_intelligence.main import ErrorIntelligence
 from .chart_mapper import ChartMapper
 
 
@@ -32,6 +34,7 @@ class ChartSelector:
         self.logger = get_logger("ChartSelector")
         self.structured_logger = get_structured_logger("ChartSelector")
         self.chart_mapper = chart_mapper or ChartMapper()
+        self.error_intelligence = ErrorIntelligence()
         self.logger.info(f"{self.name} initialized")
 
     def select_charts_for_narrative(
@@ -54,8 +57,22 @@ class ChartSelector:
             WorkerError: If selection fails
         """
         if not narrative_sections:
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="ChartSelector",
+                error_type="ValueError",
+                error_message="No narrative sections provided",
+                context={}
+            )
             raise WorkerError("No narrative sections provided")
         if not available_charts:
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="ChartSelector",
+                error_type="ValueError",
+                error_message="No available charts provided",
+                context={}
+            )
             raise WorkerError("No available charts provided")
         
         try:
@@ -111,12 +128,31 @@ class ChartSelector:
                 )
             
             self.logger.info(f"Chart selection complete: {len(selected_by_section)} sections")
+            
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="ChartSelector",
+                operation="select_charts_for_narrative",
+                context={
+                    'section_count': len(narrative_sections),
+                    'selected_sections': len(selected_by_section),
+                    'total_charts': sum(len(charts) for charts in selected_by_section.values())
+                }
+            )
+            
             return selected_by_section
         
         except WorkerError:
             raise
         except Exception as e:
             self.logger.error(f"Chart selection failed: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="ChartSelector",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={'section_count': len(narrative_sections)}
+            )
             raise WorkerError(f"Selection failed: {e}")
 
     def select_charts_for_topics(
@@ -154,10 +190,24 @@ class ChartSelector:
                     user_preferences
                 )
             
+            self.error_intelligence.track_success(
+                agent_name="report_generator",
+                worker_name="ChartSelector",
+                operation="select_charts_for_topics",
+                context={'topic_count': len(topics), 'selected_count': len(selected)}
+            )
+            
             return selected
         
         except Exception as e:
             self.logger.error(f"Topic-based selection failed: {e}")
+            self.error_intelligence.track_error(
+                agent_name="report_generator",
+                worker_name="ChartSelector",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={'topic_count': len(topics)}
+            )
             raise WorkerError(f"Selection failed: {e}")
 
     def _get_candidate_charts(
