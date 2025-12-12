@@ -25,6 +25,7 @@ class DecisionTreeWorker(BaseWorker):
         self.model = None
         self.feature_names = None
         self.mode = None  # 'regression' or 'classification'
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, **kwargs) -> WorkerResult:
         """Execute decision tree fitting.
@@ -57,16 +58,37 @@ class DecisionTreeWorker(BaseWorker):
         if df is None or df.empty:
             self._add_error(result, ErrorType.MISSING_DATA, "No data provided")
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="DecisionTreeWorker",
+                error_type=ErrorType.MISSING_DATA,
+                error_message="No data provided",
+                context={"features": features, "target": target, "mode": mode}
+            )
             return result
         
         if not isinstance(features, (list, tuple)) or len(features) == 0:
             self._add_error(result, ErrorType.INVALID_PARAMETER, "Features must be non-empty list")
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="DecisionTreeWorker",
+                error_type=ErrorType.INVALID_PARAMETER,
+                error_message="Features must be non-empty list",
+                context={"features": features, "target": target}
+            )
             return result
         
         if target is None:
             self._add_error(result, ErrorType.INVALID_PARAMETER, "Target column not specified")
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="DecisionTreeWorker",
+                error_type=ErrorType.INVALID_PARAMETER,
+                error_message="Target column not specified",
+                context={"features": features, "target": target}
+            )
             return result
         
         # Check columns exist
@@ -78,6 +100,13 @@ class DecisionTreeWorker(BaseWorker):
                 f"Missing columns: {missing_cols}"
             )
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="DecisionTreeWorker",
+                error_type=ErrorType.INVALID_COLUMN,
+                error_message=f"Missing columns: {missing_cols}",
+                context={"features": features, "target": target, "missing_cols": missing_cols}
+            )
             return result
         
         # Check data size
@@ -88,6 +117,13 @@ class DecisionTreeWorker(BaseWorker):
                 f"Need at least 3 rows, got {len(df)}"
             )
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="DecisionTreeWorker",
+                error_type=ErrorType.INSUFFICIENT_DATA,
+                error_message=f"Need at least 3 rows, got {len(df)}",
+                context={"features": len(features), "rows": len(df), "target": target}
+            )
             return result
         
         # TRAINING
@@ -183,6 +219,21 @@ class DecisionTreeWorker(BaseWorker):
                 f"leaves={result.data['num_leaves']}"
             )
             
+            # Track success
+            self.error_intelligence.track_success(
+                agent_name="predictor",
+                worker_name="DecisionTreeWorker",
+                operation="decision_tree",
+                context={
+                    "features": len(features),
+                    "samples": len(df),
+                    "mode": self.mode,
+                    "tree_depth": result.data['tree_depth'],
+                    "num_leaves": result.data['num_leaves'],
+                    "target": target
+                }
+            )
+            
         except ImportError:
             self._add_error(
                 result,
@@ -190,6 +241,13 @@ class DecisionTreeWorker(BaseWorker):
                 "scikit-learn not available"
             )
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="DecisionTreeWorker",
+                error_type="ImportError",
+                error_message="scikit-learn not available",
+                context={"features": len(features), "target": target, "mode": mode}
+            )
         except Exception as e:
             self._add_error(
                 result,
@@ -198,5 +256,18 @@ class DecisionTreeWorker(BaseWorker):
             )
             result.success = False
             self.logger.error(f"Training error: {e}")
+            self.error_intelligence.track_error(
+                agent_name="predictor",
+                worker_name="DecisionTreeWorker",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context={
+                    "features": len(features),
+                    "target": target,
+                    "samples": len(df),
+                    "mode": mode,
+                    "error_details": str(e)
+                }
+            )
         
         return result
