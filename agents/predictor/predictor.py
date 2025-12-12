@@ -66,6 +66,32 @@ class Predictor:
             ]
         })
     
+    # ===== VALIDATION HELPERS =====
+    
+    def _validate_features_and_target(
+        self,
+        features: List[str],
+        target: str,
+    ) -> None:
+        """Validate features list and target column.
+        
+        Args:
+            features: List of feature column names
+            target: Target column name
+            
+        Raises:
+            AgentError: If validation fails
+        """
+        if not features or len(features) == 0:
+            raise AgentError("Features list cannot be empty")
+        
+        if target not in self.data.columns:
+            raise AgentError(f"Target column '{target}' not found in data")
+        
+        for feature in features:
+            if feature not in self.data.columns:
+                raise AgentError(f"Feature column '{feature}' not found in data")
+    
     # ===== DATA MANAGEMENT =====
     
     @retry_on_error(max_attempts=2, backoff=1)
@@ -110,6 +136,9 @@ class Predictor:
             
         Returns:
             Dictionary with predictions and metrics
+            
+        Raises:
+            AgentError: If validation fails
         """
         if self.data is None:
             error_msg = "No data set"
@@ -117,6 +146,9 @@ class Predictor:
                 "error": error_msg
             })
             raise AgentError(error_msg)
+        
+        # Validate inputs
+        self._validate_features_and_target(features, target)
         
         self.structured_logger.info("Linear regression started", {
             "features": len(features),
@@ -166,6 +198,9 @@ class Predictor:
             
         Returns:
             Dictionary with predictions and feature importance
+            
+        Raises:
+            AgentError: If validation fails
         """
         if self.data is None:
             error_msg = "No data set"
@@ -173,6 +208,9 @@ class Predictor:
                 "error": error_msg
             })
             raise AgentError(error_msg)
+        
+        # Validate inputs
+        self._validate_features_and_target(features, target)
         
         self.structured_logger.info("Decision tree prediction started", {
             "features": len(features),
@@ -226,6 +264,9 @@ class Predictor:
             
         Returns:
             Dictionary with forecasts and confidence intervals
+            
+        Raises:
+            AgentError: If validation fails
         """
         if self.data is None:
             error_msg = "No data set"
@@ -294,6 +335,9 @@ class Predictor:
             
         Returns:
             Dictionary with validation metrics
+            
+        Raises:
+            AgentError: If validation fails
         """
         if self.data is None:
             error_msg = "No data set"
@@ -301,6 +345,9 @@ class Predictor:
                 "error": error_msg
             })
             raise AgentError(error_msg)
+        
+        # Validate inputs
+        self._validate_features_and_target(features, target)
         
         self.structured_logger.info("Model validation started", {
             "features": len(features),
