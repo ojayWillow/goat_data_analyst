@@ -311,12 +311,20 @@ class ValidatorWorker(BaseWorker):
         }
     
     def _calculate_quality_from_metrics(self, quality_info: Dict[str, Any]) -> float:
-        """Calculate quality score from quality metrics.
+        """Calculate quality score from quality metrics - IMPROVED FORMULA.
         
-        Formula considers:
-        - Null percentage (40% weight)
-        - Duplicate percentage (30% weight)
-        - Overall validity (30% weight)
+        More sensitive formula that better reflects data quality:
+        - Perfect data (0% nulls, 0% dupes): 1.0
+        - Good data (< 5% nulls, < 5% dupes): 0.95+
+        - Acceptable data (5-15% nulls): 0.8-0.90
+        - Problematic data (15-40% nulls): 0.4-0.80
+        - Poor data (40%+ nulls): < 0.4
+        
+        Formula:
+            quality = 1.0
+            quality -= (null_pct / 100.0) * 0.5      # Nulls: 50% weight
+            quality -= (dup_pct / 100.0) * 0.3       # Dupes: 30% weight
+            quality -= (issues_count / 5.0) * 0.2    # Issues: 20% weight
         
         Args:
             quality_info: Quality metrics dictionary
@@ -324,20 +332,23 @@ class ValidatorWorker(BaseWorker):
         Returns:
             Quality score (0.0 to 1.0)
         """
-        if not quality_info['valid']:
-            # Invalid data = lower score
-            base_score = 0.5
-        else:
-            base_score = 1.0
+        # Start with perfect score
+        score = 1.0
         
-        # Penalize for nulls (40% weight)
-        null_penalty = (quality_info['null_pct'] / 100.0) * 0.4
+        # Penalize for nulls (50% weight) - more aggressive
+        null_penalty = (quality_info['null_pct'] / 100.0) * 0.5
+        score -= null_penalty
         
-        # Penalize for duplicates (30% weight)
+        # Penalize for duplicates (30% weight) - more aggressive
         dup_penalty = (quality_info['duplicate_pct'] / 100.0) * 0.3
+        score -= dup_penalty
         
-        # Calculate final score
-        score = base_score - null_penalty - dup_penalty
-        score = max(0.0, min(1.0, score))  # Clamp to [0, 1]
+        # Penalize for issues (20% weight)
+        issues_count = len(quality_info.get('issues', []))
+        issues_penalty = min(0.2, (issues_count / 5.0) * 0.2)
+        score -= issues_penalty
+        
+        # Clamp to [0, 1]
+        score = max(0.0, min(1.0, score))
         
         return round(score, 2)
