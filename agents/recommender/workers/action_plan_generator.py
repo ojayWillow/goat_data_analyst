@@ -16,6 +16,7 @@ class ActionPlanGenerator(BaseWorker):
     
     def __init__(self):
         super().__init__("action_plan_generator")
+        self.error_intelligence = ErrorIntelligence()
     
     def execute(self, df: pd.DataFrame, **kwargs) -> WorkerResult:
         """Generate comprehensive action plan.
@@ -40,6 +41,13 @@ class ActionPlanGenerator(BaseWorker):
                     ErrorType.DATA_VALIDATION_ERROR,
                     "DataFrame is empty or None",
                     severity="error"
+                )
+                self.error_intelligence.track_error(
+                    agent_name="recommender",
+                    worker_name="ActionPlanGenerator",
+                    operation="generate_action_plan",
+                    error_type="DataValidationError",
+                    error_message="DataFrame is empty or None"
                 )
                 return result
             
@@ -103,6 +111,11 @@ class ActionPlanGenerator(BaseWorker):
             }
             
             self.logger.info(f"Action plan generated with {len(unique_recs)} actions")
+            self.error_intelligence.track_success(
+                agent_name="recommender",
+                worker_name="ActionPlanGenerator",
+                operation="generate_action_plan"
+            )
             
         except Exception as e:
             self._add_error(
@@ -112,5 +125,12 @@ class ActionPlanGenerator(BaseWorker):
                 severity="error"
             )
             result.success = False
+            self.error_intelligence.track_error(
+                agent_name="recommender",
+                worker_name="ActionPlanGenerator",
+                operation="generate_action_plan",
+                error_type=type(e).__name__,
+                error_message=str(e)
+            )
         
         return result
