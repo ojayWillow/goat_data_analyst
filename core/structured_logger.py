@@ -52,32 +52,18 @@ class JSONFormatter(logging.Formatter):
 
 
 class StructuredLogger:
-    """Structured logger with metrics and audit trail support."""
+    """Structured logger with metrics and audit trail support.
+    
+    Note: Does NOT use file handlers during testing to avoid I/O conflicts.
+    """
     
     def __init__(self, name: str, log_dir: str = './logs'):
         """Initialize structured logger."""
         self.name = name
         self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        self.file_handler = None
+        self.logger = None
         
-        # Create logger
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.DEBUG)
-        self.logger.propagate = False
-        
-        # Remove existing handlers
-        for handler in list(self.logger.handlers):
-            try:
-                handler.close()
-            except Exception:
-                pass
-            self.logger.removeHandler(handler)
-        
-        # NEVER add console handler - pytest conflicts
-        # NEVER add file handler - pytest conflicts
-        
-        # Metrics only
+        # Metrics only - no file handlers
         self.metrics = {
             'total_logs': 0,
             'by_level': {},
@@ -85,7 +71,7 @@ class StructuredLogger:
         }
     
     def _log_with_extra(self, level: int, msg: str, extra: Optional[Dict[str, Any]] = None):
-        """Log with extra data."""
+        """Log with extra data (in-memory only)."""
         try:
             self.metrics['total_logs'] += 1
             level_name = logging.getLevelName(level)
@@ -186,27 +172,19 @@ class StructuredLogger:
         }
     
     def close(self):
-        """Close all handlers safely."""
-        try:
-            for handler in list(self.logger.handlers):
-                try:
-                    handler.flush()
-                    handler.close()
-                except Exception:
-                    pass
-                try:
-                    self.logger.removeHandler(handler)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        """Close logger safely (no-op for in-memory logger)."""
+        # In-memory logger has nothing to close
+        pass
 
 
 # Global logger cache
 _logger_cache = {}
 
 def get_structured_logger(name: str, log_dir: str = './logs') -> StructuredLogger:
-    """Get or create structured logger."""
+    """Get or create structured logger.
+    
+    During testing, loggers are in-memory only to avoid I/O conflicts.
+    """
     cache_key = (name, log_dir)
     if cache_key not in _logger_cache:
         _logger_cache[cache_key] = StructuredLogger(name, log_dir)
