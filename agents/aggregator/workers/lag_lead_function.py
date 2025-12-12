@@ -70,6 +70,41 @@ class LagLeadFunction(BaseWorker):
             return result
         
         try:
+            # FIX #3: Check for date format errors
+            date_columns = df.select_dtypes(include=['datetime64']).columns.tolist()
+            
+            if len(date_columns) > 0:
+                self.logger.info(f"Found date columns: {date_columns}")
+                
+                # Validate date format
+                for col in date_columns:
+                    try:
+                        # Try to convert to datetime
+                        converted = pd.to_datetime(df[col], errors='coerce')
+                        # Check if conversion lost data (values that became NaT that weren't before)
+                        invalid_dates = converted.isna().sum() - df[col].isna().sum()
+                        
+                        if invalid_dates > 0:
+                            self._add_error(
+                                result,
+                                ErrorType.VALIDATION_ERROR,
+                                f"Column '{col}' has {invalid_dates} invalid date formats",
+                                severity="error",
+                                suggestion="Provide dates in format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS"
+                            )
+                            result.success = False
+                            return result
+                    except Exception as e:
+                        self._add_error(
+                            result,
+                            ErrorType.VALIDATION_ERROR,
+                            f"Date validation failed for '{col}': {e}",
+                            severity="error",
+                            suggestion="Check date format matches YYYY-MM-DD"
+                        )
+                        result.success = False
+                        return result
+            
             numeric_df = df.select_dtypes(include=[np.number])
             
             if numeric_df.empty:
