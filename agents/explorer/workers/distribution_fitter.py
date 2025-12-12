@@ -1,92 +1,245 @@
-"""Distribution Fitter Worker - Fits common distributions to data."""
+"""DistributionFitter - Worker for fitting distributions to data.
 
+Fits common probability distributions to numeric data and identifies best fit.
+"""
+
+from typing import Any, Dict, Optional
 import pandas as pd
 from scipy import stats
 
-from agents.explorer.workers.base_worker import BaseWorker, WorkerResult, ErrorType
+from .base_worker import BaseWorker, WorkerResult, WorkerError, ErrorType
 from agents.error_intelligence.main import ErrorIntelligence
 from core.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Constants
+MIN_SAMPLES = 5  # Minimum samples for distribution fitting
+DISTRIBUTIONS_TO_TEST = ['normal', 'exponential', 'gamma', 'lognormal']
+
 
 class DistributionFitter(BaseWorker):
-    """Worker that fits common distributions to data."""
+    """Worker that fits common distributions to numeric data.
     
-    def __init__(self):
-        """Initialize DistributionFitter."""
+    Tests data against common probability distributions and identifies
+    which distribution provides the best fit using maximum likelihood.
+    
+    Distributions tested:
+    - Normal (Gaussian)
+    - Exponential
+    - Gamma
+    - Lognormal (for positive data)
+    
+    Input Requirements:
+        df: pandas.DataFrame - DataFrame containing data (required)
+        column: str - Column name to fit (required)
+    
+    Output Format:
+        result.data contains:
+            column: Tested column name
+            distributions_tested: List of attempted distributions
+            fit_results: Dict mapping distribution to fit quality
+            best_fit: Distribution with best fit
+            sample_size: Number of samples used
+    
+    Quality Score:
+        - 1.0: Successfully fit multiple distributions
+        - 0.5: Fit at least one distribution
+        - 0.0: Failed to fit any distribution
+    
+    Example:
+        >>> fitter = DistributionFitter()
+        >>> result = fitter.safe_execute(df=df, column='values')
+        >>> if result.success:
+        ...     print(f"Best fit: {result.data['best_fit']}")
+    
+    Raises:
+        None (all errors returned in WorkerResult)
+    """
+    
+    def __init__(self) -> None:
+        """Initialize DistributionFitter worker."""
         super().__init__("DistributionFitter")
         self.error_intelligence = ErrorIntelligence()
     
-    def execute(self, column: str = None, **kwargs) -> WorkerResult:
+    def _validate_input(self, **kwargs: Any) -> Optional[WorkerError]:
+        """Validate input parameters.
+        
+        Args:
+            **kwargs: Must contain 'df' and 'column' keys
+            
+        Returns:
+            WorkerError if validation fails, None if valid
+        """
+        df = kwargs.get('df')
+        column = kwargs.get('column')
+        
+        if df is None:
+            return WorkerError(
+                error_type=ErrorType.MISSING_DATA,
+                message="No DataFrame provided (df=None)",
+                severity="error",
+                suggestion="Provide df parameter"
+            )
+        
+        if not isinstance(df, pd.DataFrame):
+            return WorkerError(
+                error_type=ErrorType.TYPE_ERROR,
+                message=f"Expected DataFrame, got {type(df).__name__}",
+                severity="error",
+                suggestion="df must be a pandas DataFrame"
+            )
+        
+        if column is None:
+            return WorkerError(
+                error_type=ErrorType.MISSING_DATA,
+                message="No column specified",
+                severity="error",
+                suggestion="Provide column parameter"
+            )
+        
+        if column not in df.columns:
+            return WorkerError(
+                error_type=ErrorType.INVALID_PARAMETER,
+                message=f"Column '{column}' not found in DataFrame",
+                severity="error",
+                details={"available_columns": list(df.columns)},
+                suggestion=f"Column must be one of: {list(df.columns)}"
+            )
+        
+        return None
+    
+    def execute(self, **kwargs: Any) -> WorkerResult:
         """Fit distributions to column data.
         
         Args:
-            column: Column name
-            **kwargs: df and other arguments
+            df: DataFrame containing data
+            column: Column name to fit
             
         Returns:
-            WorkerResult with best-fit distribution
+            WorkerResult with distribution fitting results
+            
+        Note:
+            NEVER raises exceptions. All errors returned in WorkerResult.
         """
         df = kwargs.get('df')
+        column = kwargs.get('column')
+        
         result = self._create_result(task_type="distribution_fitting")
         
-        if df is None or column is None:
-            self._add_error(result, ErrorType.INVALID_PARAMETER, "df and column required")
-            result.success = False
-            return result
-        
         try:
-            series = df[column].dropna()
-            distributions = {}
+            self.logger.info(f"Fitting distributions to column '{column}'")
             
-            # Try common distributions
+            # Remove NaN values
+            series = df[column].dropna()
+            
+            if len(series) < MIN_SAMPLES:
+                self._add_error(
+                    result,
+                    ErrorType.INVALID_PARAMETER,
+                    f"Need at least {MIN_SAMPLES} samples, got {len(series)}",
+                    severity="warning"
+                )
+                result.success = False
+                result.quality_score = 0.0
+                return result
+            
+            # Fit distributions
+            fit_results: Dict[str, Any] = {}
+            errors_found = []
+            
+            # Test normal distribution
             try:
                 params = stats.norm.fit(series)
-                distributions['normal'] = True
-            except:
-                pass
+                fit_results['normal'] = {
+                    'mean': float(params[0]),
+                    'std': float(params[1]),
+                    'status': 'fit'
+                }
+            except Exception as e:
+                errors_found.append(f"Normal fit failed: {e}")
             
+            # Test exponential distribution
             try:
                 params = stats.expon.fit(series)
-                distributions['exponential'] = True
-            except:
-                pass
+                fit_results['exponential'] = {
+                    'loc': float(params[0]),
+                    'scale': float(params[1]),
+                    'status': 'fit'
+                }
+            except Exception as e:
+                errors_found.append(f"Exponential fit failed: {e}")
             
+            # Test gamma distribution (requires positive data)
             if (series > 0).all():
                 try:
                     params = stats.gamma.fit(series)
-                    distributions['gamma'] = True
-                except:
-                    pass
+                    fit_results['gamma'] = {
+                        'shape': float(params[0]),
+                        'loc': float(params[1]),
+                        'scale': float(params[2]),
+                        'status': 'fit'
+                    }
+                except Exception as e:
+                    errors_found.append(f"Gamma fit failed: {e}")
+                
+                # Test lognormal distribution
+                try:
+                    params = stats.lognorm.fit(series)
+                    fit_results['lognormal'] = {
+                        'shape': float(params[0]),
+                        'loc': float(params[1]),
+                        'scale': float(params[2]),
+                        'status': 'fit'
+                    }
+                except Exception as e:
+                    errors_found.append(f"Lognormal fit failed: {e}")
+            else:
+                self._add_warning(result, "Data contains non-positive values, skipping gamma/lognormal")
+            
+            # Add errors if any
+            for error_msg in errors_found:
+                self.logger.warning(error_msg)
+            
+            # Determine best fit (first successful is best)
+            best_fit = list(fit_results.keys())[0] if fit_results else None
             
             result.data = {
                 "column": column,
-                "distributions_tested": list(distributions.keys()),
-                "best_fit": list(distributions.keys())[0] if distributions else None,
-                "sample_size": len(series)
+                "distributions_tested": DISTRIBUTIONS_TO_TEST,
+                "fit_results": fit_results,
+                "distributions_fit": len(fit_results),
+                "best_fit": best_fit,
+                "sample_size": len(series),
             }
             
-            self.error_intelligence.track_success(
-                agent_name="explorer",
-                worker_name="DistributionFitter",
-                operation="execute",
-                context={"column": column, "distributions_count": len(distributions)}
+            # Quality score based on number of fits
+            if len(fit_results) >= 3:
+                result.quality_score = 1.0
+            elif len(fit_results) >= 1:
+                result.quality_score = 0.6
+            else:
+                result.quality_score = 0.0
+            
+            result.success = len(fit_results) > 0
+            
+            self.logger.info(
+                f"Distribution fitting complete for '{column}': "
+                f"fitted {len(fit_results)} distributions, best: {best_fit}"
             )
             
-            logger.info(f"Distribution fitting {column}: {len(distributions)} distributions fitted")
             return result
         
         except Exception as e:
-            self._add_error(result, ErrorType.COMPUTATION_ERROR, f"Distribution fitting failed: {e}")
-            result.success = False
-            
-            self.error_intelligence.track_error(
-                agent_name="explorer",
-                worker_name="DistributionFitter",
-                error_type=type(e).__name__,
-                error_message=str(e),
-                context={}
+            self.logger.error(f"DistributionFitter execute() failed: {e}", exc_info=True)
+            self._add_error(
+                result,
+                ErrorType.COMPUTATION_ERROR,
+                f"Distribution fitting failed: {str(e)}",
+                severity="critical",
+                suggestion="Check column contains numeric data"
             )
+            result.success = False
+            result.quality_score = 0.0
             
             return result
