@@ -1,7 +1,7 @@
 """LagLeadFunction - Lag and lead operations for time series.
 
-Lag and lead operations for time series data with full validation
-and quality scoring per A+ worker guidance.
+Lag and lead operations for time series data with full validation,
+error intelligence, and advanced error handling per A+ guidance.
 """
 
 import pandas as pd
@@ -27,6 +27,7 @@ class LagLeadFunction(BaseWorker):
     
     Calculates lag and lead operations including:
     - Configurable lag/lead periods
+    - Advanced error handling (memory, shift errors)
     - Column selection
     - Null value tracking
     - Quality scoring
@@ -39,6 +40,7 @@ class LagLeadFunction(BaseWorker):
         self.rows_processed: int = 0
         self.rows_failed: int = 0
         self.nan_rows_created: int = 0
+        self.advanced_errors: List[str] = []
     
     def _validate_input(self, **kwargs) -> Optional[WorkerError]:
         """Validate input parameters before execution.
@@ -118,10 +120,7 @@ class LagLeadFunction(BaseWorker):
         
         return None
     
-    def execute(
-        self,
-        **kwargs
-    ) -> WorkerResult:
+    def execute(self, **kwargs) -> WorkerResult:
         """Calculate lag and lead functions.
         
         Args:
@@ -140,16 +139,22 @@ class LagLeadFunction(BaseWorker):
             result = self._run_lag_lead(**kwargs)
             
             # Track success with error intelligence
+            context = {
+                "lag_periods": kwargs.get('lag_periods', DEFAULT_LAG),
+                "lead_periods": kwargs.get('lead_periods', DEFAULT_LEAD),
+                "success": result.success,
+                "quality_score": result.quality_score,
+                "advanced_errors": len(self.advanced_errors),
+            }
+            
+            if self.advanced_errors:
+                context["error_types"] = list(set(self.advanced_errors))
+            
             self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="LagLeadFunction",
                 operation="lag_lead_functions",
-                context={
-                    "lag_periods": kwargs.get('lag_periods', DEFAULT_LAG),
-                    "lead_periods": kwargs.get('lead_periods', DEFAULT_LEAD),
-                    "success": result.success,
-                    "quality_score": result.quality_score
-                }
+                context=context
             )
             
             return result
@@ -165,7 +170,8 @@ class LagLeadFunction(BaseWorker):
                     "lag_periods": kwargs.get('lag_periods', DEFAULT_LAG),
                     "lead_periods": kwargs.get('lead_periods', DEFAULT_LEAD),
                     "rows_processed": self.rows_processed,
-                    "rows_failed": self.rows_failed
+                    "rows_failed": self.rows_failed,
+                    "advanced_errors": len(self.advanced_errors),
                 }
             )
             raise
@@ -185,6 +191,7 @@ class LagLeadFunction(BaseWorker):
         self.rows_processed = len(df) if df is not None else 0
         self.rows_failed = 0
         self.nan_rows_created = 0
+        self.advanced_errors = []
         
         result = self._create_result(
             task_type="lag_lead_functions",
@@ -217,18 +224,31 @@ class LagLeadFunction(BaseWorker):
                     columns = [columns]
                 numeric_df = numeric_df[[col for col in columns if col in numeric_df.columns]]
             
-            # Calculate lag and lead
-            lag_results = None
-            lead_results = None
-            nan_count = 0
-            
-            if lag_periods > 0:
-                lag_results = numeric_df.shift(lag_periods)
-                nan_count += lag_results.isna().sum().sum()
-            
-            if lead_periods > 0:
-                lead_results = numeric_df.shift(-lead_periods)
-                nan_count += lead_results.isna().sum().sum()
+            # Calculate lag and lead with error handling
+            try:
+                lag_results = None
+                lead_results = None
+                nan_count = 0
+                
+                if lag_periods > 0:
+                    lag_results = numeric_df.shift(lag_periods)
+                    nan_count += lag_results.isna().sum().sum()
+                
+                if lead_periods > 0:
+                    lead_results = numeric_df.shift(-lead_periods)
+                    nan_count += lead_results.isna().sum().sum()
+            except Exception as shift_error:
+                self.logger.error(f"Shift operation failed: {shift_error}")
+                self._add_error(
+                    result,
+                    ErrorType.COMPUTATION_ERROR,
+                    f"Shift operation failed: {str(shift_error)}",
+                    severity="critical"
+                )
+                self.advanced_errors.append("shift_error")
+                result.success = False
+                result.quality_score = 0
+                return result
             
             # Count rows with any NaN values (created by shift)
             if lag_periods > 0:
@@ -261,13 +281,16 @@ class LagLeadFunction(BaseWorker):
                 "lead_nan_rows_created": lead_nan_rows,
                 "total_nan_values_created": int(nan_count),
                 "operation_description": f"Lag {lag_periods} periods + Lead {lead_periods} periods",
+                "advanced_errors_encountered": len(self.advanced_errors),
+                "advanced_error_types": list(set(self.advanced_errors)) if self.advanced_errors else [],
             }
             
             # Calculate quality score
             quality_score = self._calculate_quality_score(
                 rows_processed=self.rows_processed,
                 rows_failed=self.rows_failed,
-                nan_rows_created=self.nan_rows_created
+                nan_rows_created=self.nan_rows_created,
+                advanced_errors=len(self.advanced_errors)
             )
             result.quality_score = quality_score
             result.success = True
@@ -278,6 +301,19 @@ class LagLeadFunction(BaseWorker):
                 f"quality score: {quality_score:.3f}"
             )
             
+            return result
+        
+        except MemoryError:
+            self.logger.error("Memory error during lag/lead operation")
+            self._add_error(
+                result,
+                ErrorType.COMPUTATION_ERROR,
+                "Insufficient memory for lag/lead operation",
+                severity="critical"
+            )
+            self.advanced_errors.append("memory_error")
+            result.success = False
+            result.quality_score = 0
             return result
         
         except Exception as e:
@@ -302,7 +338,8 @@ class LagLeadFunction(BaseWorker):
         self,
         rows_processed: int,
         rows_failed: int,
-        nan_rows_created: int = 0
+        nan_rows_created: int = 0,
+        advanced_errors: int = 0
     ) -> float:
         """Calculate quality score based on shift operations.
         
@@ -310,6 +347,7 @@ class LagLeadFunction(BaseWorker):
             rows_processed: Rows successfully processed
             rows_failed: Rows that failed
             nan_rows_created: Rows with NaN created by shift
+            advanced_errors: Count of advanced error types
             
         Returns:
             Quality score from 0.0 to 1.0
@@ -325,6 +363,9 @@ class LagLeadFunction(BaseWorker):
         # Penalty for NaN rows (expected behavior of shift, small penalty)
         nan_penalty = min(0.15, (nan_rows_created / rows_processed) * 0.2) if rows_processed > 0 else 0
         
-        quality_score = max(0.0, base_quality - nan_penalty)
+        # Penalty for advanced errors
+        error_penalty = min(0.1, advanced_errors * 0.05)
+        
+        quality_score = max(0.0, base_quality - nan_penalty - error_penalty)
         
         return min(1.0, quality_score)
