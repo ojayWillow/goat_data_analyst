@@ -59,3 +59,8 @@ class AnomalyDetectionError(GOATException):
 class ReportGenerationError(GOATException):
     """Raised when report generation fails."""
     pass
+
+
+class WorkerError(GOATException):
+    """Raised when a worker operation fails."""
+    pass
