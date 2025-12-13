@@ -72,7 +72,7 @@ class RollingAggregation(BaseWorker):
         try:
             numeric_df = df.select_dtypes(include=[np.number])
             
-            if numeric_df.empty:
+            if numeric_df is None or numeric_df.empty:
                 self._add_error(result, ErrorType.LOAD_ERROR, "No numeric columns found")
                 result.success = False
                 return result
