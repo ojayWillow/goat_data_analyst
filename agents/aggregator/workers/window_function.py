@@ -101,7 +101,10 @@ class WindowFunction(BaseWorker):
             
             # Properly count NaN values from rolling operations
             rolling_mean = numeric_df.rolling(window=window_size).mean()
-            nan_count = int(rolling_mean.isna().sum().sum())
+            if rolling_mean is not None:
+                nan_count = int(rolling_mean.isna().sum().sum())
+            else:
+                nan_count = 0
             
             result.data = {
                 "window_size": window_size,
