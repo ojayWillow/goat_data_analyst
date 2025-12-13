@@ -54,7 +54,7 @@ class StatisticsWorker(BaseWorker):
         self.numeric_cols_found: int = 0
         self.advanced_errors: List[str] = []
     
-    def _validate_input(self, **kwargs) -> Optional[WorkerError]:
+    def _validate_input(self, **kwargs: Any) -> Optional[WorkerError]:
         """Validate input parameters before execution.
         
         Validates:
@@ -106,7 +106,7 @@ class StatisticsWorker(BaseWorker):
         
         return None
     
-    def execute(self, **kwargs) -> WorkerResult:
+    def execute(self, **kwargs: Any) -> WorkerResult:
         """Compute summary statistics.
         
         Args:
@@ -158,17 +158,29 @@ class StatisticsWorker(BaseWorker):
             )
             raise
     
-    def _run_statistics(self, **kwargs) -> WorkerResult:
+    def _run_statistics(self, **kwargs: Any) -> WorkerResult:
         """Perform summary statistics computation.
         
         Returns:
             WorkerResult with computed statistics or errors
         """
-        df = kwargs.get('df')
+        df: pd.DataFrame | None = kwargs.get('df')
         group_column = kwargs.get('group_column')
         
+        # Add None check
+        if df is None:
+            result = self._create_result(success=False, quality_score=0, task_type="summary_statistics")
+            self._add_error(
+                result,
+                ErrorType.DATA_VALIDATION_ERROR,
+                "DataFrame is None",
+                severity="error",
+                suggestion="Provide a valid DataFrame"
+            )
+            return result
+        
         # Reset counters
-        self.rows_processed = len(df) if df is not None else 0
+        self.rows_processed = len(df)
         self.rows_failed = 0
         self.null_warnings = 0
         self.advanced_errors = []
@@ -182,7 +194,7 @@ class StatisticsWorker(BaseWorker):
         
         try:
             # Get numeric columns
-            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            numeric_cols: List[str] = df.select_dtypes(include=[np.number]).columns.tolist()
             self.numeric_cols_found = len(numeric_cols)
             
             if not numeric_cols:
