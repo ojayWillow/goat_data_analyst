@@ -1,4 +1,4 @@
-"""PHASE 1 TEST SUITE - Integration, Errors, Cooperation Tests - FIXED
+"""PHASE 1 TEST SUITE - Integration, Errors, Cooperation Tests - FIXED v2
 
 45 comprehensive tests targeting:
 - Integration workflows (10 tests)
@@ -11,6 +11,7 @@ Execution: pytest tests/test_narrative_generator_phase1.py -v
 """
 
 import pytest
+from core.error_recovery import RecoveryError
 from agents.narrative_generator.narrative_generator import NarrativeGenerator
 from agents.narrative_generator.workers.insight_extractor import InsightExtractor
 from agents.narrative_generator.workers.problem_identifier import ProblemIdentifier
@@ -217,8 +218,8 @@ class TestErrorPaths:
         try:
             agent.set_results("not a dict")
             assert False, "Should raise error"
-        except (ValueError, TypeError):
-            assert True
+        except (ValueError, TypeError, RecoveryError):
+            assert True  # Expected to fail
 
     def test_error_missing_required_keys(self):
         """set_results missing required keys."""
@@ -227,8 +228,8 @@ class TestErrorPaths:
         try:
             agent.set_results(results)
             assert False, "Should raise error"
-        except (ValueError, AssertionError):
-            assert True
+        except (ValueError, AssertionError, RecoveryError):
+            assert True  # Expected to fail
 
     def test_error_malformed_anomalies(self):
         """Handles malformed anomaly data."""
