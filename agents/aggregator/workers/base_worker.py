@@ -24,6 +24,7 @@ class ErrorType(Enum):
     VALUE_ERROR = "value_error"
     MISSING_DATA = "missing_data"
     INVALID_PARAMETER = "invalid_parameter"
+    VALIDATION_ERROR = "validation_error"  # For data validation issues
     TIMEOUT_ERROR = "timeout_error"
     UNKNOWN_ERROR = "unknown_error"
 
@@ -188,7 +189,15 @@ class BaseWorker(ABC):
         self.logger.warning(f"Warning: {warning}")
     
     def _validate_input(self, **kwargs) -> Optional[WorkerError]:
-        """Validate input parameters. Override in subclasses."""
+        """Validate input parameters. Override in subclasses.
+        
+        Subclasses should override this method to provide worker-specific
+        input validation. This method is called by safe_execute() before
+        the main execute() method.
+        
+        Returns:
+            WorkerError if validation fails, None if valid
+        """
         return None
     
     def safe_execute(self, **kwargs) -> WorkerResult:
