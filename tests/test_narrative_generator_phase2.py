@@ -258,8 +258,9 @@ class TestQualityFormulaDeep:
             actions_count=3,
             had_errors=True
         )
-        # Error reduces score by exactly 0.15 (allow 0.02 for rounding)
-        assert abs(score_no_error - score_with_error - 0.15) <= 0.02
+        # Error reduces score by exactly 0.15
+        penalty_diff = score_no_error - score_with_error
+        assert 0.13 <= penalty_diff <= 0.17
 
     def test_quality_formula_partial_components(self):
         """Quality formula with partial data."""
