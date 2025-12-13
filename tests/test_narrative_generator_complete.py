@@ -306,23 +306,33 @@ class TestQualityScoring:
         assert score == 0.4
 
     def test_quality_formula_error_penalty(self):
-        """Quality scoring: Error penalty (-0.15)."""
+        """Quality scoring: Error penalty calculation.
+        
+        Formula:
+        quality = (insights * 0.3) + (problems * 0.3) + (actions * 0.3) + ((1.0 - error_penalty) * 0.1)
+        
+        When had_errors=False: error_penalty = 0.0
+        When had_errors=True: error_penalty = 0.15
+        """
         agent = NarrativeGenerator()
         
-        # No errors
+        # No errors (all 4+ hits)
         score_no_error = agent._calculate_quality_score(
             insights_count=4, problems_count=3, actions_count=3, had_errors=False
         )
-        # Score = 1.0*0.3 + 1.0*0.3 + 1.0*0.3 + 1.0*0.1 = 1.0
+        # Score = 1.0*0.3 + 1.0*0.3 + 1.0*0.3 + (1.0-0.0)*0.1 = 0.3 + 0.3 + 0.3 + 0.1 = 1.0
         assert score_no_error == 1.0
         
-        # With errors - should be lower but still valid
+        # With errors
         score_with_error = agent._calculate_quality_score(
             insights_count=4, problems_count=3, actions_count=3, had_errors=True
         )
-        # With error penalty
+        # Score = 1.0*0.3 + 1.0*0.3 + 1.0*0.3 + (1.0-0.15)*0.1 = 0.9 + 0.085 = 0.985 → 0.98
+        assert score_with_error == 0.98
+        
+        # Error penalty is reflected
         assert score_with_error < score_no_error
-        assert 0.8 <= score_with_error <= 0.9
+        assert score_no_error - score_with_error == pytest.approx(0.02, abs=0.01)
 
     def test_quality_score_always_clamped(self):
         """Quality score always in [0, 1] range."""
