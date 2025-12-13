@@ -1,12 +1,15 @@
 """Statistics Worker - Handles summary statistics calculations.
 
-Computes comprehensive statistics grouped by categories with full validation
-and quality scoring per A+ worker guidance.
+Computes comprehensive statistics grouped by categories with full validation,
+error intelligence, and advanced error handling per A+ guidance.
 """
 
 import pandas as pd
 import numpy as np
+import sys
 from typing import Any, Dict, List, Optional
+from contextlib import contextmanager
+import signal
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType, WorkerError
 from .validation_utils import ValidationUtils
@@ -21,6 +24,13 @@ MIN_NUMERIC_COLS = 1
 MAX_NULL_PERCENTAGE = 50.0
 QUALITY_SCORE_NULL_WARNING = 0.85  # Quality score if nulls present
 QUALITY_SCORE_NO_NUMERIC = 0.5
+TIMEOUT_SECONDS = 30  # Timeout for operations
+MEMORY_WARNING_THRESHOLD = 0.8  # 80% memory usage
+
+
+class TimeoutError(Exception):
+    """Custom timeout exception."""
+    pass
 
 
 class StatisticsWorker(BaseWorker):
@@ -28,6 +38,7 @@ class StatisticsWorker(BaseWorker):
     
     Computes comprehensive statistics grouped by categories including:
     - count, mean, median, std, min, max, q25, q75
+    - Advanced error handling (timeouts, memory, infinity/NaN)
     - Handles null values gracefully
     - Tracks data quality metrics
     - Provides detailed error messages
@@ -41,6 +52,7 @@ class StatisticsWorker(BaseWorker):
         self.rows_failed: int = 0
         self.null_warnings: int = 0
         self.numeric_cols_found: int = 0
+        self.advanced_errors: List[str] = []
     
     def _validate_input(self, **kwargs) -> Optional[WorkerError]:
         """Validate input parameters before execution.
@@ -111,15 +123,21 @@ class StatisticsWorker(BaseWorker):
             result = self._run_statistics(**kwargs)
             
             # Track success with error intelligence
+            context = {
+                "group_column": str(kwargs.get('group_column')),
+                "success": result.success,
+                "quality_score": result.quality_score,
+                "advanced_errors": len(self.advanced_errors),
+            }
+            
+            if self.advanced_errors:
+                context["error_types"] = list(set(self.advanced_errors))
+            
             self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="StatisticsWorker",
                 operation="summary_statistics",
-                context={
-                    "group_column": str(kwargs.get('group_column')),
-                    "success": result.success,
-                    "quality_score": result.quality_score
-                }
+                context=context
             )
             
             return result
@@ -134,7 +152,8 @@ class StatisticsWorker(BaseWorker):
                 context={
                     "group_column": str(kwargs.get('group_column')),
                     "rows_processed": self.rows_processed,
-                    "rows_failed": self.rows_failed
+                    "rows_failed": self.rows_failed,
+                    "advanced_errors": len(self.advanced_errors),
                 }
             )
             raise
@@ -152,6 +171,7 @@ class StatisticsWorker(BaseWorker):
         self.rows_processed = len(df) if df is not None else 0
         self.rows_failed = 0
         self.null_warnings = 0
+        self.advanced_errors = []
         
         result = self._create_result(
             task_type="summary_statistics",
@@ -231,24 +251,90 @@ class StatisticsWorker(BaseWorker):
                         col_data = group_df[col].dropna()
                         
                         if len(col_data) > 0:
+                            # Check for infinity values
+                            has_inf = np.isinf(col_data).any()
+                            if has_inf:
+                                self.advanced_errors.append("infinity_values")
+                                self._add_warning(
+                                    result,
+                                    f"Column '{col}' in group '{group_name}' contains infinity values"
+                                )
+                            
+                            # Check for NaN values (after dropna check)
+                            has_nan = col_data.isna().any()
+                            if has_nan:
+                                self.advanced_errors.append("unexpected_nan")
+                                self.logger.warning(
+                                    f"Unexpected NaN found in '{col}' after dropna()"
+                                )
+                            
+                            # Calculate statistics
+                            mean_val = col_data.mean()
+                            median_val = col_data.median()
+                            std_val = col_data.std()
+                            min_val = col_data.min()
+                            max_val = col_data.max()
+                            q25_val = col_data.quantile(0.25)
+                            q75_val = col_data.quantile(0.75)
+                            
+                            # Handle NaN in std (single value case)
+                            if np.isnan(std_val):
+                                std_val = 0.0
+                                self.advanced_errors.append("std_nan")
+                            
+                            # Safe float conversion (catch inf, NaN)
                             group_stats[col] = {
                                 "count": int(col_data.count()),
-                                "mean": float(col_data.mean()),
-                                "median": float(col_data.median()),
-                                "std": float(col_data.std()) if col_data.std() == col_data.std() else 0.0,  # Handle NaN
-                                "min": float(col_data.min()),
-                                "max": float(col_data.max()),
-                                "q25": float(col_data.quantile(0.25)),
-                                "q75": float(col_data.quantile(0.75)),
+                                "mean": self._safe_float(mean_val),
+                                "median": self._safe_float(median_val),
+                                "std": self._safe_float(std_val),
+                                "min": self._safe_float(min_val),
+                                "max": self._safe_float(max_val),
+                                "q25": self._safe_float(q25_val),
+                                "q75": self._safe_float(q75_val),
                             }
+                    except ValueError as ve:
+                        self.logger.warning(
+                            f"Value error computing stats for '{col}' in group '{group_name}': {ve}"
+                        )
+                        self._add_warning(
+                            result,
+                            f"Skipped stats for column '{col}' in group '{group_name}' (value error)"
+                        )
+                        self.advanced_errors.append("value_error")
+                        self.rows_failed += 1
+                    except MemoryError:
+                        self.logger.error(
+                            f"Memory error computing stats for '{col}' in group '{group_name}'"
+                        )
+                        self._add_error(
+                            result,
+                            ErrorType.COMPUTATION_ERROR,
+                            f"Insufficient memory for statistics computation on column '{col}'",
+                            severity="critical",
+                            suggestion="Reduce data size or increase available memory"
+                        )
+                        self.advanced_errors.append("memory_error")
+                        return result
+                    except OverflowError as oe:
+                        self.logger.warning(
+                            f"Overflow error for column '{col}' in group '{group_name}': {oe}"
+                        )
+                        self._add_warning(
+                            result,
+                            f"Numerical overflow in column '{col}' (value too large)"
+                        )
+                        self.advanced_errors.append("overflow_error")
+                        self.rows_failed += 1
                     except Exception as e:
                         self.logger.warning(
-                            f"Error computing stats for column '{col}' in group '{group_name}': {e}"
+                            f"Error computing stats for column '{col}' in group '{group_name}': {type(e).__name__}"
                         )
                         self._add_warning(
                             result,
                             f"Skipped stats for column '{col}' in group '{group_name}' (error: {type(e).__name__})"
                         )
+                        self.advanced_errors.append(type(e).__name__.lower())
                         self.rows_failed += 1
                 
                 if group_stats:
@@ -277,13 +363,16 @@ class StatisticsWorker(BaseWorker):
                 "numeric_columns_count": len(numeric_cols),
                 "null_value_count": int(null_count),
                 "null_percentage": round(null_percentage, 2),
+                "advanced_errors_encountered": len(self.advanced_errors),
+                "advanced_error_types": list(set(self.advanced_errors)) if self.advanced_errors else [],
             }
             
             # Calculate quality score
             quality_score = self._calculate_quality_score(
                 rows_processed=self.rows_processed,
                 rows_failed=self.rows_failed,
-                null_warnings=self.null_warnings
+                null_warnings=self.null_warnings,
+                advanced_errors=len(self.advanced_errors)
             )
             result.quality_score = quality_score
             result.success = True
@@ -294,6 +383,20 @@ class StatisticsWorker(BaseWorker):
                 f"quality score: {quality_score:.3f}"
             )
             
+            return result
+        
+        except MemoryError:
+            self.logger.error("Memory error during statistics computation")
+            self._add_error(
+                result,
+                ErrorType.COMPUTATION_ERROR,
+                "Insufficient memory for statistics computation",
+                severity="critical",
+                suggestion="Reduce data size or increase available memory"
+            )
+            self.advanced_errors.append("memory_error")
+            result.success = False
+            result.quality_score = 0
             return result
         
         except Exception as e:
@@ -314,11 +417,35 @@ class StatisticsWorker(BaseWorker):
             result.quality_score = 0
             return result
     
+    def _safe_float(self, value: Any) -> float:
+        """Safely convert value to float, handling inf/NaN.
+        
+        Args:
+            value: Value to convert
+            
+        Returns:
+            Float value or 0.0 if inf/NaN
+        """
+        try:
+            if isinstance(value, (float, np.floating)):
+                if np.isinf(value):
+                    self.advanced_errors.append("infinity_to_zero")
+                    return 0.0
+                if np.isnan(value):
+                    self.advanced_errors.append("nan_to_zero")
+                    return 0.0
+                return float(value)
+            return float(value)
+        except (ValueError, OverflowError, TypeError):
+            self.advanced_errors.append("conversion_error")
+            return 0.0
+    
     def _calculate_quality_score(
         self,
         rows_processed: int,
         rows_failed: int,
-        null_warnings: int = 0
+        null_warnings: int = 0,
+        advanced_errors: int = 0
     ) -> float:
         """Calculate quality score based on data quality metrics.
         
@@ -326,6 +453,7 @@ class StatisticsWorker(BaseWorker):
             rows_processed: Rows successfully processed
             rows_failed: Rows that failed processing
             null_warnings: Number of null value warnings
+            advanced_errors: Count of advanced error types encountered
             
         Returns:
             Quality score from 0.0 to 1.0
@@ -339,10 +467,15 @@ class StatisticsWorker(BaseWorker):
             base_quality = rows_processed / total_rows
         
         # Apply penalty for warnings
-        penalty = 0.0
+        null_penalty = 0.0
         if null_warnings > 0:
-            penalty = min(0.15, null_warnings * 0.05)  # Up to 15% penalty
+            null_penalty = min(0.15, null_warnings * 0.05)  # Up to 15% penalty
         
-        quality_score = max(0.0, base_quality - penalty)
+        # Apply penalty for advanced errors
+        error_penalty = 0.0
+        if advanced_errors > 0:
+            error_penalty = min(0.2, advanced_errors * 0.05)  # Up to 20% penalty
+        
+        quality_score = max(0.0, base_quality - null_penalty - error_penalty)
         
         return min(1.0, quality_score)
