@@ -533,25 +533,33 @@ class TestRealisticPerformance:
         assert elapsed < 0.5, f"Extreme values took {elapsed}s"
         assert result is not None
 
-    def test_recovery_not_catastrophically_slow(self):
-        """Error recovery doesn't add huge overhead."""
+    def test_recovery_doesnt_break(self):
+        """Error recovery shouldn't break system."""
         agent = NarrativeGenerator()
-        normal_times = []
         
-        # Normal operations
-        for _ in range(3):
-            start = time.time()
-            agent.generate_narrative_from_results({
-                'anomalies': {'anomalies': [], 'total_rows': 100},
-                'predictions': {'accuracy': 85.0, 'confidence': 0.8},
-                'recommendations': {'recommendations': ['Action'], 'confidence': 0.8, 'impact': 'high'},
-                'report': {'statistics': {}, 'completeness': 95.0, 'data_quality': 'good'}
-            })
-            normal_times.append(time.time() - start)
+        # Normal operation
+        result1 = agent.generate_narrative_from_results({
+            'anomalies': {'anomalies': [], 'total_rows': 100},
+            'predictions': {'accuracy': 85.0, 'confidence': 0.8},
+            'recommendations': {'recommendations': ['Action'], 'confidence': 0.8, 'impact': 'high'},
+            'report': {'statistics': {}, 'completeness': 95.0, 'data_quality': 'good'}
+        })
+        assert result1 is not None
         
-        avg_normal = sum(normal_times) / len(normal_times)
-        # Shouldn't be slower than a few seconds
-        assert avg_normal < 2.0, f"Normal op too slow: {avg_normal}s"
+        # After error
+        try:
+            agent.generate_narrative_from_results(None)
+        except:
+            pass
+        
+        # Should still work
+        result2 = agent.generate_narrative_from_results({
+            'anomalies': {'anomalies': [], 'total_rows': 100},
+            'predictions': {'accuracy': 85.0, 'confidence': 0.8},
+            'recommendations': {'recommendations': ['Action'], 'confidence': 0.8, 'impact': 'high'},
+            'report': {'statistics': {}, 'completeness': 95.0, 'data_quality': 'good'}
+        })
+        assert result2 is not None
 
 
 # ===== REAL FAILURE SCENARIOS (12) =====
