@@ -1,7 +1,7 @@
 """CrossTab Worker - Handles cross-tabulation operations.
 
-Creates cross-tabulations for categorical data analysis with full validation
-and quality scoring per A+ worker guidance.
+Creates cross-tabulations for categorical data analysis with full validation,
+error intelligence, and advanced error handling per A+ guidance.
 """
 
 import pandas as pd
@@ -26,6 +26,7 @@ class CrossTabWorker(BaseWorker):
     Creates cross-tabulations for categorical data analysis including:
     - Row and column variable specification
     - Optional value aggregation
+    - Advanced error handling (memory, empty results, infinity/NaN)
     - Multiple aggregation functions
     - Null value handling
     - Quality tracking
@@ -38,6 +39,7 @@ class CrossTabWorker(BaseWorker):
         self.rows_processed: int = 0
         self.rows_failed: int = 0
         self.null_values_found: int = 0
+        self.advanced_errors: List[str] = []
     
     def _validate_input(self, **kwargs) -> Optional[WorkerError]:
         """Validate input parameters before execution.
@@ -123,16 +125,22 @@ class CrossTabWorker(BaseWorker):
             result = self._run_crosstab(**kwargs)
             
             # Track success with error intelligence
+            context = {
+                "rows": str(kwargs.get('rows')),
+                "columns": str(kwargs.get('columns')),
+                "success": result.success,
+                "quality_score": result.quality_score,
+                "advanced_errors": len(self.advanced_errors),
+            }
+            
+            if self.advanced_errors:
+                context["error_types"] = list(set(self.advanced_errors))
+            
             self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="CrossTabWorker",
                 operation="crosstab",
-                context={
-                    "rows": str(kwargs.get('rows')),
-                    "columns": str(kwargs.get('columns')),
-                    "success": result.success,
-                    "quality_score": result.quality_score
-                }
+                context=context
             )
             
             return result
@@ -148,7 +156,8 @@ class CrossTabWorker(BaseWorker):
                     "rows": str(kwargs.get('rows')),
                     "columns": str(kwargs.get('columns')),
                     "rows_processed": self.rows_processed,
-                    "rows_failed": self.rows_failed
+                    "rows_failed": self.rows_failed,
+                    "advanced_errors": len(self.advanced_errors),
                 }
             )
             raise
@@ -169,6 +178,7 @@ class CrossTabWorker(BaseWorker):
         self.rows_processed = len(df) if df is not None else 0
         self.rows_failed = 0
         self.null_values_found = 0
+        self.advanced_errors = []
         
         result = self._create_result(
             task_type="crosstab",
@@ -195,35 +205,80 @@ class CrossTabWorker(BaseWorker):
                     f"They will be excluded from the analysis."
                 )
             
-            # Create crosstab
-            if values:
-                # Validate that values column is numeric if provided
-                if aggfunc in ['sum', 'mean', 'min', 'max', 'median', 'std']:
-                    numeric_check = ValidationUtils.validate_numeric_columns(df, [values])
-                    if numeric_check:
-                        self._add_warning(
-                            result,
-                            f"Column '{values}' is not numeric. Attempting {aggfunc} anyway."
-                        )
-                
-                ct = pd.crosstab(
-                    df[rows],
-                    df[columns],
-                    values=df[values],
-                    aggfunc=aggfunc
+            # Create crosstab with error handling
+            try:
+                if values:
+                    # Validate that values column is numeric if provided
+                    if aggfunc in ['sum', 'mean', 'min', 'max', 'median', 'std']:
+                        numeric_check = ValidationUtils.validate_numeric_columns(df, [values])
+                        if numeric_check:
+                            self._add_warning(
+                                result,
+                                f"Column '{values}' is not numeric. Attempting {aggfunc} anyway."
+                            )
+                    
+                    ct = pd.crosstab(
+                        df[rows],
+                        df[columns],
+                        values=df[values],
+                        aggfunc=aggfunc
+                    )
+                else:
+                    ct = pd.crosstab(
+                        df[rows],
+                        df[columns]
+                    )
+            except ValueError as ve:
+                self.logger.error(f"Crosstab value error: {ve}")
+                self._add_error(
+                    result,
+                    ErrorType.COMPUTATION_ERROR,
+                    f"Crosstab failed: {str(ve)}",
+                    severity="error",
+                    suggestion="Check that values column matches aggfunc"
                 )
-            else:
-                ct = pd.crosstab(
-                    df[rows],
-                    df[columns]
+                self.advanced_errors.append("crosstab_value_error")
+                result.success = False
+                result.quality_score = 0
+                return result
+            except MemoryError:
+                self.logger.error("Memory error during crosstab")
+                self._add_error(
+                    result,
+                    ErrorType.COMPUTATION_ERROR,
+                    "Insufficient memory for crosstab (too many unique combinations)",
+                    severity="critical",
+                    suggestion="Reduce data size or filter categories"
                 )
+                self.advanced_errors.append("memory_error")
+                result.success = False
+                result.quality_score = 0
+                return result
+            except Exception as ct_error:
+                self.logger.error(f"Unexpected crosstab error: {ct_error}")
+                self._add_error(
+                    result,
+                    ErrorType.COMPUTATION_ERROR,
+                    str(ct_error),
+                    severity="critical"
+                )
+                self.advanced_errors.append(type(ct_error).__name__.lower())
+                result.success = False
+                result.quality_score = 0
+                return result
             
             # Handle single row/column result (becomes Series)
-            if isinstance(ct, pd.Series):
-                ct = ct.to_frame()
+            try:
+                if isinstance(ct, pd.Series):
+                    ct = ct.to_frame()
+                    self.advanced_errors.append("series_conversion")
+                
+                ct = ct.reset_index()
+            except Exception as e:
+                self.logger.warning(f"Error converting crosstab: {e}")
+                self.advanced_errors.append("conversion_error")
             
-            ct = ct.reset_index()
-            
+            # Check if empty
             if ct.empty:
                 self._add_error(
                     result,
@@ -232,9 +287,23 @@ class CrossTabWorker(BaseWorker):
                     severity="error",
                     suggestion="Check that data exists for row-column combinations"
                 )
+                self.advanced_errors.append("empty_result")
                 result.success = False
                 result.quality_score = 0
                 return result
+            
+            # Check for infinity/NaN in numeric columns
+            numeric_cols = ct.select_dtypes(include=[np.number]).columns
+            inf_count = np.isinf(ct[numeric_cols]).sum().sum() if len(numeric_cols) > 0 else 0
+            nan_count = ct[numeric_cols].isna().sum().sum() if len(numeric_cols) > 0 else 0
+            
+            if inf_count > 0:
+                self._add_warning(result, f"Crosstab contains {inf_count} infinity values")
+                self.advanced_errors.append("infinity_in_result")
+            
+            if nan_count > 0:
+                self._add_warning(result, f"Crosstab contains {nan_count} NaN values")
+                self.advanced_errors.append("nan_in_result")
             
             # Build result data
             result.data = {
@@ -247,13 +316,16 @@ class CrossTabWorker(BaseWorker):
                 "values_field": values if values else None,
                 "aggregation_function": aggfunc if values else "count",
                 "null_values_found": null_count,
+                "advanced_errors_encountered": len(self.advanced_errors),
+                "advanced_error_types": list(set(self.advanced_errors)) if self.advanced_errors else [],
             }
             
             # Calculate quality score
             quality_score = self._calculate_quality_score(
                 rows_processed=self.rows_processed,
                 rows_failed=self.rows_failed,
-                null_values_found=null_count
+                null_values_found=null_count,
+                advanced_errors=len(self.advanced_errors)
             )
             result.quality_score = quality_score
             result.success = True
@@ -263,6 +335,19 @@ class CrossTabWorker(BaseWorker):
                 f"quality score: {quality_score:.3f}"
             )
             
+            return result
+        
+        except MemoryError:
+            self.logger.error("Memory error during crosstab operation")
+            self._add_error(
+                result,
+                ErrorType.COMPUTATION_ERROR,
+                "Insufficient memory",
+                severity="critical"
+            )
+            self.advanced_errors.append("memory_error")
+            result.success = False
+            result.quality_score = 0
             return result
         
         except Exception as e:
@@ -287,7 +372,8 @@ class CrossTabWorker(BaseWorker):
         self,
         rows_processed: int,
         rows_failed: int,
-        null_values_found: int = 0
+        null_values_found: int = 0,
+        advanced_errors: int = 0
     ) -> float:
         """Calculate quality score based on data quality.
         
@@ -295,6 +381,7 @@ class CrossTabWorker(BaseWorker):
             rows_processed: Rows successfully processed
             rows_failed: Rows that failed
             null_values_found: Number of null values found
+            advanced_errors: Count of advanced error types
             
         Returns:
             Quality score from 0.0 to 1.0
@@ -310,6 +397,9 @@ class CrossTabWorker(BaseWorker):
         # Penalty for nulls (minimal since they're excluded)
         null_penalty = min(0.05, null_values_found * 0.001)
         
-        quality_score = max(0.0, base_quality - null_penalty)
+        # Penalty for advanced errors
+        error_penalty = min(0.2, advanced_errors * 0.05)
+        
+        quality_score = max(0.0, base_quality - null_penalty - error_penalty)
         
         return min(1.0, quality_score)
