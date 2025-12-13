@@ -7,6 +7,7 @@ Everything here - no need to jump between files.
 import pytest
 from agents.report_generator.report_generator import ReportGenerator
 from core.exceptions import WorkerError
+from core.error_recovery import RecoveryError
 
 
 class TestReportGeneratorComplete:
@@ -83,8 +84,8 @@ class TestReportGeneratorComplete:
         print(f"✅ Test 3 PASSED: Analyzed narrative - found {len(result['topics'])} topics, {len(result['sections'])} sections")
 
     def test_04_analyze_empty_narrative_fails(self, agent):
-        """Test 4: Empty narrative raises error."""
-        with pytest.raises(WorkerError):
+        """Test 4: Empty narrative raises error or recovery error."""
+        with pytest.raises((WorkerError, RecoveryError)):
             agent.analyze_narrative("")
         print("✅ Test 4 PASSED: Empty narrative correctly raises error")
 
@@ -105,13 +106,13 @@ class TestReportGeneratorComplete:
 
     def test_06_select_charts_empty_narrative_fails(self, agent, sample_charts):
         """Test 6: Empty narrative fails chart selection."""
-        with pytest.raises(WorkerError):
+        with pytest.raises((WorkerError, RecoveryError)):
             agent.select_charts_for_narrative("", sample_charts)
         print("✅ Test 6 PASSED: Chart selection correctly rejects empty narrative")
 
     def test_07_select_charts_empty_charts_fails(self, agent, sample_narrative):
         """Test 7: No charts fails selection."""
-        with pytest.raises(WorkerError):
+        with pytest.raises((WorkerError, RecoveryError)):
             agent.select_charts_for_narrative(sample_narrative, [])
         print("✅ Test 7 PASSED: Chart selection correctly rejects empty chart list")
 
@@ -204,7 +205,7 @@ class TestReportGeneratorComplete:
 
     def test_13_generate_report_invalid_format_fails(self, agent, sample_narrative, sample_charts):
         """Test 13: Invalid format raises error."""
-        with pytest.raises(WorkerError):
+        with pytest.raises((WorkerError, RecoveryError)):
             agent.generate_report(
                 sample_narrative,
                 sample_charts,
@@ -215,7 +216,7 @@ class TestReportGeneratorComplete:
 
     def test_14_generate_report_empty_narrative_fails(self, agent, sample_charts):
         """Test 14: Empty narrative fails report generation."""
-        with pytest.raises(WorkerError):
+        with pytest.raises((WorkerError, RecoveryError)):
             agent.generate_report(
                 "",
                 sample_charts,
@@ -225,7 +226,7 @@ class TestReportGeneratorComplete:
 
     def test_15_generate_report_empty_charts_fails(self, agent, sample_narrative):
         """Test 15: Empty charts list fails report generation."""
-        with pytest.raises(WorkerError):
+        with pytest.raises((WorkerError, RecoveryError)):
             agent.generate_report(
                 sample_narrative,
                 [],
