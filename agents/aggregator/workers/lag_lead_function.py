@@ -118,7 +118,7 @@ class LagLeadFunction(BaseWorker):
             numeric_df = df.select_dtypes(include=[np.number])
             
             if numeric_df is None or numeric_df.empty:
-                self._add_error(result, ErrorType.LOAD_ERROR, "No numeric columns found")
+                self._add_error(result, ErrorType.DATA_VALIDATION_ERROR, "No numeric columns found")
                 result.success = False
                 return result
             
@@ -135,8 +135,8 @@ class LagLeadFunction(BaseWorker):
             if columns is not None:
                 numeric_df = numeric_df[[col for col in columns if col in numeric_df.columns]]
             
-            lag_results = {}
-            lead_results = {}
+            lag_results = None
+            lead_results = None
             
             if lag_periods > 0:
                 lag_results = numeric_df.shift(lag_periods)
@@ -149,11 +149,11 @@ class LagLeadFunction(BaseWorker):
             lead_nan_rows = 0
             total_null = 0
             
-            if lag_periods > 0 and lag_results is not None:
+            if lag_periods > 0 and lag_results is not None and isinstance(lag_results, pd.DataFrame):
                 lag_nan_rows = int(lag_results.isna().any(axis=1).sum())
                 total_null += int(lag_results.isna().sum().sum())
             
-            if lead_periods > 0 and lead_results is not None:
+            if lead_periods > 0 and lead_results is not None and isinstance(lead_results, pd.DataFrame):
                 lead_nan_rows = int(lead_results.isna().any(axis=1).sum())
                 total_null += int(lead_results.isna().sum().sum())
             
@@ -171,6 +171,6 @@ class LagLeadFunction(BaseWorker):
             return result
         
         except Exception as e:
-            self._add_error(result, ErrorType.LOAD_ERROR, f"Lag/Lead functions failed: {e}")
+            self._add_error(result, ErrorType.COMPUTATION_ERROR, f"Lag/Lead functions failed: {e}")
             result.success = False
             return result
