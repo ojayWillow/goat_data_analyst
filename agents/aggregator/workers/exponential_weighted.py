@@ -71,7 +71,7 @@ class ExponentialWeighted(BaseWorker):
             numeric_df = df.select_dtypes(include=[np.number])
             
             if numeric_df is None or numeric_df.empty:
-                self._add_error(result, ErrorType.LOAD_ERROR, "No numeric columns found")
+                self._add_error(result, ErrorType.DATA_VALIDATION_ERROR, "No numeric columns found")
                 result.success = False
                 return result
             
@@ -98,6 +98,6 @@ class ExponentialWeighted(BaseWorker):
             return result
         
         except Exception as e:
-            self._add_error(result, ErrorType.LOAD_ERROR, f"Exponential weighted failed: {e}")
+            self._add_error(result, ErrorType.COMPUTATION_ERROR, f"Exponential weighted failed: {e}")
             result.success = False
             return result
