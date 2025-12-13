@@ -109,7 +109,7 @@ class WorkerResult:
         return any(e.severity == "critical" for e in self.errors)
     
     def get_error_summary(self) -> Dict[str, int]:
-        summary = {}
+        summary: Dict[str, int] = {}
         for error in self.errors:
             error_type = error.error_type.value
             summary[error_type] = summary.get(error_type, 0) + 1
@@ -129,7 +129,7 @@ class BaseWorker(ABC):
         self.logger.info(f"Worker initialized: {worker_name}")
     
     @abstractmethod
-    def execute(self, **kwargs) -> WorkerResult:
+    def execute(self, **kwargs: Any) -> WorkerResult:
         """Execute the worker's task.
         
         Must be implemented by subclasses.
@@ -149,7 +149,7 @@ class BaseWorker(ABC):
         data: Optional[Dict[str, Any]] = None,
         task_type: str = "generic",
         quality_score: float = 1.0,
-        **kwargs
+        **kwargs: Any
     ) -> WorkerResult:
         """Create a standardized result."""
         return WorkerResult(
@@ -188,7 +188,7 @@ class BaseWorker(ABC):
         result.warnings.append(warning)
         self.logger.warning(f"Warning: {warning}")
     
-    def _validate_input(self, **kwargs) -> Optional[WorkerError]:
+    def _validate_input(self, **kwargs: Any) -> Optional[WorkerError]:
         """Validate input parameters. Override in subclasses.
         
         Subclasses should override this method to provide worker-specific
@@ -200,7 +200,7 @@ class BaseWorker(ABC):
         """
         return None
     
-    def safe_execute(self, **kwargs) -> WorkerResult:
+    def safe_execute(self, **kwargs: Any) -> WorkerResult:
         """Execute with error handling.
         
         Wraps execute() with try-catch to ensure
