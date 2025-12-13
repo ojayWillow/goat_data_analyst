@@ -13,6 +13,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from agents.reporter.reporter import Reporter, ReportCache
+from core.error_recovery import RecoveryError
 
 
 @pytest.fixture
@@ -147,8 +148,8 @@ class TestReporterDataHandling:
         assert reporter.data_hash is not None
     
     def test_set_data_invalid(self, reporter):
-        """Should handle invalid data."""
-        with pytest.raises((AttributeError, TypeError)):
+        """Should handle invalid data - catches retry wrapper."""
+        with pytest.raises((AttributeError, TypeError, RecoveryError)):
             reporter.set_data(None)
     
     def test_set_data_clears_reports(self, reporter, sample_df):
