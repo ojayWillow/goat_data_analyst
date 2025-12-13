@@ -5,7 +5,7 @@ Performs single and multiple column grouping with various aggregation functions.
 
 import pandas as pd
 import numpy as np
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from .base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
@@ -80,8 +80,23 @@ class GroupByWorker(BaseWorker):
         try:
             self.logger.info(f"Performing groupby operation...")
             
+            # Ensure group_cols is always a list for type safety
+            if group_cols is None:
+                self._add_error(
+                    result,
+                    ErrorType.INVALID_PARAMETER,
+                    "group_cols is required",
+                    severity="error",
+                    suggestion="Provide group_cols parameter"
+                )
+                result.success = False
+                result.quality_score = 0
+                return result
+            
             if isinstance(group_cols, str):
                 group_cols = [group_cols]
+            elif not isinstance(group_cols, list):
+                group_cols = list(group_cols) if hasattr(group_cols, '__iter__') else [group_cols]
             
             missing_cols = [col for col in group_cols if col not in df.columns]
             if missing_cols:
