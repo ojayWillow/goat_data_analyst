@@ -1,7 +1,7 @@
 """ValueCount Worker - Handles value counting operations.
 
-Counts occurrences of unique values in columns with full validation
-and quality scoring per A+ worker guidance.
+Counts occurrences of unique values in columns with full validation,
+error intelligence, and advanced error handling per A+ guidance.
 """
 
 import pandas as pd
@@ -26,6 +26,7 @@ class ValueCountWorker(BaseWorker):
     
     Counts occurrences of unique values in columns including:
     - Top N value filtering
+    - Advanced error handling (empty results, type errors)
     - Percentage calculation
     - Null value tracking
     - Quality scoring
@@ -38,6 +39,7 @@ class ValueCountWorker(BaseWorker):
         self.rows_processed: int = 0
         self.rows_failed: int = 0
         self.unique_count: int = 0
+        self.advanced_errors: List[str] = []
     
     def _validate_input(self, **kwargs) -> Optional[WorkerError]:
         """Validate input parameters before execution.
@@ -111,16 +113,22 @@ class ValueCountWorker(BaseWorker):
             result = self._run_count_values(**kwargs)
             
             # Track success with error intelligence
+            context = {
+                "column": str(kwargs.get('column')),
+                "success": result.success,
+                "quality_score": result.quality_score,
+                "unique_count": self.unique_count,
+                "advanced_errors": len(self.advanced_errors),
+            }
+            
+            if self.advanced_errors:
+                context["error_types"] = list(set(self.advanced_errors))
+            
             self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="ValueCountWorker",
                 operation="value_count",
-                context={
-                    "column": str(kwargs.get('column')),
-                    "success": result.success,
-                    "quality_score": result.quality_score,
-                    "unique_count": self.unique_count
-                }
+                context=context
             )
             
             return result
@@ -135,7 +143,8 @@ class ValueCountWorker(BaseWorker):
                 context={
                     "column": str(kwargs.get('column')),
                     "rows_processed": self.rows_processed,
-                    "rows_failed": self.rows_failed
+                    "rows_failed": self.rows_failed,
+                    "advanced_errors": len(self.advanced_errors),
                 }
             )
             raise
@@ -154,6 +163,7 @@ class ValueCountWorker(BaseWorker):
         self.rows_processed = len(df) if df is not None else 0
         self.rows_failed = 0
         self.unique_count = 0
+        self.advanced_errors = []
         
         result = self._create_result(
             task_type="value_count",
@@ -174,9 +184,36 @@ class ValueCountWorker(BaseWorker):
                     f"They are excluded from value counts."
                 )
             
-            # Count values
-            vc = df[column].value_counts().head(top_n)
+            # Count values with error handling
+            try:
+                vc = df[column].value_counts().head(top_n)
+            except TypeError as te:
+                self.logger.error(f"Type error in value_count: {te}")
+                self._add_error(
+                    result,
+                    ErrorType.COMPUTATION_ERROR,
+                    f"Cannot count values (type error): {str(te)}",
+                    severity="error",
+                    suggestion="Check column data types"
+                )
+                self.advanced_errors.append("value_count_type_error")
+                result.success = False
+                result.quality_score = 0
+                return result
+            except Exception as vc_error:
+                self.logger.error(f"Value count error: {vc_error}")
+                self._add_error(
+                    result,
+                    ErrorType.COMPUTATION_ERROR,
+                    str(vc_error),
+                    severity="critical"
+                )
+                self.advanced_errors.append(type(vc_error).__name__.lower())
+                result.success = False
+                result.quality_score = 0
+                return result
             
+            # Check if empty
             if vc.empty:
                 self._add_error(
                     result,
@@ -185,22 +222,38 @@ class ValueCountWorker(BaseWorker):
                     severity="error",
                     suggestion="Ensure column contains non-null values"
                 )
+                self.advanced_errors.append("empty_result")
                 result.success = False
                 result.quality_score = 0
                 return result
             
-            # Build result list
+            # Build result list with error handling
             result_list: List[Dict[str, Any]] = []
-            for value, count in vc.items():
-                pct = (count / len(df)) * 100
-                result_list.append({
-                    "value": str(value),
-                    "count": int(count),
-                    "percentage": round(pct, 2),
-                })
+            try:
+                for value, count in vc.items():
+                    try:
+                        pct = (count / len(df)) * 100
+                        result_list.append({
+                            "value": str(value),
+                            "count": int(count),
+                            "percentage": round(pct, 2),
+                        })
+                    except (ValueError, TypeError) as e:
+                        self.logger.warning(f"Error processing value {value}: {e}")
+                        self.advanced_errors.append("value_conversion_error")
+                        self.rows_failed += 1
+                        continue
+            except Exception as e:
+                self.logger.error(f"Error building result list: {e}")
+                self.advanced_errors.append("result_building_error")
             
             # Calculate unique count
-            self.unique_count = df[column].nunique()
+            try:
+                self.unique_count = df[column].nunique()
+            except Exception as e:
+                self.logger.warning(f"Error computing nunique: {e}")
+                self.advanced_errors.append("nunique_error")
+                self.unique_count = len(result_list)
             
             # Build result data
             result.data = {
@@ -212,7 +265,9 @@ class ValueCountWorker(BaseWorker):
                 "total_rows": len(df),
                 "null_count": int(null_count),
                 "null_percentage": round(null_percentage, 2),
-                "coverage_percentage": round((len(df) - null_count) / len(df) * 100, 2),
+                "coverage_percentage": round((len(df) - null_count) / len(df) * 100, 2) if len(df) > 0 else 0,
+                "advanced_errors_encountered": len(self.advanced_errors),
+                "advanced_error_types": list(set(self.advanced_errors)) if self.advanced_errors else [],
             }
             
             # Calculate quality score
@@ -220,7 +275,8 @@ class ValueCountWorker(BaseWorker):
                 rows_processed=self.rows_processed,
                 rows_failed=self.rows_failed,
                 null_count=null_count,
-                total_rows=len(df)
+                total_rows=len(df),
+                advanced_errors=len(self.advanced_errors)
             )
             result.quality_score = quality_score
             result.success = True
@@ -230,6 +286,19 @@ class ValueCountWorker(BaseWorker):
                 f"quality score: {quality_score:.3f}"
             )
             
+            return result
+        
+        except MemoryError:
+            self.logger.error("Memory error during value count")
+            self._add_error(
+                result,
+                ErrorType.COMPUTATION_ERROR,
+                "Insufficient memory for value counting",
+                severity="critical"
+            )
+            self.advanced_errors.append("memory_error")
+            result.success = False
+            result.quality_score = 0
             return result
         
         except Exception as e:
@@ -255,7 +324,8 @@ class ValueCountWorker(BaseWorker):
         rows_processed: int,
         rows_failed: int,
         null_count: int = 0,
-        total_rows: int = 0
+        total_rows: int = 0,
+        advanced_errors: int = 0
     ) -> float:
         """Calculate quality score based on data completeness.
         
@@ -264,6 +334,7 @@ class ValueCountWorker(BaseWorker):
             rows_failed: Rows that failed
             null_count: Number of null values in column
             total_rows: Total rows in DataFrame
+            advanced_errors: Count of advanced error types
             
         Returns:
             Quality score from 0.0 to 1.0
@@ -276,12 +347,14 @@ class ValueCountWorker(BaseWorker):
         base_quality = rows_processed / total
         
         # Penalty for nulls
+        null_penalty = 0.0
         if total_rows > 0:
             null_percentage = (null_count / total_rows) * 100
             null_penalty = min(0.2, null_percentage * 0.002)  # Up to 20% penalty
-        else:
-            null_penalty = 0
         
-        quality_score = max(0.0, base_quality - null_penalty)
+        # Penalty for advanced errors
+        error_penalty = min(0.15, advanced_errors * 0.05)
+        
+        quality_score = max(0.0, base_quality - null_penalty - error_penalty)
         
         return min(1.0, quality_score)
