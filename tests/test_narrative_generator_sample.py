@@ -20,6 +20,7 @@ from agents.narrative_generator.workers.insight_extractor import InsightExtracto
 from agents.narrative_generator.workers.problem_identifier import ProblemIdentifier
 from agents.narrative_generator.workers.action_recommender import ActionRecommender
 from agents.narrative_generator.workers.story_builder import StoryBuilder
+from core.error_recovery import RecoveryError
 
 
 # ===== CATEGORY 1: INITIALIZATION TESTS =====
@@ -326,11 +327,12 @@ class TestSetResults:
         assert agent.actions == []
         assert agent.quality_score == 0.0
 
-    def test_set_results_invalid_raises_error(self):
-        """Raise ValueError for invalid results."""
+    def test_set_results_invalid_raises_recovery_error(self):
+        """Raise RecoveryError for invalid results (due to @retry_on_error decorator)."""
         agent = NarrativeGenerator()
         
-        with pytest.raises(ValueError):
+        # @retry_on_error decorator wraps ValueError in RecoveryError after retries
+        with pytest.raises(RecoveryError):
             agent.set_results(None)  # Invalid
 
     def test_set_results_resets_state(self):
