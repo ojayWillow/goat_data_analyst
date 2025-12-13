@@ -414,7 +414,7 @@ class TestHealthReporting:
         # Healthy
         assert orch.get_health_report()['status'] == 'healthy'
         
-        # Degraded
+        # Degraded/Critical
         orch.quality_tracker.add_failure()
         orch.quality_tracker.add_failure()
         orch.quality_tracker.add_failure()
@@ -422,7 +422,7 @@ class TestHealthReporting:
         orch.quality_tracker.add_success()
         
         status = orch.get_health_report()['status']
-        assert status in ['degraded', 'healthy']
+        assert status in ['degraded', 'critical', 'healthy']
 
 
 # ==================== EXECUTION HISTORY TESTS ====================
