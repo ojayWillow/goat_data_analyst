@@ -128,16 +128,30 @@ class CrossTabWorker(BaseWorker):
             
             ct = ct.reset_index()
             
-            result.data = {
-                "crosstab_data": ct.to_dict(orient='records'),
-                "shape": ct.shape,
-                "rows": ct.shape[0],
-                "columns": ct.shape[1],
-                "row_field": rows,
-                "column_field": columns,
-                "values_field": values,
-                "aggfunc": aggfunc,
-            }
+            crosstab_data: List[Dict[str, Any]] = ct.to_dict(orient='records')
+            
+            if crosstab_data:
+                result.data = {
+                    "crosstab_data": crosstab_data,
+                    "shape": ct.shape,
+                    "rows": ct.shape[0],
+                    "columns": ct.shape[1],
+                    "row_field": rows,
+                    "column_field": columns,
+                    "values_field": values,
+                    "aggfunc": aggfunc,
+                }
+            else:
+                self._add_error(
+                    result,
+                    ErrorType.MISSING_DATA,
+                    "Cross-tabulation produced no data",
+                    severity="error",
+                    suggestion="Check input data and parameters"
+                )
+                result.success = False
+                result.quality_score = 0
+                return result
             
             self.logger.info(f"Crosstab created: {ct.shape[0]} rows x {ct.shape[1]} columns")
             return result
