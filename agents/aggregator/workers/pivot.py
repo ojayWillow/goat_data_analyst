@@ -1,7 +1,7 @@
 """Pivot Worker - Handles pivot table creation.
 
-Reshapes data into pivot tables for cross-tabular analysis with full validation
-and quality scoring per A+ worker guidance.
+Reshapes data into pivot tables for cross-tabular analysis with full validation,
+error intelligence, and advanced error handling per A+ guidance.
 """
 
 import pandas as pd
@@ -18,6 +18,7 @@ logger = get_logger(__name__)
 # ===== CONSTANTS =====
 VALID_AGGFUNCS = ['sum', 'mean', 'count', 'min', 'max', 'median', 'std']
 DEFAULT_AGGFUNC = 'sum'
+MAX_PIVOT_SIZE = 10000000  # ~10M cells
 QUALITY_SCORE_DUPLICATES = 0.7  # Reduced if duplicates found and handled
 
 
@@ -27,6 +28,7 @@ class PivotWorker(BaseWorker):
     Creates pivot tables for cross-tabular analysis with:
     - Flexible index/column/value specifications
     - Multiple aggregation functions
+    - Advanced error handling (memory, overflow, empty results)
     - Duplicate detection and handling
     - Null value awareness
     - Quality scoring
@@ -39,6 +41,7 @@ class PivotWorker(BaseWorker):
         self.rows_processed: int = 0
         self.rows_failed: int = 0
         self.duplicates_found: int = 0
+        self.advanced_errors: List[str] = []
     
     def _validate_input(self, **kwargs) -> Optional[WorkerError]:
         """Validate input parameters before execution.
@@ -141,16 +144,22 @@ class PivotWorker(BaseWorker):
             result = self._run_pivot(**kwargs)
             
             # Track success with error intelligence
+            context = {
+                "index": str(kwargs.get('index')),
+                "columns": str(kwargs.get('columns')),
+                "success": result.success,
+                "quality_score": result.quality_score,
+                "advanced_errors": len(self.advanced_errors),
+            }
+            
+            if self.advanced_errors:
+                context["error_types"] = list(set(self.advanced_errors))
+            
             self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="PivotWorker",
                 operation="pivot_table",
-                context={
-                    "index": str(kwargs.get('index')),
-                    "columns": str(kwargs.get('columns')),
-                    "success": result.success,
-                    "quality_score": result.quality_score
-                }
+                context=context
             )
             
             return result
@@ -166,7 +175,8 @@ class PivotWorker(BaseWorker):
                     "index": str(kwargs.get('index')),
                     "columns": str(kwargs.get('columns')),
                     "rows_processed": self.rows_processed,
-                    "rows_failed": self.rows_failed
+                    "rows_failed": self.rows_failed,
+                    "advanced_errors": len(self.advanced_errors),
                 }
             )
             raise
@@ -187,6 +197,7 @@ class PivotWorker(BaseWorker):
         self.rows_processed = len(df) if df is not None else 0
         self.rows_failed = 0
         self.duplicates_found = 0
+        self.advanced_errors = []
         
         result = self._create_result(
             task_type="pivot_table",
@@ -237,28 +248,78 @@ class PivotWorker(BaseWorker):
                     f"Using aggfunc='{aggfunc}' to combine duplicate values."
                 )
                 if aggfunc == 'sum':
-                    # Reduce quality score slightly for duplicates
                     quality_reduction = min(0.15, duplicates * 0.01)
                 else:
                     quality_reduction = min(0.1, duplicates * 0.005)
             else:
                 quality_reduction = 0
             
-            # Create pivot table
-            pivot = pd.pivot_table(
-                df,
-                index=index,
-                columns=columns,
-                values=values,
-                aggfunc=aggfunc
-            )
+            # Create pivot table with error handling
+            try:
+                pivot = pd.pivot_table(
+                    df,
+                    index=index,
+                    columns=columns,
+                    values=values,
+                    aggfunc=aggfunc
+                )
+            except ValueError as ve:
+                self.logger.error(f"Value error during pivot: {ve}")
+                self._add_error(
+                    result,
+                    ErrorType.COMPUTATION_ERROR,
+                    f"Pivot computation failed: {str(ve)}",
+                    severity="error",
+                    suggestion="Check that values column is numeric for numeric aggfuncs"
+                )
+                self.advanced_errors.append("pivot_value_error")
+                result.success = False
+                result.quality_score = 0
+                return result
+            except MemoryError:
+                self.logger.error("Memory error during pivot table creation")
+                self._add_error(
+                    result,
+                    ErrorType.COMPUTATION_ERROR,
+                    "Insufficient memory for pivot table (result too large)",
+                    severity="critical",
+                    details={"max_size": MAX_PIVOT_SIZE},
+                    suggestion="Reduce data size or filter columns/rows"
+                )
+                self.advanced_errors.append("memory_error")
+                result.success = False
+                result.quality_score = 0
+                return result
+            except Exception as piv_error:
+                self.logger.error(f"Unexpected error during pivot: {piv_error}")
+                self._add_error(
+                    result,
+                    ErrorType.COMPUTATION_ERROR,
+                    str(piv_error),
+                    severity="critical",
+                    suggestion="Check data types and pivot parameters"
+                )
+                self.advanced_errors.append(type(piv_error).__name__.lower())
+                result.success = False
+                result.quality_score = 0
+                return result
             
             # Handle case where pivot returns Series instead of DataFrame
             if isinstance(pivot, pd.Series):
-                pivot = pivot.to_frame().reset_index()
+                try:
+                    pivot = pivot.to_frame().reset_index()
+                except Exception as e:
+                    self.logger.warning(f"Error converting Series to DataFrame: {e}")
+                    self.advanced_errors.append("series_conversion_error")
+                    pivot = pivot.reset_index()
             else:
-                pivot = pivot.reset_index()
+                try:
+                    pivot = pivot.reset_index()
+                except Exception as e:
+                    self.logger.warning(f"Error resetting pivot index: {e}")
+                    self.advanced_errors.append("reset_index_error")
             
+            # Check if pivot is empty
             if pivot.empty:
                 self._add_error(
                     result,
@@ -267,9 +328,28 @@ class PivotWorker(BaseWorker):
                     severity="error",
                     suggestion="Check that values exist in all index-column combinations"
                 )
+                self.advanced_errors.append("empty_pivot")
                 result.success = False
                 result.quality_score = 0
                 return result
+            
+            # Check for infinity/NaN in pivot result
+            inf_count = np.isinf(pivot.select_dtypes(include=[np.number])).sum().sum()
+            nan_count_pivot = pivot.select_dtypes(include=[np.number]).isna().sum().sum()
+            
+            if inf_count > 0:
+                self._add_warning(
+                    result,
+                    f"Pivot result contains {inf_count} infinity values (from division by zero?)"
+                )
+                self.advanced_errors.append("infinity_in_result")
+            
+            if nan_count_pivot > 0:
+                self._add_warning(
+                    result,
+                    f"Pivot result contains {nan_count_pivot} NaN values (missing combinations?)"
+                )
+                self.advanced_errors.append("nan_in_result")
             
             # Build result data
             result.data = {
@@ -283,6 +363,10 @@ class PivotWorker(BaseWorker):
                 "aggregation_function": aggfunc,
                 "null_values_found": int(null_count),
                 "duplicate_combinations": duplicates,
+                "infinity_values_in_result": int(inf_count),
+                "nan_values_in_result": int(nan_count_pivot),
+                "advanced_errors_encountered": len(self.advanced_errors),
+                "advanced_error_types": list(set(self.advanced_errors)) if self.advanced_errors else [],
             }
             
             # Calculate quality score
@@ -290,7 +374,8 @@ class PivotWorker(BaseWorker):
                 rows_processed=self.rows_processed,
                 rows_failed=self.rows_failed,
                 duplicates_found=duplicates,
-                quality_reduction=quality_reduction
+                quality_reduction=quality_reduction,
+                advanced_errors=len(self.advanced_errors)
             )
             result.quality_score = quality_score
             result.success = True
@@ -300,6 +385,20 @@ class PivotWorker(BaseWorker):
                 f"quality score: {quality_score:.3f}"
             )
             
+            return result
+        
+        except MemoryError:
+            self.logger.error("Memory error during pivot operation")
+            self._add_error(
+                result,
+                ErrorType.COMPUTATION_ERROR,
+                "Insufficient memory for pivot operation",
+                severity="critical",
+                suggestion="Reduce data size or number of unique combinations"
+            )
+            self.advanced_errors.append("memory_error")
+            result.success = False
+            result.quality_score = 0
             return result
         
         except Exception as e:
@@ -326,7 +425,8 @@ class PivotWorker(BaseWorker):
         rows_processed: int,
         rows_failed: int,
         duplicates_found: int = 0,
-        quality_reduction: float = 0.0
+        quality_reduction: float = 0.0,
+        advanced_errors: int = 0
     ) -> float:
         """Calculate quality score based on data quality metrics.
         
@@ -335,6 +435,7 @@ class PivotWorker(BaseWorker):
             rows_failed: Rows that failed processing
             duplicates_found: Number of duplicate key combinations
             quality_reduction: Penalty for duplicates
+            advanced_errors: Count of advanced error types
             
         Returns:
             Quality score from 0.0 to 1.0
@@ -347,7 +448,14 @@ class PivotWorker(BaseWorker):
         else:
             base_quality = rows_processed / total_rows
         
-        # Apply reduction
-        quality_score = max(0.0, base_quality - quality_reduction)
+        # Apply reduction for duplicates
+        dup_penalty = quality_reduction
+        
+        # Apply penalty for advanced errors
+        error_penalty = 0.0
+        if advanced_errors > 0:
+            error_penalty = min(0.2, advanced_errors * 0.05)
+        
+        quality_score = max(0.0, base_quality - dup_penalty - error_penalty)
         
         return min(1.0, quality_score)
