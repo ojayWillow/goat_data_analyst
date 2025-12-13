@@ -12,8 +12,7 @@ Tests advanced features:
 import pytest
 import pandas as pd
 import numpy as np
-from agents.reporter.main import Reporter
-from agents.reporter.reporter import ReportCache
+from agents.reporter.reporter import Reporter, ReportCache
 
 
 @pytest.fixture
