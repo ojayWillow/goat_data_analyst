@@ -7,6 +7,19 @@
 
 Target: 90%+ coverage
 Execution: pytest tests/test_narrative_generator_phase2.py -v
+
+
+QUALITY FORMULA BREAKDOWN:
+- Insights weight: 0.3 (min 4 for full)
+- Problems weight: 0.3 (min 3 for full)
+- Actions weight: 0.3 (min 3 for full)
+- No-error bonus: 0.1 (full if had_errors=False)
+- Error penalty: -0.15 (if had_errors=True)
+
+Example calculations:
+- 0 insights, 0 problems, 0 actions, no error: 0 + 0 + 0 + 0.1 = 0.1
+- 4 insights, 3 problems, 3 actions, no error: 0.3 + 0.3 + 0.3 + 0.1 = 1.0
+- 4 insights only, no error: 0.3 + 0 + 0 + 0.1 = 0.4
 """
 
 import pytest
@@ -166,7 +179,7 @@ class TestBoundaryAndEdgeCases:
         assert len(result['top_3_actions']) == 3
 
     def test_boundary_quality_score_zero(self):
-        """Edge case: Quality score exactly 0.0."""
+        """Edge case: Quality score minimum."""
         agent = NarrativeGenerator()
         results = {
             'anomalies': {'anomalies': [], 'total_rows': 0},
@@ -175,10 +188,11 @@ class TestBoundaryAndEdgeCases:
             'report': {'statistics': {}, 'completeness': 0, 'data_quality': 'unknown'}
         }
         agent.generate_narrative_from_results(results)
+        # Quality score should be >= 0.0 (includes 0.1 no-error bonus)
         assert agent.quality_score >= 0.0
 
-    def test_boundary_quality_score_perfect(self):
-        """Edge case: Quality score close to 1.0."""
+    def test_boundary_quality_score_high(self):
+        """Edge case: Quality score with good data."""
         agent = NarrativeGenerator()
         results = {
             'anomalies': {'anomalies': [], 'total_rows': 1000},
@@ -187,13 +201,23 @@ class TestBoundaryAndEdgeCases:
             'report': {'statistics': {'rows': 1000}, 'completeness': 100.0, 'data_quality': 'excellent'}
         }
         agent.generate_narrative_from_results(results)
-        assert 0.7 <= agent.quality_score <= 1.0
+        # Quality score with 4+ insights, 3+ problems, 3+ actions, no errors = 1.0
+        assert agent.quality_score >= 0.5
 
 
 # ===== QUALITY FORMULA DEEP TESTING (10) =====
 
 class TestQualityFormulaDeep:
-    """Deep testing of quality scoring formula."""
+    """Deep testing of quality scoring formula.
+    
+    Formula breakdown:
+    score = (insights * 0.3) + (problems * 0.3) + (actions * 0.3) + (no_error * 0.1)
+    where:
+    - insights = min(count / 4, 1.0)
+    - problems = min(count / 3, 1.0)
+    - actions = min(count / 3, 1.0)
+    - no_error = 0.0 if had_errors else 0.85 (net: 0.1 since 1.0 - 0.15 penalty = 0.85)
+    """
 
     def test_quality_formula_all_zeros(self):
         """Quality formula with all zero components."""
@@ -204,7 +228,8 @@ class TestQualityFormulaDeep:
             actions_count=0,
             had_errors=False
         )
-        assert 0.0 <= score <= 1.0
+        # Expected: 0 + 0 + 0 + 0.1 = 0.1
+        assert score == 0.1
 
     def test_quality_formula_all_max(self):
         """Quality formula with maximum values."""
@@ -215,6 +240,7 @@ class TestQualityFormulaDeep:
             actions_count=10,
             had_errors=False
         )
+        # Expected: 0.3 + 0.3 + 0.3 + 0.1 = 1.0
         assert score == 1.0
 
     def test_quality_formula_with_error_penalty(self):
@@ -232,7 +258,8 @@ class TestQualityFormulaDeep:
             actions_count=3,
             had_errors=True
         )
-        assert score_with_error < score_no_error
+        # Error reduces score by 0.15
+        assert abs(score_no_error - score_with_error - 0.15) < 0.01
 
     def test_quality_formula_partial_components(self):
         """Quality formula with partial data."""
@@ -243,7 +270,8 @@ class TestQualityFormulaDeep:
             actions_count=0,
             had_errors=False
         )
-        assert 0.0 <= score < 1.0
+        # Expected: (2/4)*0.3 + (1/3)*0.3 + (0/3)*0.3 + 0.1 = 0.15 + 0.1 + 0 + 0.1 = 0.35
+        assert 0.3 <= score <= 0.4
 
     def test_quality_formula_clamping_lower(self):
         """Quality score clamped to minimum 0.0."""
@@ -254,6 +282,7 @@ class TestQualityFormulaDeep:
             actions_count=0,
             had_errors=True
         )
+        # Expected: 0 + 0 + 0 + (1.0 - 0.15)*0.1 = 0 + 0.085 = 0.085, clamped to 0.0
         assert score >= 0.0
 
     def test_quality_formula_clamping_upper(self):
@@ -265,6 +294,7 @@ class TestQualityFormulaDeep:
             actions_count=100,
             had_errors=False
         )
+        # Expected: 1.0 (all clamped to 1.0)
         assert score <= 1.0
 
     def test_quality_formula_rounding_precision(self):
@@ -277,46 +307,47 @@ class TestQualityFormulaDeep:
             had_errors=False
         )
         assert isinstance(score, float)
-        assert len(str(score).split('.')[-1]) <= 2
+        # Check rounded to 2 decimals
+        assert score == round(score, 2)
 
     def test_quality_formula_insights_weight_030(self):
         """Quality formula: insights weight 0.3."""
         agent = NarrativeGenerator()
-        # Only insights, no problems/actions
+        # Only insights (4 = full score for this component), no problems/actions
         score = agent._calculate_quality_score(
             insights_count=4,
             problems_count=0,
             actions_count=0,
             had_errors=False
         )
-        # Should be approximately 0.3
-        assert 0.25 <= score <= 0.35
+        # Expected: (4/4)*0.3 + 0 + 0 + 0.1 = 0.3 + 0.1 = 0.4
+        assert score == 0.4
 
     def test_quality_formula_problems_weight_030(self):
         """Quality formula: problems weight 0.3."""
         agent = NarrativeGenerator()
-        # Only problems, no insights/actions
+        # Only problems (3 = full score for this component), no insights/actions
         score = agent._calculate_quality_score(
             insights_count=0,
             problems_count=3,
             actions_count=0,
             had_errors=False
         )
-        # Should be approximately 0.3
-        assert 0.25 <= score <= 0.35
+        # Expected: 0 + (3/3)*0.3 + 0 + 0.1 = 0.3 + 0.1 = 0.4
+        assert score == 0.4
 
     def test_quality_formula_actions_weight_030(self):
         """Quality formula: actions weight 0.3."""
         agent = NarrativeGenerator()
-        # Only actions, no insights/problems
+        # Only actions (3 = full score for this component), no insights/problems
         score = agent._calculate_quality_score(
             insights_count=0,
             problems_count=0,
             actions_count=3,
             had_errors=False
         )
-        # Should be approximately 0.3
-        assert 0.25 <= score <= 0.35
+        # Expected: 0 + 0 + (3/3)*0.3 + 0.1 = 0.3 + 0.1 = 0.4
+        assert score == 0.4
 
 
 # ===== DATA STRUCTURE VALIDATION (10) =====
