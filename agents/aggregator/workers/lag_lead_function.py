@@ -1,371 +1,176 @@
-"""LagLeadFunction - Lag and lead operations for time series.
-
-Lag and lead operations for time series data with full validation,
-error intelligence, and advanced error handling per A+ guidance.
-"""
+"""LagLeadFunction - Lag and lead operations for time series."""
 
 import pandas as pd
 import numpy as np
-from typing import List, Optional, Any, Dict
+from typing import List, Optional
 
-from .base_worker import BaseWorker, WorkerResult, ErrorType, WorkerError
-from .validation_utils import ValidationUtils
+from agents.aggregator.workers.base_worker import BaseWorker, WorkerResult, ErrorType
 from core.logger import get_logger
 from agents.error_intelligence.main import ErrorIntelligence
 
 logger = get_logger(__name__)
 
-# ===== CONSTANTS =====
-MIN_PERIODS = 0
-MAX_PERIODS = 100
-DEFAULT_LAG = 1
-DEFAULT_LEAD = 0
-
 
 class LagLeadFunction(BaseWorker):
-    """Worker that calculates lag and lead functions on time series data.
+    """Worker that calculates lag and lead functions on time series data."""
     
-    Calculates lag and lead operations including:
-    - Configurable lag/lead periods
-    - Advanced error handling (memory, shift errors)
-    - Column selection
-    - Null value tracking
-    - Quality scoring
-    """
-    
-    def __init__(self) -> None:
+    def __init__(self):
         """Initialize LagLeadFunction."""
         super().__init__("LagLeadFunction")
         self.error_intelligence = ErrorIntelligence()
-        self.rows_processed: int = 0
-        self.rows_failed: int = 0
-        self.nan_rows_created: int = 0
-        self.advanced_errors: List[str] = []
     
-    def _validate_input(self, **kwargs) -> Optional[WorkerError]:
-        """Validate input parameters before execution.
-        
-        Validates:
-        - DataFrame is provided and valid
-        - lag_periods is valid integer
-        - lead_periods is valid integer
-        - columns (if provided) exist and are numeric
-        
-        Returns:
-            WorkerError if validation fails, None if valid
-        """
-        # Check DataFrame
-        df = kwargs.get('df')
-        df_error = ValidationUtils.validate_dataframe(df)
-        if df_error:
-            return df_error
-        
-        # Check lag_periods
-        lag_periods = kwargs.get('lag_periods', DEFAULT_LAG)
-        if not isinstance(lag_periods, int):
-            return WorkerError(
-                ErrorType.TYPE_ERROR,
-                f"lag_periods must be integer, got {type(lag_periods).__name__}",
-                severity="error",
-                suggestion="Provide lag_periods as integer"
-            )
-        
-        if lag_periods < MIN_PERIODS or lag_periods > MAX_PERIODS:
-            return WorkerError(
-                ErrorType.VALUE_ERROR,
-                f"lag_periods must be between {MIN_PERIODS} and {MAX_PERIODS}, got {lag_periods}",
-                severity="error",
-                suggestion=f"Use value between {MIN_PERIODS} and {MAX_PERIODS}"
-            )
-        
-        # Check lead_periods
-        lead_periods = kwargs.get('lead_periods', DEFAULT_LEAD)
-        if not isinstance(lead_periods, int):
-            return WorkerError(
-                ErrorType.TYPE_ERROR,
-                f"lead_periods must be integer, got {type(lead_periods).__name__}",
-                severity="error",
-                suggestion="Provide lead_periods as integer"
-            )
-        
-        if lead_periods < MIN_PERIODS or lead_periods > MAX_PERIODS:
-            return WorkerError(
-                ErrorType.VALUE_ERROR,
-                f"lead_periods must be between {MIN_PERIODS} and {MAX_PERIODS}, got {lead_periods}",
-                severity="error",
-                suggestion=f"Use value between {MIN_PERIODS} and {MAX_PERIODS}"
-            )
-        
-        # Check columns if provided
-        columns = kwargs.get('columns')
-        if columns:
-            if isinstance(columns, str):
-                columns = [columns]
-            
-            col_error = ValidationUtils.validate_columns_exist(
-                df, columns, "lag/lead columns"
-            )
-            if col_error:
-                return col_error
-            
-            # Check columns are numeric
-            numeric_error = ValidationUtils.validate_numeric_columns(df, columns)
-            if numeric_error:
-                return numeric_error
-        else:
-            # Check that DataFrame has numeric columns
-            numeric_error = ValidationUtils.validate_numeric_columns(df)
-            if numeric_error:
-                return numeric_error
-        
-        return None
-    
-    def execute(self, **kwargs) -> WorkerResult:
+    def execute(
+        self,
+        df: pd.DataFrame = None,
+        lag_periods: int = 1,
+        lead_periods: int = 0,
+        columns: Optional[List[str]] = None,
+        **kwargs
+    ) -> WorkerResult:
         """Calculate lag and lead functions.
         
         Args:
             df: DataFrame to process
-            lag_periods: Number of periods to lag (default: 1)
-            lead_periods: Number of periods to lead (default: 0)
-            columns: Columns to apply lag/lead (default: all numeric)
+            lag_periods: Number of periods to lag
+            lead_periods: Number of periods to lead
+            columns: Columns to apply lag/lead
             
         Returns:
             WorkerResult with lag/lead results
-            
-        Raises:
-            Exception: Caught and handled by safe_execute wrapper
         """
         try:
-            result = self._run_lag_lead(**kwargs)
-            
-            # Track success with error intelligence
-            context = {
-                "lag_periods": kwargs.get('lag_periods', DEFAULT_LAG),
-                "lead_periods": kwargs.get('lead_periods', DEFAULT_LEAD),
-                "success": result.success,
-                "quality_score": result.quality_score,
-                "advanced_errors": len(self.advanced_errors),
-            }
-            
-            if self.advanced_errors:
-                context["error_types"] = list(set(self.advanced_errors))
+            result = self._run_lag_lead(df, lag_periods, lead_periods, columns, **kwargs)
             
             self.error_intelligence.track_success(
                 agent_name="aggregator",
                 worker_name="LagLeadFunction",
                 operation="lag_lead_functions",
-                context=context
+                context={"lag_periods": lag_periods, "lead_periods": lead_periods}
             )
             
             return result
             
         except Exception as e:
-            # Track error with error intelligence
             self.error_intelligence.track_error(
                 agent_name="aggregator",
                 worker_name="LagLeadFunction",
                 error_type=type(e).__name__,
                 error_message=str(e),
-                context={
-                    "lag_periods": kwargs.get('lag_periods', DEFAULT_LAG),
-                    "lead_periods": kwargs.get('lead_periods', DEFAULT_LEAD),
-                    "rows_processed": self.rows_processed,
-                    "rows_failed": self.rows_failed,
-                    "advanced_errors": len(self.advanced_errors),
-                }
+                context={"lag_periods": lag_periods, "lead_periods": lead_periods}
             )
             raise
     
-    def _run_lag_lead(self, **kwargs) -> WorkerResult:
-        """Calculate lag and lead functions.
+    def _run_lag_lead(self, df, lag_periods, lead_periods, columns, **kwargs) -> WorkerResult:
+        """Calculate lag and lead functions."""
+        result = self._create_result(task_type="lag_lead_functions")
         
-        Returns:
-            WorkerResult with lag/lead results or errors
-        """
-        df = kwargs.get('df')
-        lag_periods = kwargs.get('lag_periods', DEFAULT_LAG)
-        lead_periods = kwargs.get('lead_periods', DEFAULT_LEAD)
-        columns = kwargs.get('columns')
-        
-        # Reset counters
-        self.rows_processed = len(df) if df is not None else 0
-        self.rows_failed = 0
-        self.nan_rows_created = 0
-        self.advanced_errors = []
-        
-        result = self._create_result(
-            task_type="lag_lead_functions",
-            quality_score=1.0
-        )
-        
-        self.logger.info(
-            f"Computing lag/lead: lag_periods={lag_periods}, lead_periods={lead_periods}"
-        )
+        if df is None:
+            self._add_error(result, ErrorType.VALIDATION_ERROR, "df required")
+            result.success = False
+            return result
         
         try:
-            # Get numeric columns
+            # FIX #3: Check for date format errors
+            date_columns = df.select_dtypes(include=['datetime64']).columns.tolist()
+            
+            if len(date_columns) > 0:
+                self.logger.info(f"Found date columns: {date_columns}")
+                
+                # Validate date format
+                for col in date_columns:
+                    try:
+                        # Try to convert to datetime
+                        converted = pd.to_datetime(df[col], errors='coerce')
+                        if converted is None:
+                            self._add_error(
+                                result,
+                                ErrorType.VALIDATION_ERROR,
+                                f"Date conversion failed for column '{col}'",
+                                severity="error",
+                                suggestion="Provide dates in format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS"
+                            )
+                            result.success = False
+                            return result
+                        # Check if conversion lost data (values that became NaT that weren't before)
+                        invalid_dates = converted.isna().sum() - df[col].isna().sum()
+                        
+                        if invalid_dates > 0:
+                            self._add_error(
+                                result,
+                                ErrorType.VALIDATION_ERROR,
+                                f"Column '{col}' has {invalid_dates} invalid date formats",
+                                severity="error",
+                                suggestion="Provide dates in format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS"
+                            )
+                            result.success = False
+                            return result
+                    except Exception as e:
+                        self._add_error(
+                            result,
+                            ErrorType.VALIDATION_ERROR,
+                            f"Date validation failed for '{col}': {e}",
+                            severity="error",
+                            suggestion="Check date format matches YYYY-MM-DD"
+                        )
+                        result.success = False
+                        return result
+            
             numeric_df = df.select_dtypes(include=[np.number])
             
-            if numeric_df.empty:
-                self._add_error(
-                    result,
-                    ErrorType.MISSING_DATA,
-                    "No numeric columns found in DataFrame",
-                    severity="error",
-                    suggestion="DataFrame must contain numeric columns for lag/lead operations"
-                )
+            if numeric_df is None or numeric_df.empty:
+                self._add_error(result, ErrorType.LOAD_ERROR, "No numeric columns found")
                 result.success = False
-                result.quality_score = 0
                 return result
             
-            # Filter to specified columns if provided
-            if columns:
-                if isinstance(columns, str):
-                    columns = [columns]
+            if lag_periods < 0:
+                self._add_error(result, ErrorType.VALIDATION_ERROR, "lag_periods must be >= 0")
+                result.success = False
+                return result
+            
+            if lead_periods < 0:
+                self._add_error(result, ErrorType.VALIDATION_ERROR, "lead_periods must be >= 0")
+                result.success = False
+                return result
+            
+            if columns is not None:
                 numeric_df = numeric_df[[col for col in columns if col in numeric_df.columns]]
             
-            # Calculate lag and lead with error handling
-            try:
-                lag_results = None
-                lead_results = None
-                nan_count = 0
-                
-                if lag_periods > 0:
-                    lag_results = numeric_df.shift(lag_periods)
-                    nan_count += lag_results.isna().sum().sum()
-                
-                if lead_periods > 0:
-                    lead_results = numeric_df.shift(-lead_periods)
-                    nan_count += lead_results.isna().sum().sum()
-            except Exception as shift_error:
-                self.logger.error(f"Shift operation failed: {shift_error}")
-                self._add_error(
-                    result,
-                    ErrorType.COMPUTATION_ERROR,
-                    f"Shift operation failed: {str(shift_error)}",
-                    severity="critical"
-                )
-                self.advanced_errors.append("shift_error")
-                result.success = False
-                result.quality_score = 0
-                return result
+            lag_results = {}
+            lead_results = {}
             
-            # Count rows with any NaN values (created by shift)
             if lag_periods > 0:
-                lag_nan_rows = int(lag_results.isna().any(axis=1).sum())
-            else:
-                lag_nan_rows = 0
+                lag_results = numeric_df.shift(lag_periods)
             
             if lead_periods > 0:
+                lead_results = numeric_df.shift(-lead_periods)
+            
+            # Calculate safely with None checks
+            lag_nan_rows = 0
+            lead_nan_rows = 0
+            total_null = 0
+            
+            if lag_periods > 0 and lag_results is not None:
+                lag_nan_rows = int(lag_results.isna().any(axis=1).sum())
+                total_null += int(lag_results.isna().sum().sum())
+            
+            if lead_periods > 0 and lead_results is not None:
                 lead_nan_rows = int(lead_results.isna().any(axis=1).sum())
-            else:
-                lead_nan_rows = 0
+                total_null += int(lead_results.isna().sum().sum())
             
-            self.nan_rows_created = lag_nan_rows + lead_nan_rows
-            
-            if self.nan_rows_created > 0:
-                self._add_warning(
-                    result,
-                    f"Lag/lead operations created {self.nan_rows_created} rows with NaN values. "
-                    f"First {lag_periods} rows are NaN for lag, last {lead_periods} for lead."
-                )
-            
-            # Build result data
             result.data = {
                 "lag_periods": lag_periods,
                 "lead_periods": lead_periods,
                 "columns_processed": numeric_df.columns.tolist(),
-                "columns_count": len(numeric_df.columns),
                 "rows_processed": len(numeric_df),
-                "lag_nan_rows_created": lag_nan_rows,
-                "lead_nan_rows_created": lead_nan_rows,
-                "total_nan_values_created": int(nan_count),
-                "operation_description": f"Lag {lag_periods} periods + Lead {lead_periods} periods",
-                "advanced_errors_encountered": len(self.advanced_errors),
-                "advanced_error_types": list(set(self.advanced_errors)) if self.advanced_errors else [],
+                "lag_nan_rows": lag_nan_rows,
+                "lead_nan_rows": lead_nan_rows,
+                "total_null_values": total_null
             }
             
-            # Calculate quality score
-            quality_score = self._calculate_quality_score(
-                rows_processed=self.rows_processed,
-                rows_failed=self.rows_failed,
-                nan_rows_created=self.nan_rows_created,
-                advanced_errors=len(self.advanced_errors)
-            )
-            result.quality_score = quality_score
-            result.success = True
-            
-            self.logger.info(
-                f"Lag/lead completed: {len(numeric_df.columns)} columns, "
-                f"{len(numeric_df)} rows, {self.nan_rows_created} NaN rows, "
-                f"quality score: {quality_score:.3f}"
-            )
-            
-            return result
-        
-        except MemoryError:
-            self.logger.error("Memory error during lag/lead operation")
-            self._add_error(
-                result,
-                ErrorType.COMPUTATION_ERROR,
-                "Insufficient memory for lag/lead operation",
-                severity="critical"
-            )
-            self.advanced_errors.append("memory_error")
-            result.success = False
-            result.quality_score = 0
+            logger.info(f"Lag/Lead functions: lag={lag_periods}, lead={lead_periods}")
             return result
         
         except Exception as e:
-            self.logger.error(f"Lag/lead functions failed: {e}")
-            self._add_error(
-                result,
-                ErrorType.COMPUTATION_ERROR,
-                str(e),
-                severity="critical",
-                details={
-                    "exception_type": type(e).__name__,
-                    "rows_processed": self.rows_processed,
-                    "rows_failed": self.rows_failed
-                },
-                suggestion="Check DataFrame structure and numeric column existence"
-            )
+            self._add_error(result, ErrorType.LOAD_ERROR, f"Lag/Lead functions failed: {e}")
             result.success = False
-            result.quality_score = 0
             return result
-    
-    def _calculate_quality_score(
-        self,
-        rows_processed: int,
-        rows_failed: int,
-        nan_rows_created: int = 0,
-        advanced_errors: int = 0
-    ) -> float:
-        """Calculate quality score based on shift operations.
-        
-        Args:
-            rows_processed: Rows successfully processed
-            rows_failed: Rows that failed
-            nan_rows_created: Rows with NaN created by shift
-            advanced_errors: Count of advanced error types
-            
-        Returns:
-            Quality score from 0.0 to 1.0
-        """
-        # Base quality from processing
-        total_rows = rows_processed + rows_failed
-        
-        if total_rows == 0:
-            return 1.0
-        
-        base_quality = rows_processed / total_rows
-        
-        # Penalty for NaN rows (expected behavior of shift, small penalty)
-        nan_penalty = min(0.15, (nan_rows_created / rows_processed) * 0.2) if rows_processed > 0 else 0
-        
-        # Penalty for advanced errors
-        error_penalty = min(0.1, advanced_errors * 0.05)
-        
-        quality_score = max(0.0, base_quality - nan_penalty - error_penalty)
-        
-        return min(1.0, quality_score)
