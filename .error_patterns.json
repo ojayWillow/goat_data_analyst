@@ -1,21 +1,48 @@
 {
-  "TestAgent": {
-    "total_runs": 2,
-    "successes": 1,
-    "failures": 1,
+  "report_generator": {
+    "total_runs": 134,
+    "successes": 132,
+    "failures": 2,
     "workers": {
-      "TestWorker": {
-        "successes": 1,
-        "failures": 1,
+      "TopicAnalyzer": {
+        "successes": 15,
+        "failures": 0,
+        "errors": []
+      },
+      "ChartMapper": {
+        "successes": 93,
+        "failures": 0,
+        "errors": []
+      },
+      "ChartSelector": {
+        "successes": 12,
+        "failures": 2,
         "errors": [
           {
-            "timestamp": "2025-12-11T22:41:37.494021",
-            "error_type": "TestError",
-            "error_message": "This is a test error",
+            "timestamp": "2025-12-13T14:08:12.624056",
+            "error_type": "ValueError",
+            "error_message": "No available charts provided",
+            "data_type": null,
+            "context": {}
+          },
+          {
+            "timestamp": "2025-12-13T14:08:13.628355",
+            "error_type": "ValueError",
+            "error_message": "No available charts provided",
             "data_type": null,
             "context": {}
           }
         ]
+      },
+      "ReportFormatter": {
+        "successes": 10,
+        "failures": 0,
+        "errors": []
+      },
+      "CustomizationEngine": {
+        "successes": 2,
+        "failures": 0,
+        "errors": []
       }
     }
   }
