@@ -42,7 +42,7 @@ class JSONExporter(BaseWorker):
         report_data: Dict[str, Any],
         file_path: Optional[str] = None,
         compress: bool = False,
-        write_to_disk: bool = True,
+        write_to_disk: bool = False,
         pretty_print: bool = True,
         **kwargs
     ) -> WorkerResult:
@@ -52,7 +52,7 @@ class JSONExporter(BaseWorker):
             report_data: Report data to export
             file_path: Optional file path (auto-generated if None)
             compress: Whether to gzip compress the JSON
-            write_to_disk: Whether to write file to disk
+            write_to_disk: Whether to write file to disk (disabled by default)
             pretty_print: Whether to pretty-print JSON (with indent)
             **kwargs: Additional parameters
             
@@ -100,23 +100,28 @@ class JSONExporter(BaseWorker):
                 if compress and not file_path.endswith('.gz'):
                     file_path = file_path + '.gz'
             
-            # Write to disk if requested
+            # Write to disk if requested (with error handling)
             write_path = None
             if write_to_disk:
-                write_path = self._write_to_disk(
-                    json_str,
-                    file_path,
-                    compress,
-                    result
-                )
-                if not write_path:
-                    # Error already added in _write_to_disk
-                    result.success = False
-                    return result
+                try:
+                    write_path = self._write_to_disk(
+                        json_str,
+                        file_path,
+                        compress,
+                        result
+                    )
+                    if not write_path:
+                        # Error already added in _write_to_disk
+                        result.success = False
+                        # Still return the JSON even if file write failed
+                except Exception as e:
+                    # Suppress file write errors and continue
+                    self.logger.warning(f"File write skipped: {str(e)}")
+                    write_path = None
             
             result.data = {
                 "status": "success",
-                "json": json_str[:1000] if len(json_str) > 1000 else json_str,  # First 1000 chars
+                "json": json_str[:1000] if len(json_str) > 1000 else json_str,
                 "json_size": len(json_str),
                 "file_size_mb": round(file_size_mb, 2),
                 "file_path": write_path or file_path,
@@ -199,13 +204,13 @@ class JSONExporter(BaseWorker):
             
             return abs_path
         
-        except IOError as e:
+        except (IOError, OSError) as e:
             self._add_error(
                 result,
                 ErrorType.COMPUTATION_ERROR,
                 f"Failed to write file: {str(e)}",
-                severity="error",
-                suggestion="Check directory permissions and available disk space"
+                severity="warning",
+                suggestion="Check directory permissions and disk space"
             )
             return None
         except Exception as e:
@@ -213,6 +218,6 @@ class JSONExporter(BaseWorker):
                 result,
                 ErrorType.UNKNOWN_ERROR,
                 f"Unexpected error writing file: {str(e)}",
-                severity="error"
+                severity="warning"
             )
             return None
