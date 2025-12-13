@@ -134,16 +134,30 @@ class PivotWorker(BaseWorker):
                 aggfunc=aggfunc
             ).reset_index()
             
-            result.data = {
-                "pivot_data": pivot.to_dict(orient='records'),
-                "shape": pivot.shape,
-                "rows": pivot.shape[0],
-                "columns": pivot.shape[1],
-                "index": index,
-                "columns_field": columns,
-                "values": values,
-                "aggfunc": aggfunc,
-            }
+            pivot_data: List[Dict[str, Any]] = pivot.to_dict(orient='records')
+            
+            if pivot_data:
+                result.data = {
+                    "pivot_data": pivot_data,
+                    "shape": pivot.shape,
+                    "rows": pivot.shape[0],
+                    "columns": pivot.shape[1],
+                    "index": index,
+                    "columns_field": columns,
+                    "values": values,
+                    "aggfunc": aggfunc,
+                }
+            else:
+                self._add_error(
+                    result,
+                    ErrorType.MISSING_DATA,
+                    "Pivot table produced no data",
+                    severity="error",
+                    suggestion="Check input data and parameters"
+                )
+                result.success = False
+                result.quality_score = 0
+                return result
             
             self.logger.info(f"Pivot table created: {pivot.shape[0]} rows x {pivot.shape[1]} columns")
             return result
