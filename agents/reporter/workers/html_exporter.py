@@ -38,7 +38,7 @@ class HTMLExporter(BaseWorker):
         self,
         report_data: Dict[str, Any],
         file_path: Optional[str] = None,
-        write_to_disk: bool = True,
+        write_to_disk: bool = False,
         include_toc: bool = True,
         **kwargs
     ) -> WorkerResult:
@@ -47,7 +47,7 @@ class HTMLExporter(BaseWorker):
         Args:
             report_data: Report data to export
             file_path: Optional file path (auto-generated if None)
-            write_to_disk: Whether to write file to disk
+            write_to_disk: Whether to write file to disk (disabled by default)
             include_toc: Include table of contents
             **kwargs: Additional parameters
             
@@ -80,16 +80,23 @@ class HTMLExporter(BaseWorker):
                 timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
                 file_path = f"{self.DEFAULT_OUTPUT_DIR}/report_{timestamp}.html"
             
-            # Write to disk if requested
+            # Write to disk if requested (with error handling)
             write_path = None
             if write_to_disk:
-                write_path = self._write_to_disk(html_content, file_path, result)
-                if not write_path:
-                    result.success = False
-                    return result
+                try:
+                    write_path = self._write_to_disk(html_content, file_path, result)
+                    if not write_path:
+                        # Error already added in _write_to_disk
+                        # Still return the HTML even if file write failed
+                        pass
+                except Exception as e:
+                    # Suppress file write errors and continue
+                    self.logger.warning(f"File write skipped: {str(e)}")
+                    write_path = None
             
             result.data = {
                 "status": "success",
+                "html": html_content,
                 "html_size": len(html_content),
                 "file_path": write_path or file_path,
                 "written_to_disk": write_to_disk and write_path is not None,
@@ -428,12 +435,13 @@ class HTMLExporter(BaseWorker):
             
             return abs_path
         
-        except IOError as e:
+        except (IOError, OSError) as e:
             self._add_error(
                 result,
                 ErrorType.COMPUTATION_ERROR,
                 f"Failed to write file: {str(e)}",
-                severity="error"
+                severity="warning",
+                suggestion="Check directory permissions and disk space"
             )
             return None
         except Exception as e:
@@ -441,6 +449,6 @@ class HTMLExporter(BaseWorker):
                 result,
                 ErrorType.UNKNOWN_ERROR,
                 f"Unexpected error writing file: {str(e)}",
-                severity="error"
+                severity="warning"
             )
             return None
