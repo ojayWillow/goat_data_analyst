@@ -113,7 +113,7 @@ class ValueCountWorker(BaseWorker):
             
             vc = df[column].value_counts().head(top_n)
             
-            result_list = []
+            result_list: List[Dict[str, Any]] = []
             for value, count in vc.items():
                 pct = (count / len(df)) * 100
                 result_list.append({
@@ -122,16 +122,28 @@ class ValueCountWorker(BaseWorker):
                     "percentage": round(pct, 2),
                 })
             
-            result.data = {
-                "value_counts": result_list,
-                "column": column,
-                "total_unique": df[column].nunique(),
-                "top_n": top_n,
-                "results_returned": len(result_list),
-                "total_rows": len(df),
-                "null_count": int(df[column].isna().sum()),
-                "null_percentage": round((df[column].isna().sum() / len(df)) * 100, 2),
-            }
+            if result_list:
+                result.data = {
+                    "value_counts": result_list,
+                    "column": column,
+                    "total_unique": df[column].nunique(),
+                    "top_n": top_n,
+                    "results_returned": len(result_list),
+                    "total_rows": len(df),
+                    "null_count": int(df[column].isna().sum()),
+                    "null_percentage": round((df[column].isna().sum() / len(df)) * 100, 2),
+                }
+            else:
+                self._add_error(
+                    result,
+                    ErrorType.MISSING_DATA,
+                    "No results available after processing",
+                    severity="error",
+                    suggestion="Ensure column contains valid values"
+                )
+                result.success = False
+                result.quality_score = 0
+                return result
             
             self.logger.info(f"Value counts completed: {len(result_list)} values shown")
             return result
