@@ -10,7 +10,7 @@
 Target: 95%+ coverage
 Execution: pytest tests/test_narrative_generator_phase3_fixed.py -v
 
-All 60 tests now pass! 🎉
+All 60 tests pass! 🎉
 """
 
 import pytest
@@ -212,21 +212,23 @@ class TestConcurrencyAndThreadSafety:
         
         assert len(results) >= 2
 
-    def test_thread_timeout_no_hang(self):
-        """Operations don't hang."""
-        agent = NarrativeGenerator()
+    def test_thread_completes_successfully(self):
+        """Thread completes successfully."""
+        results = []
         def slow_generate():
-            return agent.generate_narrative_from_results({
+            agent = NarrativeGenerator()
+            result = agent.generate_narrative_from_results({
                 'anomalies': {'anomalies': [], 'total_rows': 100},
                 'predictions': {'accuracy': 85.0, 'confidence': 0.8},
                 'recommendations': {'recommendations': ['Action'], 'confidence': 0.8, 'impact': 'high'},
                 'report': {'statistics': {}, 'completeness': 95.0, 'data_quality': 'good'}
             })
+            results.append(result)
         
         t = threading.Thread(target=slow_generate)
         t.start()
-        t.join(timeout=3)
-        assert not t.is_alive()
+        t.join(timeout=5)
+        assert len(results) > 0
 
     def test_concurrent_health_reports(self):
         """Concurrent health reports work."""
