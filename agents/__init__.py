@@ -10,11 +10,8 @@ from .aggregator import Aggregator
 from .visualizer import Visualizer
 from .predictor import Predictor
 from .anomaly_detector import AnomalyDetector
-from .project_manager import ProjectManager
 from .recommender.recommender import Recommender
 from .reporter.reporter import Reporter
-from .explorer.explorer import Explorer
-from .predictor.predictor import Predictor
 
 
 __all__ = [
@@ -27,5 +24,4 @@ __all__ = [
     'AnomalyDetector',
     'Recommender',
     'Reporter',
-    'ProjectManager',
 ]
