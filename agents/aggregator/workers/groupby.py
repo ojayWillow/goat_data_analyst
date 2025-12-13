@@ -125,12 +125,26 @@ class GroupByWorker(BaseWorker):
                 result.quality_score = 0
                 return result
             
-            result.data = {
-                "grouped_data": aggregated.to_dict(orient='records'),
-                "groups_count": len(aggregated),
-                "group_columns": group_cols,
-                "aggregation_specs": agg_specs,
-            }
+            grouped_data: List[Dict[str, Any]] = aggregated.to_dict(orient='records')
+            
+            if grouped_data:
+                result.data = {
+                    "grouped_data": grouped_data,
+                    "groups_count": len(aggregated),
+                    "group_columns": group_cols,
+                    "aggregation_specs": agg_specs,
+                }
+            else:
+                self._add_error(
+                    result,
+                    ErrorType.MISSING_DATA,
+                    "No grouped data produced",
+                    severity="error",
+                    suggestion="Check grouping columns and aggregation specs"
+                )
+                result.success = False
+                result.quality_score = 0
+                return result
             
             self.logger.info(f"Grouped into {len(aggregated)} groups")
             return result
