@@ -81,6 +81,16 @@ class LagLeadFunction(BaseWorker):
                     try:
                         # Try to convert to datetime
                         converted = pd.to_datetime(df[col], errors='coerce')
+                        if converted is None:
+                            self._add_error(
+                                result,
+                                ErrorType.VALIDATION_ERROR,
+                                f"Date conversion failed for column '{col}'",
+                                severity="error",
+                                suggestion="Provide dates in format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS"
+                            )
+                            result.success = False
+                            return result
                         # Check if conversion lost data (values that became NaT that weren't before)
                         invalid_dates = converted.isna().sum() - df[col].isna().sum()
                         
@@ -107,7 +117,7 @@ class LagLeadFunction(BaseWorker):
             
             numeric_df = df.select_dtypes(include=[np.number])
             
-            if numeric_df.empty:
+            if numeric_df is None or numeric_df.empty:
                 self._add_error(result, ErrorType.LOAD_ERROR, "No numeric columns found")
                 result.success = False
                 return result
@@ -134,14 +144,27 @@ class LagLeadFunction(BaseWorker):
             if lead_periods > 0:
                 lead_results = numeric_df.shift(-lead_periods)
             
+            # Calculate safely with None checks
+            lag_nan_rows = 0
+            lead_nan_rows = 0
+            total_null = 0
+            
+            if lag_periods > 0 and lag_results is not None:
+                lag_nan_rows = int(lag_results.isna().any(axis=1).sum())
+                total_null += int(lag_results.isna().sum().sum())
+            
+            if lead_periods > 0 and lead_results is not None:
+                lead_nan_rows = int(lead_results.isna().any(axis=1).sum())
+                total_null += int(lead_results.isna().sum().sum())
+            
             result.data = {
                 "lag_periods": lag_periods,
                 "lead_periods": lead_periods,
                 "columns_processed": numeric_df.columns.tolist(),
                 "rows_processed": len(numeric_df),
-                "lag_nan_rows": int(lag_results.isna().any(axis=1).sum()) if lag_periods > 0 else 0,
-                "lead_nan_rows": int(lead_results.isna().any(axis=1).sum()) if lead_periods > 0 else 0,
-                "total_null_values": int(lag_results.isna().sum().sum() + lead_results.isna().sum().sum())
+                "lag_nan_rows": lag_nan_rows,
+                "lead_nan_rows": lead_nan_rows,
+                "total_null_values": total_null
             }
             
             logger.info(f"Lag/Lead functions: lag={lag_periods}, lead={lead_periods}")
