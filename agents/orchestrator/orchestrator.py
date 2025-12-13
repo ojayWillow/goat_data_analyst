@@ -31,7 +31,7 @@ from enum import Enum
 
 from core.logger import get_logger
 from core.structured_logger import get_structured_logger
-from core.exceptions import OrchestratorError, ValidationError
+from core.exceptions import OrchestratorError, DataValidationError
 from core.error_recovery import retry_on_error
 from core.validators import validate_output
 
@@ -239,11 +239,11 @@ class Orchestrator:
         
         Raises:
             OrchestratorError: If registration fails
-            ValidationError: If agent instance invalid
+            DataValidationError: If agent instance invalid
         """
         try:
             if not hasattr(agent_instance, 'name'):
-                raise ValidationError(
+                raise DataValidationError(
                     f"Agent must have 'name' attribute; {agent_name} missing it"
                 )
             
@@ -411,7 +411,7 @@ class Orchestrator:
         
         Raises:
             OrchestratorError: If task execution fails
-            ValidationError: If parameters invalid
+            DataValidationError: If parameters invalid
         """
         task_start = datetime.now(timezone.utc)
         task_id = f"task_{task_start.timestamp()}"
@@ -495,15 +495,15 @@ class Orchestrator:
             task: Task dict
         
         Raises:
-            ValidationError: If validation fails
+            DataValidationError: If validation fails
         """
         if not task.get('type'):
-            raise ValidationError("Task must have 'type' field")
+            raise DataValidationError("Task must have 'type' field")
         
         required_agents = self._get_required_agents(task['type'])
         for agent_name in required_agents:
             if not self.agent_registry.is_registered(agent_name):
-                raise ValidationError(
+                raise DataValidationError(
                     f"Required agent '{agent_name}' not registered "
                     f"for task type '{task['type']}'"
                 )
