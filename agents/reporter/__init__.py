@@ -1,3 +1,3 @@
-from .reporter import Reporter
+from .reporter import Reporter, ReportCache
 
-__all__ = ['Reporter']
+__all__ = ['Reporter', 'ReportCache']
